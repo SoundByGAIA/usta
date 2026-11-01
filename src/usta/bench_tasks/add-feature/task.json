@@ -1,0 +1,9 @@
+{
+  "prompt": "todo.py içindeki TodoList sınıfına şunları ekle: complete(index) (maddeyi tamamlandı yapar; geçersiz indekste IndexError, zaten tamamlanmışsa ValueError), pending() (tamamlanmamış maddelerin başlıklarını sırayla liste olarak döndürür), to_json() (metin döndürür) ve from_json(text) (sınıf metodu, to_json çıktısından aynı listeyi kurar). Mevcut davranışı bozma.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

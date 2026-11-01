@@ -1,0 +1,9 @@
+{
+  "prompt": "test_cart.py başarısız. Nedenini bul ve düzelt. pricing.py başka yerlerde de kullanılıyor, davranışı değişmemeli.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

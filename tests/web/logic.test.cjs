@@ -1,0 +1,156 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const L = require(path.resolve(__dirname, "../../src/usta/web/logic.js"));
+
+function collect(chunks) {
+  const out = [];
+  const p = L.createSSEParser((e) => out.push(e));
+  for (const c of chunks) p.feed(c);
+  return out;
+}
+
+test("sse: tek olay", () => {
+  assert.deepEqual(collect(['id: 3\nevent: message\ndata: {"a":1}\n\n']), [
+    { id: "3", event: "message", data: '{"a":1}' },
+  ]);
+});
+
+test("sse: olay parçalara bölünse de birleşir", () => {
+  const whole = 'id: 1\nevent: done\ndata: {"x":"ü"}\n\n';
+  for (let cut = 1; cut < whole.length; cut++) {
+    const got = collect([whole.slice(0, cut), whole.slice(cut)]);
+    assert.equal(got.length, 1, `kesim ${cut}`);
+    assert.equal(got[0].event, "done");
+  }
+});
+
+test("sse: CRLF, yorum (keepalive) ve çoklu data satırı", () => {
+  const got = collect([": keepalive\r\n\r\nevent: m\r\ndata: a\r\ndata: b\r\n\r\n"]);
+  assert.deepEqual(got, [{ id: null, event: "m", data: "a\nb" }]);
+});
+
+test("sse: yalnız yorumdan olay çıkmaz; yarım olay bekler", () => {
+  assert.deepEqual(collect([": x\n\n"]), []);
+  assert.deepEqual(collect(["event: a\ndata: 1\n"]), []);
+});
+
+test("sse: ardışık olaylar", () => {
+  const got = collect(["event: a\ndata: 1\n\nevent: b\ndata: 2\n\n"]);
+  assert.deepEqual(got.map((e) => e.event), ["a", "b"]);
+});
+
+const DIFF = [
+  "--- a/a.txt", "+++ b/a.txt", "@@ -1,2 +1,2 @@", " bir", "-iki", "+2",
+  "--- /dev/null", "+++ b/yeni.py", "@@ -0,0 +1 @@", "+print(1)",
+  "--- a/sil.txt", "+++ /dev/null", "@@ -1 +0,0 @@", "-gidecek",
+  "Binary files a/b.bin and b/b.bin differ",
+  "",
+].join("\n");
+
+test("diff: dosyalar ve durumlar", () => {
+  const files = L.parseDiff(DIFF);
+  assert.deepEqual(files.map((f) => [f.name, f.status]), [
+    ["a.txt", "modified"], ["yeni.py", "added"], ["sil.txt", "deleted"], ["b.bin", "binary"],
+  ]);
+});
+
+test("diff: satır türleri", () => {
+  const f = L.parseDiff(DIFF)[0];
+  assert.deepEqual(f.lines.map((l) => l.kind), ["hunk", "ctx", "del", "add"]);
+  assert.equal(f.lines[2].text, "iki");
+  assert.deepEqual(L.parseDiff(DIFF)[0].stats, { add: 1, del: 1 });
+});
+
+test("diff: boş girdi", () => {
+  assert.deepEqual(L.parseDiff(""), []);
+});
+
+test("diff: '+++' ile başlayan içerik satırı dosya başlığı sanılmaz", () => {
+  const d = ["--- a/x", "+++ b/x", "@@ -1 +1 @@", "-a", "+++ b", ""].join("\n");
+  const f = L.parseDiff(d);
+  assert.equal(f.length, 1);
+  assert.deepEqual(f[0].lines.map((l) => l.kind), ["hunk", "del", "add"]);
+});
+
+test("diff: 'Dosya sonu satırı yok' notu meta olur", () => {
+  const d = ["--- a/x", "+++ b/x", "@@ -1 +1 @@", "-a", "+b", "\\ Dosya sonu satırı yok", ""].join("\n");
+  assert.equal(L.parseDiff(d)[0].lines.at(-1).kind, "meta");
+});
+
+test("özet: mesaj, araç, red, onay, bitiş", () => {
+  assert.deepEqual(L.summarize("message", { content: "selam" }), { kind: "assistant", title: "", body: "selam" });
+  const tc = L.summarize("tool_call", { tool: "write_file", args: { path: "a.py", content: "x" } });
+  assert.equal(tc.kind, "tool"); assert.match(tc.title, /write_file/); assert.match(tc.title, /a\.py/);
+  assert.equal(L.summarize("denied", { tool: "run" }).kind, "warn");
+  const ap = L.summarize("approval_required", { approval_id: "z", tool: "web_search", args: { query: "q" } });
+  assert.equal(ap.kind, "approval"); assert.equal(ap.approvalId, "z");
+  assert.equal(L.summarize("done", { status: "cancelled", answer: "" }).kind, "status");
+  assert.equal(L.summarize("done", { status: "failed", error: "model isteği başarısız" }).kind, "error");
+  assert.equal(L.summarize("bilinmeyen", {}).kind, "meta");
+});
+
+test("özet: uzun araç sonucu kırpılır, tam metin kaybolmaz uyarısı", () => {
+  const s = L.summarize("tool_result", { tool: "read_file", result: "x".repeat(5000) });
+  assert.ok(s.body.length < 1500 && s.body.includes("kırpıldı"));
+});
+
+test("durum etiketleri", () => {
+  assert.equal(L.isActive("running"), true);
+  assert.equal(L.isActive("awaiting_approval"), true);
+  assert.equal(L.isActive("cancelling"), true);
+  assert.equal(L.isActive("done"), false);
+  assert.equal(L.isActive("failed"), false);
+});
+
+test("jeton başlığı", () => {
+  assert.deepEqual(L.authHeaders("abc"), { Authorization: "Bearer abc" });
+  assert.deepEqual(L.authHeaders(""), {});
+});
+
+test("uyarı olayı (ör. MCP sunucusu başlamadı) uyarı olarak görünür", () => {
+  const s = L.summarize("warning", { message: "MCP sunucusu 'x' başlatılamadı: komut bulunamadı" });
+  assert.equal(s.kind, "warn");
+  assert.ok(s.title.includes("komut bulunamadı"));
+  assert.equal(L.summarize("warning", {}).title, "Uyarı");
+  assert.ok(L.summarize("warning", { message: "a".repeat(1000) }).title.length <= 300);
+});
+
+test("token biçimlendirme", () => {
+  assert.equal(L.formatTokens(0), "0");
+  assert.equal(L.formatTokens(812), "812");
+  assert.equal(L.formatTokens(1234), "1,2K");
+  assert.equal(L.formatTokens(15600), "15,6K");
+  assert.equal(L.formatTokens(2500000), "2,5M");
+  assert.equal(L.formatTokens(-5), "0");
+  assert.equal(L.formatTokens("x"), "0");
+});
+
+test("token sayacı metni ve bağlam doluluğu", () => {
+  const u = { prompt: 11000, completion: 1300, requests: 4, context: 4100 };
+  const a = L.usageText(u, null);
+  assert.equal(a.text, "12,3K token (girdi 11K, çıktı 1,3K) · 4 istek");
+  assert.equal(a.context, "bağlam 4,1K");
+  assert.equal(a.pct, null);
+  const b = L.usageText(u, 8192);
+  assert.equal(b.context, "bağlam 4,1K / 8,2K (%50)");
+  assert.equal(b.pct, 50);
+  assert.equal(L.usageText({ ...u, context: 7000 }, 8192).pct, 85);
+  assert.equal(L.usageText({ ...u, context: 99999 }, 8192).pct, 100);
+  assert.equal(L.usageText(null, 8192), null);
+});
+
+test("usage olayı akışa düğüm eklemez, özet türü usage", () => {
+  assert.equal(L.summarize("usage", { prompt: 1, completion: 1, requests: 1, context: 1 }).kind, "usage");
+});
+
+test("autoScale: küçük pencere 1, büyük ekran orantılı, üst sınır 2", () => {
+  assert.equal(L.autoScale(1366, 768), 1);
+  assert.equal(L.autoScale(1920, 1080), 1);
+  assert.equal(L.autoScale(2560, 1440), 1.35);
+  assert.equal(L.autoScale(3440, 1300), 1.2);
+  assert.equal(L.autoScale(3840, 2160), 2);
+  assert.equal(L.autoScale(7680, 4320), 2);
+  assert.equal(L.autoScale(0, 0), 1);
+  assert.equal(L.autoScale(NaN, 900), 1);
+});

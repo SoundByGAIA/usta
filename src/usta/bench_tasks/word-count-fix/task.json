@@ -1,0 +1,9 @@
+{
+  "prompt": "text.py içindeki word_count(text) kelime sayısını yanlış buluyor: \"don't\" ve \"well-known\" tek kelime sayılmalı (kelime içindeki kesme işareti veya tire kelimeyi bölmez), Türkçe harfler (ç ğ ı ö ş ü) kelimenin parçasıdır. Mevcut davranış korunmalı: noktalama kelimeleri ayırır (\"a,b\" 2 kelime, \"hello...world\" 2 kelime), sayılar kelime sayılmaz.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

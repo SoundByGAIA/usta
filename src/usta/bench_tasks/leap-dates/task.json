@@ -1,0 +1,9 @@
+{
+  "prompt": "dates.py içinde takvim hataları var. Düzelt: yüzyıl yılları kuralı (1900 artık değil, 2000 artık, 2100 değil), geçersiz ay (1-12 dışı) için ValueError, ayın gün sayısını aşan gün veya 1'den küçük gün için ValueError. Geçerli girdilerde mevcut davranış korunmalı.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

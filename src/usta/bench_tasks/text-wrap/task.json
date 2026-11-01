@@ -1,0 +1,9 @@
+{
+  "prompt": "wrap.py içindeki wrap(text, width) fonksiyonunu yaz: metni en fazla width karakterlik satırlara bölüp satır listesi döndürür. Kelimeler boşlukla ayrılır, satır içi ardışık boşluklar tek boşluğa iner, satırların başı/sonu boşluksuz olur. width'ten uzun kelime width'lik parçalara bölünür. Boş satırla ayrılmış paragraflar korunur: aralarına tek bir '' elemanı konur. Boş/yalnız boşluk metin için []. width < 1 ise ValueError. Örnek: wrap('aa bb cc', 5) → ['aa bb', 'cc'].",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

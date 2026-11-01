@@ -1,0 +1,9 @@
+{
+  "prompt": "users.py içindeki get_user_name fonksiyonunu display_name olarak yeniden adlandır ve kodun tamamında (greeting.py, report.py, api.py) kullanımları güncelle. Yeni display_name, adın başındaki/sonundaki boşlukları da atmalı. Eski ad kalmamalı.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

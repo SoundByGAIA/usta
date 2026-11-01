@@ -1,0 +1,9 @@
+{
+  "prompt": "intervals.py içindeki merge_intervals(intervals) fonksiyonunu yaz. [başlangıç, bitiş] çiftlerinden oluşan listeyi alır, çakışan VE uç uca değen aralıkları birleştirir ve başlangıca göre sıralı, [başlangıç, bitiş] listelerinden oluşan yeni bir liste döndürür. Girdi değiştirilmemeli. Boş girdi için []. başlangıç > bitiş olan bir aralık varsa ValueError. Örnek: [[1,3],[2,6],[6,8]] → [[1,8]].",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

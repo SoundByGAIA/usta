@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Usta</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header>
+    <h1>Usta</h1>
+    <button id="tools-btn" type="button" aria-pressed="false">Araçlar</button>
+    <button id="apis-btn" type="button" aria-pressed="false">API'ler</button>
+    <form id="token-form" autocomplete="off">
+      <label for="token" class="sr">Jeton</label>
+      <input id="token" type="password" placeholder="Jeton (~/.usta/token)" autocomplete="off" spellcheck="false">
+      <button type="submit">Bağlan</button>
+    </form>
+    <label for="model-select" class="sr">Model</label>
+    <select id="model-select" title="Model (görevler arasında değiştirilir; uç nokta sabit)" hidden></select>
+    <label for="zoom" class="sr">Arayüz boyutu</label>
+    <select id="zoom" title="Arayüz boyutu: Otomatik pencere/ekran boyutuna uyar">
+      <option value="auto">Boyut: otomatik</option>
+      <option value="0.9">%90</option>
+      <option value="1">%100</option>
+      <option value="1.1">%110</option>
+      <option value="1.25">%125</option>
+      <option value="1.5">%150</option>
+      <option value="1.75">%175</option>
+    </select>
+    <label for="theme" class="sr">Tema</label>
+    <select id="theme" title="Tema (terminalle ortak)">
+      <option value="siyah">Siyah</option>
+      <option value="gri">Gri</option>
+      <option value="beyaz">Beyaz</option>
+    </select>
+    <span id="conn" role="status"></span>
+  </header>
+
+  <section id="apis" aria-label="API'ler" hidden>
+    <p class="note">Bağladığın API'lerin modelleri üstteki model listesinde görünür. İstemlerin ve açtığın dosyaların içeriği seçtiğin modelin API'sine gider. Anahtarlar yalnız bilgisayarında (<code>~/.usta/apis.json</code>, yalnız sen okuyabilirsin) durur ve ekranda bir daha gösterilmez.</p>
+    <h2>Bağlı API'ler</h2>
+    <div id="apis-list"></div>
+    <h2>API ekle</h2>
+    <form id="api-form" class="card" autocomplete="off">
+      <div class="key-row"><input id="api-name" placeholder="ad (ör. deepseek)" maxlength="30" pattern="[a-z0-9][a-z0-9_\-]{0,29}" required aria-label="API adı"></div>
+      <div class="key-row"><input id="api-endpoint" list="api-presets" placeholder="Uç nokta (ör. https://api.deepseek.com/v1)" required aria-label="Uç nokta"></div>
+      <datalist id="api-presets">
+        <option value="http://127.0.0.1:11434/v1">Ollama (yerel)</option>
+        <option value="https://api.deepseek.com/v1">DeepSeek</option>
+        <option value="https://openrouter.ai/api/v1">OpenRouter</option>
+        <option value="https://api.openai.com/v1">OpenAI</option>
+      </datalist>
+      <div class="key-row"><input id="api-key" type="password" placeholder="API anahtarı (yerel modelde boş bırak)" autocomplete="off" spellcheck="false" aria-label="API anahtarı"></div>
+      <div class="row"><button class="primary" type="submit">Ekle</button></div>
+    </form>
+    <p id="apis-msg" class="empty" role="status"></p>
+  </section>
+
+  <section id="tools" aria-label="Araçlar" hidden>
+    <h2>Beceriler</h2>
+    <p class="empty">Klasör: <code>~/.usta/skills</code>. Her beceri bir <code>.md</code> dosyasıdır (ilk satır açıklama). Mesajda veya terminalde <code>/ad</code> yazınca çalışır.</p>
+    <div id="skills-list"></div>
+    <div class="row"><button id="skill-upload" type="button">Beceri yükle (.md)</button></div>
+    <input id="skill-input" type="file" accept=".md,text/markdown" multiple hidden>
+    <p id="skills-msg" class="empty" role="status"></p>
+    <h2>MCP araçları</h2>
+    <p class="note">Ek araçlar (MCP sunucuları) bilgisayarında <strong>senin yetkilerinle</strong> çalışır; yalnız güvendiklerini ekle. Her çağrıları varsayılan olarak onayına sunulur.</p>
+    <div id="tools-installed"></div>
+    <h2>Eklenebilir</h2>
+    <div id="tools-catalog"></div>
+    <p id="tools-msg" class="empty" role="status"></p>
+  </section>
+
+  <main>
+    <aside aria-label="Çalışma alanları">
+      <h2>Çalışma alanları</h2>
+      <ul id="ws-list"></ul>
+      <form id="ws-form">
+        <label for="ws-name" class="sr">Yeni çalışma alanı adı</label>
+        <input id="ws-name" placeholder="yeni-alan" maxlength="40" pattern="[a-z0-9][a-z0-9_\-]{0,39}" required>
+        <button type="submit">Oluştur</button>
+      </form>
+      <h2 class="files-h">Dosyalar</h2>
+      <div class="files-bar">
+        <button id="f-refresh" type="button" title="Yenile" aria-label="Dosya listesini yenile">↻</button>
+        <button id="f-new-file" type="button" title="Yeni boş dosya" disabled>Yeni dosya</button>
+        <button id="f-new-dir" type="button" title="Yeni klasör" disabled>Yeni klasör</button>
+        <button id="f-up-files" type="button" title="Çalışma alanına dosya yükle" disabled>Dosya yükle</button>
+        <button id="f-up-dir" type="button" title="Klasörü (alt klasörleriyle) çalışma alanına yükle" disabled>Klasör yükle</button>
+      </div>
+      <form id="fs-form" class="fs-form" hidden autocomplete="off">
+        <label id="fs-label" for="fs-input" class="empty"></label>
+        <div class="files-bar">
+          <input id="fs-input" maxlength="200" required spellcheck="false">
+          <button class="primary" type="submit">Tamam</button>
+          <button id="fs-cancel" type="button">İptal</button>
+        </div>
+      </form>
+      <input id="f-input" type="file" multiple hidden>
+      <input id="f-dir-input" type="file" webkitdirectory hidden>
+      <ul id="file-tree" class="tree"></ul>
+      <p id="files-msg" class="empty" role="status"></p>
+    </aside>
+
+    <section id="work" aria-label="Görev">
+      <div class="bar">
+        <div role="tablist">
+          <button id="tab-stream" role="tab" aria-selected="true" type="button">Akış</button>
+          <button id="tab-diff" role="tab" aria-selected="false" type="button">Değişiklikler <span id="diff-count"></span></button>
+          <button id="tab-memory" role="tab" aria-selected="false" type="button">Hafıza <span id="memory-count"></span></button>
+          <button id="tab-history" role="tab" aria-selected="false" type="button">Geçmiş</button>
+          <button id="tab-preview" role="tab" aria-selected="false" type="button">Önizleme</button>
+          <button id="tab-file" role="tab" aria-selected="false" type="button" hidden>Dosya</button>
+        </div>
+        <span id="ws-title"></span>
+        <span id="tokens" class="tokens" title="Bu görevde kullanılan token ve bağlam doluluğu" hidden></span>
+        <span id="status" class="chip" role="status"></span>
+      </div>
+
+      <div id="replay-bar" class="note" hidden>
+        <span id="replay-text"></span>
+        <button id="replay-close" type="button">Yeni göreve dön</button>
+      </div>
+      <div id="stream" aria-live="polite"></div>
+      <p id="mode-warn" class="note warn-note" hidden>Oto onay: onay isteyen eylemler sorulmadan çalışır. Yasaklar ve sandbox sınırları geçerlidir.</p>
+
+      <div id="diff" hidden>
+        <div class="toolbar">
+          <button id="revert" type="button" disabled>Değişiklikleri geri al</button>
+        </div>
+        <div id="diff-files"></div>
+      </div>
+
+      <div id="preview" hidden>
+        <div class="toolbar">
+          <label for="preview-path" class="sr">Önizlenecek dosya</label>
+          <input id="preview-path" value="index.html" spellcheck="false" placeholder="index.html">
+          <button id="preview-go" type="button">Aç</button>
+          <button id="preview-reload" type="button">Yenile</button>
+          <a id="preview-open" target="_blank" rel="noopener noreferrer">Yeni sekmede aç</a>
+        </div>
+        <p class="empty">Statik siteler (HTML/CSS/JS) için. Önizleme yalıtılmış çerçevede çalışır: portalın jetonuna ve ağa erişemez. Sunucu çalıştıran uygulamalar (örn. <code>python3 server.py</code>) burada çalışmaz.</p>
+        <iframe id="preview-frame" title="Site önizlemesi" sandbox="allow-scripts"></iframe>
+      </div>
+
+      <div id="fileview" hidden>
+        <div class="toolbar">
+          <code id="fileview-path"></code>
+          <button id="fileview-attach" type="button">Göreve ekle</button>
+        </div>
+        <pre id="fileview-body"></pre>
+      </div>
+
+      <div id="history" hidden>
+        <p class="empty">Bu çalışma alanındaki önceki görevler (<code>~/.usta/sessions/</code>). Birine tıklarsan akışı salt okunur yeniden görürsün; terminalde de aynı kayıtlar var.</p>
+        <ul id="history-list"></ul>
+        <p id="history-msg" class="empty" role="status"></p>
+      </div>
+
+      <div id="memory" hidden>
+        <p class="empty">Bu çalışma alanının notları ve görev geçmişi (<code>.usta/memory/</code>). Model bunları veri olarak görür; yanlış ya da istenmeyen bir not varsa sil.</p>
+        <h3>Notlar</h3>
+        <ul id="memory-notes"></ul>
+        <h3>Son görevler</h3>
+        <div class="toolbar"><button id="clear-history" type="button" disabled>Geçmişi temizle</button></div>
+        <ul id="memory-history"></ul>
+        <p id="memory-msg" class="empty" role="status"></p>
+      </div>
+
+      <form id="composer">
+        <label for="prompt" class="sr">Görev</label>
+        <div id="attached" class="attached" hidden></div>
+        <textarea id="prompt" rows="3" placeholder="Ne yapmamı istersin? (Ctrl+Enter gönderir)" disabled></textarea>
+        <div class="actions">
+          <label for="mode" class="sr">Mod</label>
+          <select id="mode" title="Çalışma modu (terminalle ortak)">
+            <option value="manual">Manuel: her onay sorulur</option>
+            <option value="auto">Oto onay</option>
+            <option value="plan">Plan: yalnız plan sunar</option>
+          </select>
+          <label class="guard" title="Koruma: değişiklikten sonra testleri çalıştırır, döngüde son güvenli duruma döner">
+            <input id="guard" type="checkbox"> Koruma
+          </label>
+          <input id="file-input" type="file" multiple hidden accept=".md,.markdown,.txt,.json,.yaml,.yml,.toml,.csv,.log,.py,.js,.ts,.tsx,.jsx,.html,.css,.sh,.sql,.go,.rs,.java,.c,.h,.cpp,.rb,.php,.ini,.cfg,.xml,text/*">
+          <button id="attach" type="button" title="Metin/Markdown dosyası ekle (en çok 5 dosya, dosya başına 100 KB). Dosyaya sürükleyip bırakabilirsin." disabled>Dosya ekle</button>
+          <button id="send" type="submit" disabled>Gönder</button>
+          <button id="stop" type="button" hidden>Durdur</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="/logic.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "prompt": "money.py para hesaplarında hatalı. add_tax(amount, rate): tutara vergi ekler, sonucu kuruşa YARIM YUKARI yuvarlar (0.5 kuruş yukarı gider; ör. add_tax(100, 0.075) → 107.5 ve 1.15 + %10 = 1.265 → 1.27). split_bill(total, people): toplamı kişilere böler; paylar kuruş cinsinden olmalı ve toplamı TAM olarak total'e eşit olmalı; artan kuruşlar ilk kişilerden başlayarak birer kuruş dağıtılır (split_bill(100, 3) → [33.34, 33.33, 33.33]). people ≤ 0 için ValueError.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

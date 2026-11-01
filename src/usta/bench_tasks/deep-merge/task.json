@@ -1,0 +1,9 @@
+{
+  "prompt": "config.py içindeki deep_merge(base, override) fonksiyonunu yaz: iki sözlüğü birleştirip YENİ bir sözlük döndürür. İç içe sözlükler özyinelemeli birleşir; diğer değerler (liste dahil) override'dan gelen ile değiştirilir (listeler birleştirilmez); override'da değeri None olan anahtar sonuçtan silinir. base ve override ASLA değiştirilmemeli, sonuç onlarla iç nesne paylaşmamalı.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

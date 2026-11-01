@@ -1,0 +1,9 @@
+{
+  "prompt": "calc.py içindeki evaluate(expr) fonksiyonunu yaz: + - * / işleyen, parantezleri, tekli eksi/artıyı, ondalık sayıları ve boşlukları destekleyen bir ifade değerlendirici. Çarpma/bölme toplama/çıkarmadan önce işlenir, soldan sağa. eval/exec KULLANMA. Sıfıra bölme ZeroDivisionError; geçersiz ifade (boş, eksik parantez, tanınmayan karakter, ardışık işleçler) ValueError. Örnekler: '2 + 3 * 4' → 14, '(2+3)*4' → 20, '-(1+2)' → -3, '10/4' → 2.5.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

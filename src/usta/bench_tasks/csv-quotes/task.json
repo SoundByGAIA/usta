@@ -1,0 +1,9 @@
+{
+  "prompt": "parse.py içindeki parse_line(line) satırı virgüllerle alanlara ayırıyor ama çift tırnaklı alanları desteklemiyor. Çift tırnak içindeki virgül alanı bölmemeli, tırnak içinde \"\" tek bir \" sayılmalı, tırnaklar sonuçta olmamalı. Örnekler: 'a,\"b,c\",d' → ['a', 'b,c', 'd']; '\"he said \"\"hi\"\"\"' → ['he said \"hi\"']; 'a,,b' → ['a', '', 'b']; 'a,b,' → ['a', 'b', ''].",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

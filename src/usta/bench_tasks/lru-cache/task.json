@@ -1,0 +1,9 @@
+{
+  "prompt": "lru.py içindeki LRUCache sınıfını yaz. LRUCache(capacity): capacity pozitif tamsayı değilse ValueError. get(key, default=None): değeri döndürür ve anahtarı en son kullanılan yapar; yoksa default. put(key, value): ekler ya da günceller (güncellenen de en son kullanılan olur); kapasite aşılırsa en az son kullanılanı atar. len(cache) eleman sayısıdır. key in cache kullanım sırasını DEĞİŞTİRMEZ. keys() anahtarları en eskiden en yeniye liste olarak döndürür.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

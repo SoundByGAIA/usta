@@ -1,0 +1,9 @@
+{
+  "prompt": "slug.py içindeki slugify(text) fonksiyonunu yaz. Kurallar: küçük harfe çevir; Türkçe harfleri ASCII karşılığına çevir (ç→c, ğ→g, ı→i, ö→o, ş→s, ü→u, İ→i); harf/rakam olmayan her karakter dizisini tek '-' yap; baştaki/sondaki '-' işaretlerini at; sonuç boşsa 'n-a' döndür. Örnekler: 'Merhaba Dünya!' → 'merhaba-dunya', '  ÇığÖşÜ  ' → 'cigosu', '---' → 'n-a'.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

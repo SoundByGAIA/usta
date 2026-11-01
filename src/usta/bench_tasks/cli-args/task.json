@@ -1,0 +1,9 @@
+{
+  "prompt": "cli.py içindeki parse_args(argv) fonksiyonunu yaz (argv bir metin listesi). Sonuç sözlük: {\"verbose\": bool (varsayılan False), \"name\": metin veya None, \"count\": int (varsayılan 1), \"files\": liste}. Seçenekler: -v/--verbose (bayrak), -n X / --name X / --name=X, --count N / --count=N (tamsayı olmalı). Seçenek olmayan her şey files'a sırayla girer. '--' sonrasındaki her şey (tire ile başlasa da) dosya sayılır. Bilinmeyen seçenek, değeri eksik seçenek veya tamsayı olmayan count için ValueError. Son verilen değer kazanır.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ]
+}

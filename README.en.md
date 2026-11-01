@@ -15,7 +15,7 @@ A feature becomes the default only if a measurement shows it helps.
 ## Quick start
 
 ```bash
-git clone <repo-url> usta && cd usta
+git clone https://github.com/SoundByGAIA/usta.git usta && cd usta
 uv venv && uv pip install -e .
 ln -s "$PWD/.venv/bin/usta" ~/.local/bin/usta     # or: uv tool install --editable .
 cd my-project

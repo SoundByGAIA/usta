@@ -15,7 +15,7 @@ kılan harness** (araç çağrısı, bağlam yönetimi, doğrulama döngüsü, d
 ## Hızlı başlangıç
 
 ```bash
-git clone <depo-adresi> usta && cd usta
+git clone https://github.com/SoundByGAIA/usta.git usta && cd usta
 uv venv && uv pip install -e .
 ln -s "$PWD/.venv/bin/usta" ~/.local/bin/usta     # ya da: uv tool install --editable .
 cd benim-projem

@@ -14,6 +14,8 @@ kılan harness** (araç çağrısı, bağlam yönetimi, doğrulama döngüsü, d
 
 ## Hızlı başlangıç
 
+PyPI'den: `uv tool install usta` (ya da `pip install usta`). Kaynaktan:
+
 ```bash
 git clone https://github.com/SoundByGAIA/usta.git usta && cd usta
 uv venv && uv pip install -e .

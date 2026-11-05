@@ -14,6 +14,8 @@ A feature becomes the default only if a measurement shows it helps.
 
 ## Quick start
 
+From PyPI: `uv tool install usta` (or `pip install usta`). From source:
+
 ```bash
 git clone https://github.com/SoundByGAIA/usta.git usta && cd usta
 uv venv && uv pip install -e .

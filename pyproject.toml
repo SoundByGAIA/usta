@@ -1,6 +1,6 @@
 [project]
 name = "usta"
-version = "0.1.0"
+version = "0.2.0"
 description = "Genel amaçlı, açık kaynak yapay zekâ ajanı"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -23,6 +23,14 @@ usta = "usta.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
+symbols = [
+  "tree-sitter>=0.23",
+  "tree-sitter-python>=0.23",
+  "tree-sitter-javascript>=0.23",
+  "tree-sitter-typescript>=0.23",
+  "tree-sitter-go>=0.23",
+  "tree-sitter-rust>=0.23",
+]
 
 [build-system]
 requires = ["hatchling"]

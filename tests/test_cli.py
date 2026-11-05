@@ -190,33 +190,55 @@ def test_mcp_add_requires_command_and_valid_name(uhome, capsys):
 def test_mcp_add_shows_warning_and_declines_without_yes(uhome, monkeypatch, capsys):
     monkeypatch.setattr("builtins.input", lambda *a: "h")
     monkeypatch.setattr(_sys.stdin, "isatty", lambda: True)
-    assert run_cli("mcp", "add", "x", "--", "npx", "-y", "paket") == 1
+    assert run_cli("mcp", "add", "x", "--image", "py:1", "--", "npx", "-y", "paket") == 1
     out = capsys.readouterr().out
-    assert "SENİN yetkilerinle" in out and "npx -y paket" in out
+    assert "konteynerde (py:1)" in out and "npx -y paket" in out and "ağ kapalı" in out
     assert mcpconfig.load(uhome) == {}
 
 
 def test_mcp_add_non_interactive_without_yes_is_refused(uhome, monkeypatch, capsys):
     monkeypatch.setattr(_sys.stdin, "isatty", lambda: False)
-    assert run_cli("mcp", "add", "x", "--", "cmd") == 1
+    assert run_cli("mcp", "add", "x", "--image", "py:1", "--", "cmd") == 1
     assert "--yes" in capsys.readouterr().err
     assert mcpconfig.load(uhome) == {}
 
 
 def test_mcp_add_with_yes_stores_server_and_hints_test(uhome, capsys):
-    assert run_cli("mcp", "add", "arama", "--yes", "--approve", "allow", "--", "cmd", "-x") == 0
+    assert (
+        run_cli(
+            "mcp",
+            "add",
+            "arama",
+            "--yes",
+            "--image",
+            "py:1",
+            "--approve",
+            "allow",
+            "--",
+            "cmd",
+            "-x",
+        )
+        == 0
+    )
     s = mcpconfig.load(uhome)["arama"]
     assert s.command == ("cmd", "-x") and s.approve == "allow"
     assert "usta mcp test arama" in capsys.readouterr().out
-    assert run_cli("mcp", "add", "arama", "--yes", "--", "cmd") == 2  # zaten var
-    assert run_cli("mcp", "add", "arama", "--yes", "--replace", "--", "baska") == 0
+    assert run_cli("mcp", "add", "arama", "--yes", "--image", "py:1", "--", "cmd") == 2  # zaten var
+    assert (
+        run_cli("mcp", "add", "arama", "--yes", "--image", "py:1", "--replace", "--", "baska") == 0
+    )
 
 
 def test_mcp_add_env_prompts_hidden_and_never_echoes_value(uhome, monkeypatch, capsys):
     monkeypatch.delenv("BRAVE_KEY", raising=False)
     monkeypatch.setattr(_sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr("getpass.getpass", lambda prompt="": "cok-gizli-123")
-    assert run_cli("mcp", "add", "brave", "--yes", "--env", "BRAVE_KEY", "--", "cmd") == 0
+    assert (
+        run_cli(
+            "mcp", "add", "brave", "--yes", "--image", "py:1", "--env", "BRAVE_KEY", "--", "cmd"
+        )
+        == 0
+    )
     cap = capsys.readouterr()
     assert "cok-gizli-123" not in cap.out + cap.err
     assert "cok-gizli-123" not in (uhome / "mcp.json").read_text()
@@ -228,7 +250,12 @@ def test_mcp_add_env_prompts_hidden_and_never_echoes_value(uhome, monkeypatch, c
 def test_mcp_add_env_from_environment_is_not_stored(uhome, monkeypatch, capsys):
     monkeypatch.setenv("BRAVE_KEY", "ortamdan")
     monkeypatch.setattr(_sys.stdin, "isatty", lambda: True)
-    assert run_cli("mcp", "add", "brave", "--yes", "--env", "BRAVE_KEY", "--", "cmd") == 0
+    assert (
+        run_cli(
+            "mcp", "add", "brave", "--yes", "--image", "py:1", "--env", "BRAVE_KEY", "--", "cmd"
+        )
+        == 0
+    )
     assert "ortam değişkeninden" in capsys.readouterr().out
     assert not (uhome / "mcp-secrets.json").exists()
 
@@ -236,14 +263,19 @@ def test_mcp_add_env_from_environment_is_not_stored(uhome, monkeypatch, capsys):
 def test_mcp_add_env_missing_and_not_interactive_explains(uhome, monkeypatch, capsys):
     monkeypatch.delenv("BRAVE_KEY", raising=False)
     monkeypatch.setattr(_sys.stdin, "isatty", lambda: False)
-    assert run_cli("mcp", "add", "brave", "--yes", "--env", "BRAVE_KEY", "--", "cmd") == 0
+    assert (
+        run_cli(
+            "mcp", "add", "brave", "--yes", "--image", "py:1", "--env", "BRAVE_KEY", "--", "cmd"
+        )
+        == 0
+    )
     assert "BRAVE_KEY" in capsys.readouterr().out  # nasıl verileceğini söyler
 
 
 def test_mcp_list_empty_and_filled(uhome, capsys):
     assert run_cli("mcp", "list") == 0
     assert "yok" in capsys.readouterr().out
-    run_cli("mcp", "add", "a", "--yes", "--env", "A_KEY", "--", "komut", "arg")
+    run_cli("mcp", "add", "a", "--yes", "--image", "py:1", "--env", "A_KEY", "--", "komut", "arg")
     capsys.readouterr()
     assert run_cli("mcp", "list") == 0
     out = capsys.readouterr().out
@@ -251,7 +283,7 @@ def test_mcp_list_empty_and_filled(uhome, capsys):
 
 
 def test_mcp_remove_enable_disable(uhome, capsys):
-    run_cli("mcp", "add", "a", "--yes", "--", "komut")
+    run_cli("mcp", "add", "a", "--yes", "--image", "py:1", "--", "komut")
     assert run_cli("mcp", "disable", "a") == 0 and mcpconfig.load(uhome)["a"].enabled is False
     assert run_cli("mcp", "enable", "a") == 0 and mcpconfig.load(uhome)["a"].enabled is True
     assert run_cli("mcp", "remove", "a") == 0 and mcpconfig.load(uhome) == {}
@@ -260,7 +292,19 @@ def test_mcp_remove_enable_disable(uhome, capsys):
 
 
 def test_mcp_test_lists_tools_with_sanitized_descriptions(uhome, capsys):
-    run_cli("mcp", "add", "f", "--yes", "--", _sys.executable, "-I", FAKE_MCP)
+    run_cli(
+        "mcp",
+        "add",
+        "f",
+        "--yes",
+        "--isolation",
+        "host",
+        "--i-understand-host-risk",
+        "--",
+        _sys.executable,
+        "-I",
+        FAKE_MCP,
+    )
     capsys.readouterr()
     assert run_cli("mcp", "test", "f") == 0
     out = capsys.readouterr().out
@@ -269,7 +313,17 @@ def test_mcp_test_lists_tools_with_sanitized_descriptions(uhome, capsys):
 
 
 def test_mcp_test_failure_is_friendly(uhome, capsys):
-    run_cli("mcp", "add", "k", "--yes", "--", "/yok/komut")
+    run_cli(
+        "mcp",
+        "add",
+        "k",
+        "--yes",
+        "--isolation",
+        "host",
+        "--i-understand-host-risk",
+        "--",
+        "/yok/komut",
+    )
     capsys.readouterr()
     assert run_cli("mcp", "test", "k") == 1
     err = capsys.readouterr().err
@@ -285,7 +339,21 @@ def test_corrupt_mcp_config_gives_clear_error(uhome, capsys):
 
 
 def test_run_uses_mcp_tools_allow_mode(tmp_path, endpoint, uhome, capsys):
-    run_cli("mcp", "add", "f", "--yes", "--approve", "allow", "--", _sys.executable, "-I", FAKE_MCP)
+    run_cli(
+        "mcp",
+        "add",
+        "f",
+        "--yes",
+        "--isolation",
+        "host",
+        "--i-understand-host-risk",
+        "--approve",
+        "allow",
+        "--",
+        _sys.executable,
+        "-I",
+        FAKE_MCP,
+    )
     endpoint.responses = [tool_reply("mcp__f__echo", {"text": "mcp-selam"}), text_reply("tamam")]
     code = main(["run", "dene", "-w", str(tmp_path), "--endpoint", endpoint.url, "--model", "m"])
     assert code == 0
@@ -296,7 +364,19 @@ def test_run_uses_mcp_tools_allow_mode(tmp_path, endpoint, uhome, capsys):
 
 
 def test_run_mcp_ask_mode_is_denied_when_not_interactive(tmp_path, endpoint, uhome, monkeypatch):
-    run_cli("mcp", "add", "f", "--yes", "--", _sys.executable, "-I", FAKE_MCP)
+    run_cli(
+        "mcp",
+        "add",
+        "f",
+        "--yes",
+        "--isolation",
+        "host",
+        "--i-understand-host-risk",
+        "--",
+        _sys.executable,
+        "-I",
+        FAKE_MCP,
+    )
     monkeypatch.setattr(_sys.stdin, "isatty", lambda: False)
     endpoint.responses = [tool_reply("mcp__f__echo", {"text": "x"}), text_reply("tamam")]
     assert (
@@ -307,7 +387,17 @@ def test_run_mcp_ask_mode_is_denied_when_not_interactive(tmp_path, endpoint, uho
 
 
 def test_run_with_broken_mcp_server_warns_and_continues(tmp_path, endpoint, uhome, capsys):
-    run_cli("mcp", "add", "k", "--yes", "--", "/yok/komut")
+    run_cli(
+        "mcp",
+        "add",
+        "k",
+        "--yes",
+        "--isolation",
+        "host",
+        "--i-understand-host-risk",
+        "--",
+        "/yok/komut",
+    )
     endpoint.responses = [text_reply("yine de çalıştı")]
     assert main(["run", "x", "-w", str(tmp_path), "--endpoint", endpoint.url, "--model", "m"]) == 0
     cap = capsys.readouterr()
@@ -329,7 +419,7 @@ def test_serve_passes_mcp_servers_to_manager(uhome, monkeypatch):
     monkeypatch.setattr(cli, "TaskManager", lambda *a, **k: seen.update(k) or real(*a, **k))
     monkeypatch.setattr(cli, "_serve", lambda *a: None)
     monkeypatch.setattr(cli, "cleanup_orphans", lambda: 0)
-    run_cli("mcp", "add", "f", "--yes", "--", "cmd")
+    run_cli("mcp", "add", "f", "--yes", "--image", "py:1", "--", "cmd")
     assert main(["serve", "--model", "m"]) == 0
     assert [s.name for s in seen["mcp_servers"]()] == ["f"]
 

@@ -15,7 +15,11 @@ FAKE = str(Path(__file__).parent / "fake_mcp.py")
 
 
 def server(name="fake", mode="normal", approve="ask", enabled=True, env=()):
-    return mcpconfig.Server(name, (sys.executable, "-I", FAKE, mode), tuple(env), approve, enabled)
+    # Bu testler istemci/oturum mantığını sınar; sahte sunucu ana makinede (host uyumluluk modu) çalışır.
+    # Konteyner izolasyonunun kendi testleri tests/test_mcp_runtime.py içindedir.
+    return mcpconfig.Server(
+        name, (sys.executable, "-I", FAKE, mode), tuple(env), approve, enabled, isolation="host"
+    )
 
 
 # --- adlandırma ----------------------------------------------------------------------------
@@ -39,7 +43,9 @@ def test_session_exposes_tools_with_untrusted_metadata_sanitized():
         assert len(big.description) < 500 and big.description.startswith("[MCP: fake]")
         assert big.parameters["type"] == "object"
         assert s.modes["mcp__fake__echo"] == "ask"
-        assert s.warnings == []
+        # host uyumluluk modu her zaman uyarı üretir (izole değil); başka uyarı yok
+        assert [w for w in s.warnings if "uyumluluk modu" not in w] == []
+        assert any("uyumluluk modu" in w and "fake" in w for w in s.warnings)
 
 
 def test_tool_result_is_wrapped_as_external_data():
@@ -66,11 +72,12 @@ def test_non_dict_arguments_rejected_before_server():
 
 
 def test_broken_server_is_skipped_with_warning_others_work():
-    broken = mcpconfig.Server("kirik", ("/yok/komut",), (), "ask", True)
+    broken = mcpconfig.Server("kirik", ("/yok/komut",), (), "ask", True, isolation="host")
     with McpSession([broken, server("iyi")], home=None) as s:
         assert any(t.name == "mcp__iyi__echo" for t in s.tools)
         assert not any(t.name.startswith("mcp__kirik__") for t in s.tools)
-        assert len(s.warnings) == 1 and "kirik" in s.warnings[0] and "bulunamadı" in s.warnings[0]
+        fails = [w for w in s.warnings if "uyumluluk modu" not in w]
+        assert len(fails) == 1 and "kirik" in fails[0] and "bulunamadı" in fails[0]
 
 
 def test_disabled_servers_do_not_start():
@@ -79,7 +86,9 @@ def test_disabled_servers_do_not_start():
 
 
 def test_secrets_go_only_to_their_own_server(tmp_path):
-    mcpconfig.add_server(tmp_path, "fake", [sys.executable, "-I", FAKE], env=["MY_KEY"])
+    mcpconfig.add_server(
+        tmp_path, "fake", [sys.executable, "-I", FAKE], env=["MY_KEY"], isolation="host"
+    )
     mcpconfig.set_secret(tmp_path, "fake", "MY_KEY", "deger")
     srv = mcpconfig.load(tmp_path)["fake"]
     with McpSession([srv, server("diger")], home=tmp_path) as s:
@@ -155,7 +164,7 @@ def test_task_with_mcp_asks_for_approval_and_runs_tool(tmp_path):
 def test_task_survives_broken_mcp_server_and_reports_warning(tmp_path):
     ws = tmp_path / "ws"
     ws.mkdir()
-    bad = mcpconfig.Server("kirik", ("/yok/komut",), (), "ask", True)
+    bad = mcpconfig.Server("kirik", ("/yok/komut",), (), "ask", True, isolation="host")
     m = TaskManager(
         lambda: Scripted(ModelResponse("ok")), home=tmp_path / "home", mcp_servers=[bad]
     )

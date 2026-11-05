@@ -7,6 +7,7 @@ alt süreçleriyle birlikte öldürülür. Tasarım: docs/design.md §5.3.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import signal
@@ -14,6 +15,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Self
 
@@ -46,11 +48,13 @@ class McpClient:
         max_chars: int = 50_000,
         max_line: int = 1_000_000,
         cwd: str | None = None,
+        on_close: Callable[[], None] | None = None,
     ):
         if not command or not all(isinstance(c, str) and c for c in command):
             raise McpError("komut boş veya geçersiz")
         self.command, self.env = list(command), dict(env or {})
         self.timeout, self.max_chars, self.max_line, self.cwd = timeout, max_chars, max_line, cwd
+        self.on_close = on_close  # konteyner gibi dışarıda kalan kaynakları temizler
         self.pid: int | None = None
         self._proc: subprocess.Popen | None = None
         self._cv = threading.Condition()
@@ -138,9 +142,16 @@ class McpClient:
                     stream.close()
             except OSError:
                 pass
+        self._run_on_close()
         with self._cv:
             self._dead = self._dead or "kapatıldı"
             self._cv.notify_all()
+
+    def _run_on_close(self) -> None:
+        cleanup, self.on_close = self.on_close, None
+        if cleanup is not None:
+            with contextlib.suppress(Exception):
+                cleanup()
 
     # --- okuyucu iş parçacıkları -----------------------------------------------------------
     def _mark_dead(self, why: str) -> None:
@@ -188,6 +199,7 @@ class McpClient:
             self._threads[1].join(timeout=1.0)
 
     def _kill_group(self) -> None:
+        self._run_on_close()
         if self.pid is not None:
             try:
                 os.killpg(self.pid, signal.SIGKILL)

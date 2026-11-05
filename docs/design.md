@@ -72,7 +72,7 @@ Bileşenler:
 - **Okuma:** görev başında son 8000 karakter not + son 5 görev, nonce'lu `<<<PROJE-HAFIZASI ...>>>` işaretleriyle **kullanıcı mesajına** eklenir (sistem rolüne değil): veridir, talimat değildir.
 - **Tehdit:** (1) ajan web içeriğinden etkilenip kalıcı bir yanlış/kötü niyetli not yazabilir (kalıcı prompt injection); (2) sandbox'taki `run` bu dosyaları doğrudan değiştirebilir. Bu yüzden içerik her okunduğunda güvenilmeyen veri sayılır, boyutu sınırlıdır ve karakterleri yeniden temizlenir; `.usta` veya `memory` sembolik bağ/dosya ise hafıza devre dışı kalır (hata görevi durdurmaz). Notlar düz metindir, kullanıcı `NOTES.md`'yi elle okuyup temizleyebilir. Henüz yok: notları API/arayüzde gösterme, silme, arama; görev geçmişinin SQLite'a taşınması.
 
-### 5.3 MCP istemcisi (taslak, v0.3)
+### 5.3 MCP istemcisi ve MCP Runtime (v0.3; izolasyon v0.2.0)
 Amaç: arama, takvim, veritabanı gibi araçları Usta'ya sonradan, kod yazmadan eklemek. Kullanıcı kolaylığı ve güvenlik birlikte tasarlanır.
 
 **Kullanıcı deneyimi (hiç bilmeyen kullanıcı için):**
@@ -82,12 +82,13 @@ Amaç: arama, takvim, veritabanı gibi araçları Usta'ya sonradan, kod yazmadan
 
 **Güvenlik:**
 - Varsayılan kapalı: yalnız kullanıcının `usta mcp add` ile eklediği sunucular başlar; yapılandırma `~/.usta/mcp.json` (0600) çalışma alanının dışındadır, ajan değiştiremez.
-- Taşıma: önce stdio (sunucu yerel alt süreç). Bu süreç ana makinede kullanıcının yetkileriyle çalışır (sandbox'ta değil): güven kararı ekleme anında kullanıcıdadır; belgeler bunu açıkça yazar. Sunucuya yalnız o sunucu için tanımlı ortam değişkenleri verilir (Usta'nın model anahtarı ve jetonu verilmez).
+- Taşıma: stdio. **MCP Runtime (`mcp_runtime.py`):** sunucu varsayılan olarak `docker run -i` ile yalıtılmış konteynerde başlar (salt okunur kök, root olmayan kullanıcı, `cap_drop=ALL`, `no-new-privileges`, `--init`, CPU/RAM/PID sınırı, `tmpfs`, ağ kapalı; ev dizini/Docker soketi/ana makine ortamı yok; çalışma alanı yalnız `none|ro|rw` ile açıkça). Ağ gereken sunucuda mevcut allowlist proxy (`ProxyNetwork`) yeniden kullanılır; engellenen/izinli ağ kararları denetim kaydına `mcp_network` olarak girer. Sırlar komut satırına değil, docker istemci ortamına yazılır (`-e ADI`). İzolasyon kurulamazsa (Docker yok, imaj yok, sabitleme tutmuyor) sunucu başlamaz ve `mcp_blocked` kaydı düşer; ana makineye geri düşülmez. `--isolation host --i-understand-host-risk` ayrı, açık bir uyumluluk modudur (her başlatmada uyarı).
+- Paket sabitleme: `usta mcp prepare` komutu ağ allowlist'i (yalnız npm/PyPI kayıtları, kurulum betikleri kapalı) altında bir kez çalıştırıp paketleri `~/.usta/mcp-cache/<ad>/` önbelleğine indirir; çalışma anında önbellek `:ro` bağlanır, ağ kapalıdır. Yerel imaj kimliği ve önbellek içerik özeti `mcp.json`'a yazılır ve her başlatmada doğrulanır (tutmuyorsa başlatma reddedilir).
 - Her MCP aracı politikada varsayılan **ASK** (her çağrıda onay); kullanıcı sunucu bazında `--approve allow` diyebilir. Bilinmeyen `mcp__` aracı DENY.
 - Araç adı `mcp__<sunucu>__<araç>` (yerel araçlarla çakışamaz); açıklama ve şema sunucudan geldiği için **güvenilmez**: açıklama kısaltılır ve temizlenir, aşırı büyük şema genel bir şemayla değiştirilir.
 - Sonuç her zaman nonce'lu `<<<HARİCİ-İÇERİK ...>>>` içinde VERİ olarak verilir; boyut ve süre sınırlıdır.
 - Sunucu istemciden istek yapamaz (sampling/roots/elicitation reddedilir); stderr sınırlı tutulur, yanıtsız sunucu zaman aşımıyla sonlandırılır, görev bitince süreç kapatılır.
-- Kalan risk: kötü niyetli/ele geçirilmiş MCP sunucusu ana makinede kod çalıştırabilir (Usta'dan bağımsız olarak, kullanıcı o programı kurduğu için). Bu yüzden yalnız güvenilen sunucular eklenmeli; sandbox'ta MCP çalıştırma (Docker) sonraki aşamada.
+- Kalan risk: Docker erişimi kök yetkisi demektir; konteyner çekirdeği paylaşır; izinli alan adlarına HTTPS içeriği opaktır; host uyumluluk modu yalıtımsızdır. Plan modunda MCP sunucuları hiç başlatılmaz. Olumsuz testler `tests/test_mcp_runtime.py` (canary dosyalar, sahte sırlar, ağ, salt okunur kök, zaman aşımı/artık süreç temizliği, kapalı başarısızlık).
 
 ### 5.4 Terminal deneyimi, kalıcı oturumlar ve alt ajanlar (taslak, v0.3-0.4)
 **Referanslar (fikir olarak; kaynaklar ikinci el, resmi depolar doğrudan incelenmedi, kod alınmaz):** Hermes Agent (Nous Research, MIT) ve DeepSeek-TUI (MIT): Plan/Agent/YOLO modları, SQLite+FTS5 oturum araması, beceriler → `/komut`, sınırlı sayıda izole alt ajan, yürütme ortamının ajan döngüsünden ayrılması.
@@ -150,3 +151,20 @@ Bağımlılıklar: fastapi, uvicorn, httpx, pydantic; test: pytest. Yerel CI = `
 - GitHub `usta` kullanıcısı dolu (2009, kişisel hesap) → `github.com/usta/usta` olmaz. `usta-ai`, `usta-agent`, `usta-dev` kullanıcı/org adları boş.
 - GitHub'da "usta agent" adlı belirgin bir rakip proje yok (arama: ilgisiz, 0 yıldız).
 - Öneri: PyPI paketi `usta`, GitHub org `usta-ai` (alınmadan önce Can'a sorulur; hesap/org açmak onay ister).
+
+
+## v0.2.0 eklemeleri (güvenilirlik ve ölçüm)
+
+Ayrıntılı denetim ve boşluk analizi: [implementation-audit.md](implementation-audit.md). Sonuçlar ve maliyetler: [v0.2.0-raporu.md](v0.2.0-raporu.md).
+
+- **MCP Runtime** (`mcp_runtime.py`, §5.3): MCP sunucuları varsayılan olarak yalıtılmış konteynerde; `prepare` ile paket/imaj sabitleme.
+- **Reliability Lab** (`lab/`, [reliability-lab.md](reliability-lab.md)): eşleştirilmiş temiz/saldırılı koşular, araç eylemi izi, deterministik değerlendirici, metrik motoru.
+- **Bench teşhisi** (`taxonomy.py`, `bench.py`): başarısızlık sınıflandırması, adım izi, modelsiz tekrar oynatma, eşleştirilmiş kol karşılaştırması, train/dev/final bölümleri.
+- **Yetenek profili** (`capability.py`): protokol başına sondalar (uçtan uca ajan görevleri dahil); uç nokta + model revizyonu + yapılandırma ile anahtarlı.
+- **Sembol araçları** (`symbols.py`, deneysel): Tree-sitter ile çok dilli semboller, stat tabanlı güncel indeks, bütçeli bağlam; yoksa regex/AST'ye düşer.
+- **Yürütme aşamaları** (`phases.py`): durum makinesi gözlemcisi ve terminal durumlar; ajan döngüsünü değiştirmez (onarım bütçesi `enforce` deneysel).
+- **Doğrulama ortamı ayrımı** (`verify.env_problem`): eksik bağımlılık kod hatası sayılmaz; kapı onarım turu yakmaz, bench'te altyapı hatası sayılır.
+- **Hafıza zehirleme azaltımı** (`memory.suspicious`, `policy.py`): kaynak izi + şüpheli not onayı.
+- **Tedarik zinciri**: hash'li kilit dosyaları, sandbox imaj sabitleme.
+
+İlke: yeni yetenekler varsayılan kapalıdır ya da yalnız gözlem yapar; varsayılan olması için `usta bench`/`usta lab` ile fayda ve maliyetin birlikte gösterilmesi gerekir.

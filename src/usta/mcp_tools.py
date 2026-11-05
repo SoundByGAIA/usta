@@ -11,12 +11,13 @@ import hashlib
 import json
 import os
 import re
+import tempfile
 import threading
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Self
 
-from usta import mcpconfig
+from usta import mcp_runtime, mcpconfig
 from usta.fetch import _clean, wrap_external
 from usta.mcp import McpClient, McpError
 from usta.tools import Tool, ToolError
@@ -55,9 +56,15 @@ class McpSession:
         environ: Mapping[str, str] | None = None,
         timeout: float = 30.0,
         cancel: threading.Event | None = None,
+        *,
+        workspace: Path | None = None,
+        on_event: Callable[[str, dict], None] | None = None,
     ):
         self.servers = [s for s in servers if s.enabled]
         self.home, self.timeout, self.cancel = home, timeout, cancel
+        self.workspace = workspace
+        self.on_event = on_event or (lambda *_: None)
+        self.handles: list[mcp_runtime.Handle] = []
         self.environ = os.environ if environ is None else environ
         self.tools: list[Tool] = []
         self.modes: dict[str, str] = {}
@@ -77,14 +84,43 @@ class McpSession:
             if self.cancel is not None and self.cancel.is_set():
                 break
             env = mcpconfig.resolve_env(self.home, srv, self.environ) if self.home else {}
-            client = McpClient(list(srv.command), env, timeout=self.timeout)
+            handle: mcp_runtime.Handle | None = None
+            client: McpClient | None = None
             try:
-                client.start()
+                if (
+                    srv.isolation == "host"
+                ):  # açık uyumluluk modu: ana makinede, kullanıcı yetkisiyle
+                    self.warnings.append(
+                        f"MCP sunucusu '{srv.name}' ana makinede, senin yetkilerinle çalışıyor "
+                        "(uyumluluk modu; izole değil)."
+                    )
+                    self.on_event(
+                        "mcp_start",
+                        {"server": srv.name, "isolation": "host", "command": srv.command[0]},
+                    )
+                    client = McpClient(list(srv.command), env, timeout=self.timeout)
+                    client.start()
+                else:  # konteyner: kurulamazsa başlamaz, ana makineye düşülmez
+                    handle = mcp_runtime.start(
+                        srv,
+                        home=self.home or Path(tempfile.gettempdir()),
+                        env=env,
+                        workspace=self.workspace,
+                        timeout=self.timeout,
+                        on_event=self.on_event,
+                    )
+                    client = handle.client
+                    self.warnings.extend(handle.notes)
                 found = client.list_tools()
             except McpError as e:
-                client.close()
+                if handle is not None:
+                    handle.close()
+                elif client is not None:
+                    client.close()
                 self.warnings.append(f"MCP sunucusu '{srv.name}' başlatılamadı: {e}")
                 continue
+            if handle is not None:
+                self.handles.append(handle)
             self.clients.append(client)
             for t in found:
                 name = qualified_name(srv.name, t.name, taken)
@@ -119,3 +155,8 @@ class McpSession:
         for c in self.clients:
             c.close()
         self.clients = []
+        for h in self.handles:
+            h.close()  # konteyneri ve proxy ağını siler
+            for d in h.decisions:  # engellenen/izin verilen ağ erişimleri denetim kaydına
+                self.on_event("mcp_network", {"container": h.name, **d})
+        self.handles = []

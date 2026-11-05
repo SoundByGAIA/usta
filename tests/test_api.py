@@ -223,10 +223,15 @@ def test_audit_endpoint_is_scoped_and_limited(tmp_path):
     tid = c.post(f"/workspaces/{w}/tasks", json={"prompt": "x"}, headers=AUTH).json()["id"]
     sse(c, f"/tasks/{tid}/events")
     rows = c.get("/audit", params={"workspace": w}, headers=AUTH).json()
-    assert [r["event"] for r in rows] == ["task", "answer"]
+    assert [r["event"] for r in rows] == [
+        "task",
+        "answer",
+        "terminal",
+    ]  # v0.2.0: terminal durum kaydı
+    assert rows[-1]["state"] == "COMPLETE_NO_CHANGE"
     assert (
         c.get("/audit", params={"workspace": w, "limit": 1}, headers=AUTH).json()[0]["event"]
-        == "answer"
+        == "terminal"
     )
     assert c.get("/audit", params={"workspace": "../x"}, headers=AUTH).status_code == 422
     assert c.get("/audit", params={"workspace": "yok"}, headers=AUTH).json() == []

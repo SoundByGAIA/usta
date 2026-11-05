@@ -141,9 +141,31 @@ def save(home: Path, endpoint: str, model: str, p: Profile) -> None:
 
 
 def resolve_protocol(
-    home: Path, endpoint: str, model: str, make_client: Callable[[], ModelClient]
+    home: Path,
+    endpoint: str,
+    model: str,
+    make_client: Callable[[], ModelClient],
+    *,
+    revision: str = "",
+    config: dict | None = None,
 ) -> Profile:
-    """Önbellekte varsa onu, yoksa sondayı çalıştırıp kaydederek profili döndürür."""
+    """Önce derin yetenek profili (uç nokta+model+revizyon+yapılandırma tam eşleşirse), sonra hızlı sonda önbelleği;
+    ikisi de yoksa sondayı çalıştırıp kaydeder."""
+    from usta import capability
+
+    deep = capability.load(home, endpoint, model, revision, config or {})
+    if deep is not None:
+        sel = deep.protocols.get(deep.recommended, {})
+        return Profile(
+            model,
+            deep.recommended,
+            0,
+            0,
+            0,
+            len(sel.get("results", [])),
+            f"derin profil: {deep.rationale}",
+            deep.ts,
+        )
     cached = load(home, endpoint, model)
     if cached is not None:
         return cached

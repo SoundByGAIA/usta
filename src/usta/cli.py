@@ -16,7 +16,20 @@ from pathlib import Path
 
 import httpx
 
-from usta import apis, bench, mcpconfig, memory, profile, projectcfg, projects, settings, theme
+from usta import (
+    apis,
+    bench,
+    capability,
+    mcp_runtime,
+    mcpconfig,
+    memory,
+    profile,
+    projectcfg,
+    projects,
+    settings,
+    symbols,
+    theme,
+)
 from usta.agent import Agent
 from usta.api import create_app, load_or_create_token
 from usta.audit import AuditLog
@@ -96,14 +109,41 @@ def _make_model(args: argparse.Namespace) -> ModelClient | None:
         print("hata: model belirtilmedi (--model veya USTA_MODEL)", file=sys.stderr)
         return None
     protocol = args.protocol or os.environ.get("USTA_PROTOCOL") or "native"
-    if protocol not in PROTOCOLS:
-        print(f"hata: protokol native|json|text olmalı: {protocol}", file=sys.stderr)
+    if protocol not in (*PROTOCOLS, "auto"):
+        print(f"hata: protokol native|json|text|auto olmalı: {protocol}", file=sys.stderr)
         return None
     endpoint = args.endpoint or os.environ.get("USTA_ENDPOINT") or DEFAULT_ENDPOINT
     extra = _extra_body(args)
     if extra is None:
         return None
+    if protocol == "auto":
+        # Profil koşu başında BİR KEZ çözülür ve sabitlenir (rapora çözülmüş protokol yazılır); koşu sırasında değişmez.
+        try:
+            prof = profile.resolve_protocol(
+                _home(),
+                endpoint,
+                name,
+                lambda: _build_model(endpoint, name, "native", args.model_timeout, extra),
+                revision=capability.detect_revision(endpoint, name)
+                if (_home() / "capabilities.json").exists()
+                else "",
+                config=_capability_config(args, extra),
+            )
+        except profile.ProfileError as e:
+            print(f"hata: {e}", file=sys.stderr)
+            return None
+        protocol = prof.protocol
+        args.protocol = protocol
+        print(f"Protokol (otomatik, sabitlendi): {protocol} — {prof.note}", flush=True)
     return _build_model(endpoint, name, protocol, args.model_timeout, extra)
+
+
+def _capability_config(args: argparse.Namespace, extra: dict | None) -> dict:
+    """Profili geçersiz kılan sunucu/istek yapılandırması: bağlam penceresi + ek gövde alanları."""
+    return {
+        "context_window": getattr(args, "context_window", None) or None,
+        "extra_body": extra or {},
+    }
 
 
 def _add_model_args(p: argparse.ArgumentParser) -> None:
@@ -128,10 +168,28 @@ def _add_model_args(p: argparse.ArgumentParser) -> None:
         "(USTA_ALLOW_HOSTS, virgüllü). Varsayılan: ağ kapalı",
     )
     p.add_argument(
-        "--protocol",
-        choices=PROTOCOLS,
-        help="native: yerel araç çağrısı; json: şemayla kısıtlı JSON; text: JSON-metin yedek protokolü (USTA_PROTOCOL)",
+        "--symbol-tools",
+        action="store_true",
+        help="DENEYSEL: find_symbol/symbol_context/related_files araçlarını aç (pip install 'usta[symbols]'; USTA_SYMBOL_TOOLS=1)",
     )
+    p.add_argument(
+        "--protocol",
+        choices=(*PROTOCOLS, "auto"),
+        help="native: yerel araç çağrısı; json: şemayla kısıtlı JSON; text: JSON-metin yedek protokolü; "
+        "auto: profilden seç ve koşu boyunca sabitle (USTA_PROTOCOL)",
+    )
+
+
+def _symbol_tools(args: argparse.Namespace) -> bool:
+    """Deneysel sembol araçları: bayrak ya da USTA_SYMBOL_TOOLS=1. Paket yoksa kapalı kalır ve söyler."""
+    on = bool(getattr(args, "symbol_tools", False)) or os.environ.get("USTA_SYMBOL_TOOLS") == "1"
+    if on and not symbols.available():
+        print(
+            "uyarı: sembol araçları için `pip install 'usta[symbols]'` gerekli; kapalı.",
+            file=sys.stderr,
+        )
+        return False
+    return on
 
 
 def _allowed_hosts(args: argparse.Namespace) -> tuple[str, ...] | None:
@@ -192,6 +250,36 @@ def _parser() -> argparse.ArgumentParser:
         help="modelin bağlam penceresi (token); arayüzde doluluk göstergesi için (ör. 8192)",
     )
     _add_model_args(sv)
+    lab = sub.add_parser(
+        "lab", help="Reliability Lab: saldırı/hata senaryolarıyla ajan güvenilirliğini ölç"
+    )
+    ls = lab.add_subparsers(dest="lab_cmd", required=True)
+    ls.add_parser("list", help="senaryoları listele")
+    lv = ls.add_parser("validate", help="senaryo dosyasını doğrula")
+    lv.add_argument("file", nargs="?", help="JSONL (varsayılan: yerleşik küme)")
+    lsm = ls.add_parser("smoke", help="betikli modellerle (harici model yok) değerlendiriciyi sına")
+    lsm.add_argument("--out", help="rapor klasörü (davranış başına bir alt klasör)")
+    lr = ls.add_parser("run", help="senaryoları modelle çalıştır (temiz + saldırılı eşleştirilmiş)")
+    lr.add_argument("--out", required=True, help="deney klasörü (runs.jsonl, traces/, report.md)")
+    lr.add_argument("--file", help="senaryo JSONL (varsayılan: yerleşik küme)")
+    lr.add_argument("--scenario", action="append", help="yalnız bu senaryo(lar)")
+    lr.add_argument("--category", action="append", help="yalnız bu kategori(ler)")
+    lr.add_argument("--repeat", type=int, default=1, help="her koşulu kaç kez tekrarla")
+    lr.add_argument("--time-limit", type=float, default=300.0, help="koşu başına saniye")
+    lr.add_argument(
+        "--breaker", action="store_true", help="devre kesici açık (harness yapılandırması)"
+    )
+    lr.add_argument("--harness-id", default="base", help="deney kaydına yazılan yapılandırma adı")
+    lr.add_argument(
+        "--model-revision", help="model revizyonu/özeti (verilmezse Ollama'dan okunmaya çalışılır)"
+    )
+    lr.add_argument("--note", default="", help="deney kaydına serbest not")
+    _add_model_args(lr)
+    lrp = ls.add_parser("report", help="deney klasöründen results.json + report.md üret")
+    lrp.add_argument("dir")
+    lcp = ls.add_parser("compare", help="iki deneyi karşılaştır (A: önceki, B: yeni)")
+    lcp.add_argument("a")
+    lcp.add_argument("b")
     bn = sub.add_parser(
         "bench", help="modeli küçük yazılım görevlerinde ölç (harness değerlendirmesi)"
     )
@@ -202,7 +290,29 @@ def _parser() -> argparse.ArgumentParser:
     )
     bc.add_argument("pairs", nargs="+", metavar="KATMAN=RAPOR.json")
     bc.add_argument("--out", help="Markdown çıktı dosyası")
+    bs.add_parser("splits", help="görev bölümlerini (train/dev/final) göster")
+    brp = bs.add_parser(
+        "replay", help="kaydedilmiş bir izi modelsiz yeniden oynat ve gizli testle doğrula"
+    )
+    brp.add_argument("trace", help="--trace-dir ile kaydedilen iz dosyası (JSON)")
+    brg = bs.add_parser(
+        "regress", help="önceki sürüm raporuna göre regresyon/iyileşme (görev bazında)"
+    )
+    brg.add_argument("old", metavar="ONCEKI.json")
+    brg.add_argument("new", metavar="YENI.json")
+    bdg = bs.add_parser("diagnose", help="rapor(lar)dan başarısızlık nedenleri ve maliyet dökümü")
+    bdg.add_argument("reports", nargs="+", metavar="RAPOR.json")
     br = bs.add_parser("run", help="görevleri modelle çalıştır, gizli testle doğrula")
+    br.add_argument(
+        "--split",
+        choices=["dev-all", "train", "dev", "final", "all"],
+        default="dev-all",
+        help="görev bölümü: dev-all (eğitim+geliştirme, varsayılan), final yalnız sürüm ölçümünde kullanılmalı",
+    )
+    br.add_argument(
+        "--trace-dir",
+        help="her koşu için adım izi ve model yanıtlarını bu klasöre yaz (tekrar oynatma)",
+    )
     br.add_argument("--task", action="append", help="yalnız bu görev(ler); tekrarlanabilir")
     br.add_argument("--repeat", type=int, default=1, help="her görevi kaç kez dene")
     br.add_argument("--max-steps", type=int, default=30)
@@ -234,8 +344,39 @@ def _parser() -> argparse.ArgumentParser:
     vs.add_parser("clear", help="ayarı sil (otomatik keşif)")
     for v in vs.choices.values():
         v.add_argument("-w", "--workspace", default=".", help="proje dizini")
+    sbx = sub.add_parser(
+        "sandbox", help="sandbox imajı: kimliğini sabitle ve doğrula (tedarik zinciri)"
+    )
+    sbs = sbx.add_subparsers(dest="sandbox_cmd", required=True)
+    sbp = sbs.add_parser(
+        "pin", help="yerel imajın kimliğini kaydet; değişirse çalıştırma reddedilir"
+    )
+    sbp.add_argument("--image", default="python:3.12-slim")
+    sbs.add_parser("status", help="sabitlemeleri ve yerel imaj kimliklerini göster")
     pr = sub.add_parser("probe", help="modelin araç çağrısı yeteneğini ölç ve önbelleğe al")
     pr.add_argument("--refresh", action="store_true", help="önbelleği yok say, yeniden ölç")
+    pr.add_argument(
+        "--deep",
+        action="store_true",
+        help="derin yetenek profili: çoklu çağrı, argüman doğruluğu, toparlanma, uzun bağlam (protokol başına)",
+    )
+    pr.add_argument(
+        "--long-chars",
+        type=int,
+        default=6000,
+        help="--deep uzun bağlam sondasının uzunluğu (karakter)",
+    )
+    pr.add_argument(
+        "--probe-repeats",
+        type=int,
+        default=3,
+        help="--deep: her sondayı kaç kez dene (gürültüyü azaltır)",
+    )
+    pr.add_argument(
+        "--context-window",
+        type=int,
+        help="modelin bağlam penceresi (token); derin profil bu yapılandırmaya bağlanır",
+    )
     _add_model_args(pr)
     ms = mcp.add_subparsers(dest="mcp_cmd", required=True)
     add = ms.add_parser("add", help="sunucu ekle: usta mcp add AD [seçenekler] -- KOMUT [ARG...]")
@@ -246,9 +387,43 @@ def _parser() -> argparse.ArgumentParser:
     )
     add.add_argument("--yes", action="store_true", help="onay sormadan ekle")
     add.add_argument("--replace", action="store_true", help="aynı adlıyı değiştir")
+    add.add_argument(
+        "--image",
+        help="konteyner imajı (yerelde çekilmiş olmalı; ör. node:22-slim, mümkünse @sha256)",
+    )
+    add.add_argument(
+        "--allow-host",
+        action="append",
+        default=[],
+        dest="allow_hosts",
+        help="sunucunun erişebileceği alan adı (allowlist proxy); verilmezse ağ kapalı",
+    )
+    add.add_argument(
+        "--workspace-access",
+        choices=mcpconfig.WORKSPACE_MODES,
+        default="none",
+        dest="workspace_access",
+        help="çalışma alanı sunucuya bağlansın mı (varsayılan: none)",
+    )
+    add.add_argument("--memory", default="256m", help="bellek sınırı (256m, 1g)")
+    add.add_argument("--cpus", default="0.5", help="CPU sınırı")
+    add.add_argument("--pids", type=int, default=64, help="süreç sayısı sınırı")
+    add.add_argument(
+        "--isolation",
+        choices=mcpconfig.ISOLATIONS,
+        default="container",
+        help="container (varsayılan, yalıtılmış) ya da host (ana makinede; riskli uyumluluk modu)",
+    )
+    add.add_argument(
+        "--i-understand-host-risk",
+        action="store_true",
+        dest="host_risk",
+        help="--isolation host için zorunlu: sunucu tüm yetkilerinle çalışır",
+    )
     ms.add_parser("list", help="ekli sunucuları göster")
     for name, text in (
         ("test", "sunucuyu başlat ve araçlarını listele"),
+        ("prepare", "paketleri allowlist ağıyla önbelleğe indir ve imaj/önbelleği sabitle"),
         ("remove", "sunucuyu ve anahtarlarını sil"),
         ("enable", "sunucuyu aç"),
         ("disable", "sunucuyu kapat (silmeden)"),
@@ -269,16 +444,41 @@ def _mcp_add(args: argparse.Namespace, command: list[str], home: Path) -> int:
     if not command:
         print("hata: komut eksik. Örnek: usta mcp add arama -- npx -y paket-adi", file=sys.stderr)
         return 2
+    host = args.isolation == "host"
+    if host and not args.host_risk:
+        print(
+            "hata: --isolation host sunucuyu ana makinede, tüm yetkilerinle çalıştırır "
+            "(ev dizinin, jetonların, ssh anahtarların dahil). Bunu bilerek istiyorsan "
+            "--i-understand-host-risk ekle; aksi halde --image ile konteyner izolasyonu kullan.",
+            file=sys.stderr,
+        )
+        return 2
     try:
         mcpconfig.validate(args.name, command, args.env, args.approve)
+        mcpconfig.validate_runtime(
+            args.isolation,
+            args.image,
+            [h.lower() for h in args.allow_hosts],
+            args.workspace_access,
+            args.memory,
+            args.cpus,
+            args.pids,
+        )
         if args.name in mcpconfig.load(home) and not args.replace:
             raise mcpconfig.McpConfigError(f"'{args.name}' zaten var (değiştirmek için --replace)")
     except mcpconfig.McpConfigError as e:
         print(f"hata: {e}", file=sys.stderr)
         return 2
     interactive = sys.stdin.isatty()
+    where = (
+        "bilgisayarında SENİN yetkilerinle çalışacak (UYUMLULUK MODU, yalıtım yok)"
+        if host
+        else f"konteynerde ({args.image}) çalışacak: ağ "
+        + (", ".join(args.allow_hosts) if args.allow_hosts else "kapalı")
+        + f", çalışma alanı {args.workspace_access}, {args.memory}/{args.cpus} CPU/{args.pids} süreç"
+    )
     print(
-        f"Bu komut bilgisayarında SENİN yetkilerinle çalışacak:\n  {' '.join(command)}\n"
+        f"Bu komut {where}:\n  {' '.join(command)}\n"
         "Yalnız güvendiğin kaynaklardan ekle. "
         + (
             "Araçları her çağrıda onayına sunulur (onay: ask)."
@@ -294,7 +494,21 @@ def _mcp_add(args: argparse.Namespace, command: list[str], home: Path) -> int:
             print("iptal edildi")
             return 1
     try:
-        mcpconfig.add_server(home, args.name, command, args.env, args.approve, args.replace)
+        mcpconfig.add_server(
+            home,
+            args.name,
+            command,
+            args.env,
+            args.approve,
+            args.replace,
+            isolation=args.isolation,
+            image=args.image,
+            allow_hosts=[h.lower() for h in args.allow_hosts],
+            workspace=args.workspace_access,
+            memory=args.memory,
+            cpus=args.cpus,
+            pids=args.pids,
+        )
         for key in args.env:
             if os.environ.get(key):
                 print(f"{key}: ortam değişkeninden alınacak (dosyaya yazılmaz)")
@@ -310,7 +524,12 @@ def _mcp_add(args: argparse.Namespace, command: list[str], home: Path) -> int:
     except mcpconfig.McpConfigError as e:
         print(f"hata: {e}", file=sys.stderr)
         return 2
-    print(f"Eklendi: {args.name}. Denemek için: usta mcp test {args.name}")
+    nxt = (
+        f"usta mcp test {args.name}"
+        if host
+        else f"usta mcp prepare {args.name}  (paketleri indirip sabitler), sonra usta mcp test {args.name}"
+    )
+    print(f"Eklendi: {args.name}. Sonraki adım: {nxt}")
     return 0
 
 
@@ -324,8 +543,15 @@ def _mcp_list(home: Path) -> int:
     for s in servers:
         env = mcpconfig.resolve_env(home, s, os.environ)
         keys = ", ".join(f"{k}({'tanımlı' if k in env else 'EKSİK'})" for k in s.env)
+        iso = (
+            "HOST(yalıtımsız)"
+            if s.isolation == "host"
+            else f"konteyner:{s.image or 'İMAJ YOK'}"
+            + (f" ağ:{','.join(s.allow_hosts)}" if s.allow_hosts else " ağ:kapalı")
+            + (" sabit" if s.pin_image and s.pin_cache else " sabitlenmemiş")
+        )
         print(
-            f"{s.name}  [{'açık' if s.enabled else 'kapalı'}]  onay: {s.approve}  "
+            f"{s.name}  [{'açık' if s.enabled else 'kapalı'}]  onay: {s.approve}  {iso}  "
             f"{' '.join(s.command)}" + (f"  env: {keys}" if keys else "")
         )
     return 0
@@ -340,10 +566,18 @@ def _mcp_test(name: str, home: Path) -> int:
         print(f"hata: '{name}' yok. Ekli olanlar için: usta mcp list", file=sys.stderr)
         return 2
     env = mcpconfig.resolve_env(home, server, os.environ)
-    print(f"'{name}' başlatılıyor (ilk seferde paket indirilebilir, bir dakika sürebilir)...")
+    print(f"'{name}' başlatılıyor...")
     try:
-        with McpClient(list(server.command), env, timeout=90) as client:
-            tools = client.list_tools()
+        if server.isolation == "host":
+            print("uyarı: ana makinede, yetkilerinle çalışıyor (uyumluluk modu)", file=sys.stderr)
+            with McpClient(list(server.command), env, timeout=90) as client:
+                tools = client.list_tools()
+        else:
+            handle = mcp_runtime.start(server, home=home, env=env, workspace=None, timeout=90)
+            try:
+                tools = handle.client.list_tools()
+            finally:
+                handle.close()
     except McpError as e:
         hint = (
             "\nKomutun kurulu olduğundan emin ol (ör. npx için Node.js)."
@@ -377,14 +611,215 @@ def _bench_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sandbox_cmd(args: argparse.Namespace) -> int:
+    from usta import sandbox as sbx
+
+    if args.sandbox_cmd == "pin":
+        try:
+            iid = sbx.pin_image(args.image, _home())
+        except sbx.SandboxError as e:
+            print(f"hata: {e}", file=sys.stderr)
+            return 1
+        print(f"Sabitlendi: {args.image} → {iid}")
+        return 0
+    pins = sbx.load_pins(_home())
+    if not pins:
+        print(
+            "Sabitlenmiş imaj yok (usta sandbox pin ile sabitle). İmajlar etiketle seçilir; etiket başka içeriğe işaret edebilir."
+        )
+    for image, want in pins.items():
+        have = sbx.local_image_id(image)
+        state = "TUTUYOR" if have == want else f"DEĞİŞMİŞ (yerel {(have or 'yok')[:19]}…)"
+        print(f"{image}: {want[:19]}… — {state}")
+    return 0
+
+
+def _lab_cmd(args: argparse.Namespace) -> int:
+    from usta.lab import report as labreport
+    from usta.lab import runner as labrunner
+    from usta.lab import scenario as labscenario
+    from usta.lab.metrics import summarize as lab_summarize
+    from usta.lab.scripted import BEHAVIORS, ScriptedModel
+
+    try:
+        if args.lab_cmd == "report":
+            labreport.write(Path(args.dir))
+            print(f"Rapor: {Path(args.dir) / 'report.md'}")
+            return 0
+        if args.lab_cmd == "compare":
+            print(labreport.compare(Path(args.a), Path(args.b)))
+            return 0
+        path = Path(args.file) if getattr(args, "file", None) else None
+        scenarios = labscenario.load(path)
+    except (labscenario.ScenarioError, OSError, ValueError, KeyError) as e:
+        print(f"hata: {e}", file=sys.stderr)
+        return 2
+    if args.lab_cmd == "validate":
+        print(
+            f"{len(scenarios)} senaryo geçerli; küme özeti {labscenario.set_hash(scenarios)[:19]}…"
+        )
+        return 0
+    if args.lab_cmd == "list":
+        for s in scenarios:
+            print(f"{s.id:14} {s.category:22} {s.surface}")
+        return 0
+    harness = labrunner.HarnessConfig(
+        id=getattr(args, "harness_id", "base"), breaker=getattr(args, "breaker", False)
+    )
+    if args.lab_cmd == "smoke":
+        bad = 0
+        for beh in BEHAVIORS:
+            meta = labrunner.experiment_meta(
+                scenarios,
+                model=f"scripted-{beh}",
+                model_revision="",
+                endpoint="-",
+                harness=harness,
+                repeat=1,
+            )
+            out = Path(args.out) / beh if args.out else None
+            recs = labrunner.run_experiment(
+                scenarios,
+                lambda s, c, b=beh: ScriptedModel(s, c, b),
+                meta=meta,
+                harness=harness,
+                out_dir=out,
+            )
+            sm = lab_summarize(recs)
+            if out:
+                labreport.write(out)
+            print(
+                f"{beh:10} TSR {sm['task_success_rate']['rate']}  ASR {sm['asr']['rate']}  "
+                f"deneme {sm['unauthorized_attempt_rate']['rate']}  gerçekleşme {sm['unauthorized_execution_rate']['rate']}  "
+                f"yanlış ret {sm['false_refusal_rate']['rate']}  toparlanma {sm['recovery_rate']['rate']}"
+            )
+            if beh == "gullible":  # izin katmanı beklentileri (senaryodaki `expect`)
+                exp = {s.id: s.expect for s in scenarios}
+                for r in recs:
+                    e = exp[r["scenario_id"]]
+                    if (
+                        r["condition"] == "attack"
+                        and e
+                        and (
+                            r["attack_attempted"],
+                            r["unauthorized_action_executed"],
+                            r["blocked_attempts"] > 0,
+                        )
+                        != (e["attempt"], e["executed"], e["blocked"])
+                    ):
+                        print(f"  BEKLENTİ TUTMADI: {r['scenario_id']}", file=sys.stderr)
+                        bad += 1
+        return 1 if bad else 0
+    # run
+    if args.scenario:
+        unknown = sorted(set(args.scenario) - {s.id for s in scenarios})
+        if unknown:
+            print(f"hata: bilinmeyen senaryo: {', '.join(unknown)}", file=sys.stderr)
+            return 2
+        scenarios = [s for s in scenarios if s.id in args.scenario]
+    if args.category:
+        scenarios = [s for s in scenarios if s.category in args.category]
+    if not scenarios:
+        print("hata: çalıştırılacak senaryo yok", file=sys.stderr)
+        return 2
+    model = _make_model(args)
+    if model is None:
+        return 2
+    name = args.model or os.environ.get("USTA_MODEL") or "?"
+    endpoint = args.endpoint or os.environ.get("USTA_ENDPOINT") or DEFAULT_ENDPOINT
+    harness = labrunner.HarnessConfig(
+        id=args.harness_id,
+        breaker=args.breaker,
+        protocol=args.protocol or os.environ.get("USTA_PROTOCOL") or "native",
+    )
+    rev = args.model_revision or capability.detect_revision(endpoint, name)
+    meta = labrunner.experiment_meta(
+        scenarios,
+        model=name,
+        model_revision=rev,
+        endpoint=endpoint,
+        harness=harness,
+        repeat=args.repeat,
+        note=args.note,
+    )
+    print(
+        f"Lab: {name} ({harness.protocol}); {len(scenarios)} senaryo x {args.repeat}; deney {meta['experiment_id']}",
+        flush=True,
+    )
+
+    def show(r: dict) -> None:
+        mark = "GEÇTİ " if r["task_success"] else "KALDI "
+        extra = f"  [{'; '.join(r['detail'])}]" if r["detail"] else ""
+        print(
+            f"{mark} {r['scenario_id']}/{r['condition']}: {r['tool_calls']} çağrı, {r['duration_ms']} ms{extra}",
+            flush=True,
+        )
+
+    recs = labrunner.run_experiment(
+        scenarios,
+        lambda s, c: model,
+        meta=meta,
+        harness=harness,
+        repeat=args.repeat,
+        out_dir=Path(args.out),
+        time_limit=args.time_limit,
+        on_record=show,
+    )
+    labreport.write(Path(args.out))
+    sm = lab_summarize(recs)
+    print(
+        f"TSR {sm['task_success_rate']['rate']}  ASR {sm['asr']['rate']}  deneme {sm['unauthorized_attempt_rate']['rate']}  "
+        f"gerçekleşme {sm['unauthorized_execution_rate']['rate']}  yanlış ret {sm['false_refusal_rate']['rate']}  "
+        f"altyapı hatası {sm['infra_errors']}\nRapor: {Path(args.out) / 'report.md'}"
+    )
+    return 0
+
+
 def _bench_cmd(args: argparse.Namespace) -> int:
     if args.bench_cmd == "compare":
         return _bench_compare(args)
     tasks = bench.load_tasks()
     if args.bench_cmd == "list":
         for t in tasks:
-            print(f"{t.id}: {t.prompt[:90]}")
+            print(f"{t.id} [{t.split}]: {t.prompt[:90]}")
         return 0
+    if args.bench_cmd == "splits":
+        for sp in bench.SPLITS:
+            print(f"{sp}: {', '.join(t.id for t in tasks if t.split == sp)}")
+        return 0
+    if args.bench_cmd == "replay":
+        try:
+            new, old = bench.replay_trace(Path(args.trace), tasks=tasks)
+        except (OSError, ValueError, KeyError) as e:
+            print(f"hata: {e}", file=sys.stderr)
+            return 2
+        same = new.passed == old["passed"]
+        print(
+            f"{new.task}: yeniden oynatma {'GEÇTİ' if new.passed else 'KALDI'} (kayıtta: {'GEÇTİ' if old['passed'] else 'KALDI'}); "
+            f"{new.tool_calls} araç çağrısı; nedeni: {new.failure or '-'}\n"
+            f"{'Sonuç kayıtla AYNI.' if same else 'UYARI: sonuç kayıttan FARKLI (harness/araç davranışı değişmiş).'}"
+        )
+        return 0 if same else 1
+    if args.bench_cmd == "regress":
+        try:
+            print(bench.regress_markdown(Path(args.old), Path(args.new)))
+        except (OSError, ValueError, KeyError) as e:
+            print(f"hata: {e}", file=sys.stderr)
+            return 2
+        return 0
+    if args.bench_cmd == "diagnose":
+        try:
+            print(bench.diagnose_markdown([Path(p) for p in args.reports]))
+        except (OSError, ValueError, KeyError) as e:
+            print(f"hata: {e}", file=sys.stderr)
+            return 2
+        return 0
+    tasks = bench.select_tasks(tasks, args.split)
+    if args.split in ("final", "all"):
+        print(
+            "uyarı: final bölümü yalnız sürüm ölçümü içindir; harness'ı bu görevlere bakarak AYARLAMA.",
+            file=sys.stderr,
+        )
     if args.task:
         unknown = sorted(set(args.task) - {t.id for t in tasks})
         if unknown:
@@ -428,6 +863,7 @@ def _bench_cmd(args: argparse.Namespace) -> int:
         agent_factory=functools.partial(Agent, shrink_writes=args.shrink_writes),
         on_result=show,
         should_stop=(lambda: Path(args.stop_file).exists()) if args.stop_file else None,
+        trace_dir=Path(args.trace_dir) if args.trace_dir else None,
     )
     if args.stop_file and Path(args.stop_file).exists():
         print(f"\nÖlçüm durduruldu ({args.stop_file} bulundu); {len(results)} koşu tamamlandı.")
@@ -451,9 +887,38 @@ def _bench_cmd(args: argparse.Namespace) -> int:
     return 0
 
 
+def _mcp_prepare(name: str, home: Path) -> int:
+    servers = _mcp_servers(home)
+    if servers is None:
+        return 2
+    server = next((s for s in servers if s.name == name), None)
+    if server is None:
+        print(f"hata: '{name}' yok. Ekli olanlar için: usta mcp list", file=sys.stderr)
+        return 2
+    if server.isolation != "container":
+        print("hata: yalnız konteyner izolasyonlu sunucular hazırlanır", file=sys.stderr)
+        return 2
+    print(
+        f"'{name}' hazırlanıyor: paketler yalnız paket kayıtlarına ({', '.join(mcp_runtime.PREPARE_HOSTS)}) "
+        "açık bir ağda indirilir; kurulum betikleri çalışmaz. Sonra ağ kapalı çalışır."
+    )
+    try:
+        iid, digest = mcp_runtime.prepare(
+            server, home=home, env=mcpconfig.resolve_env(home, server, os.environ)
+        )
+        mcpconfig.set_pin(home, name, iid, digest)
+    except (McpError, mcpconfig.McpConfigError) as e:
+        print(f"hata: {e}", file=sys.stderr)
+        return 1
+    print(f"Hazır. Sabitlendi: imaj {iid[:19]}…, önbellek {digest[:19]}…")
+    return 0
+
+
 def _mcp_cmd(args: argparse.Namespace, command: list[str]) -> int:
     home = _home()
     try:
+        if args.mcp_cmd == "prepare":
+            return _mcp_prepare(args.name, home)
         if args.mcp_cmd == "add":
             return _mcp_add(args, command, home)
         if args.mcp_cmd == "list":
@@ -494,6 +959,7 @@ def _serve_cmd(args: argparse.Namespace) -> int:
         home=home,
         max_steps=args.max_steps,
         allowed_hosts=hosts,
+        symbol_tools=_symbol_tools(args),
         mcp_servers=lambda: (
             _mcp_servers(home) or []
         ),  # panelden eklenenler yeniden başlatmadan gelir
@@ -621,6 +1087,41 @@ def _verify_cmd(args: argparse.Namespace, command: list[str]) -> int:
     return 0
 
 
+def _probe_deep(args: argparse.Namespace, home: Path, endpoint: str, name: str) -> int:
+    extra = _extra_body(args)
+    if extra is None:
+        return 2
+    config = _capability_config(args, extra)
+    revision = capability.detect_revision(endpoint, name)
+    cached = None if args.refresh else capability.load(home, endpoint, name, revision, config)
+    if cached is not None:
+        print(capability.table(cached))
+        return 0
+    long_chars = args.long_chars
+    if config["context_window"]:  # pencereyi aşmayacak bir uzunluk (≈3 karakter/token, yarısı)
+        long_chars = min(long_chars, int(config["context_window"] * 3 * 0.5))
+    print(
+        f"{name}: derin yetenek profili çıkarılıyor (protokol başına 8 sonda × {args.probe_repeats} tekrar)…",
+        flush=True,
+    )
+    try:
+        prof = capability.profile_model(
+            lambda: _build_model(endpoint, name, "native", args.model_timeout, extra),
+            name,
+            endpoint=endpoint,
+            revision=revision,
+            config=config,
+            long_chars=long_chars,
+            repeats=max(1, args.probe_repeats),
+        )
+    except capability.CapabilityError as e:
+        print(f"hata: {e}", file=sys.stderr)
+        return 2
+    capability.save(home, prof)
+    print(capability.table(prof))
+    return 0
+
+
 def _probe_cmd(args: argparse.Namespace) -> int:
     home = _home()
     cur = settings.load(home)
@@ -630,6 +1131,8 @@ def _probe_cmd(args: argparse.Namespace) -> int:
         print("hata: model belirtilmedi (--model veya USTA_MODEL)", file=sys.stderr)
         return 2
     make = lambda: _build_model(endpoint, name, "native", args.model_timeout)
+    if args.deep:
+        return _probe_deep(args, home, endpoint, name)
     try:
         if args.refresh:
             prof = profile.probe(make(), name)
@@ -671,6 +1174,8 @@ def _chat_cmd(args: argparse.Namespace) -> int:
         if saved is not None:  # son oturumda seçilen kayıtlı API
             endpoint, api_key, api_name = saved.endpoint, saved.key, saved.name
     explicit = args.protocol or os.environ.get("USTA_PROTOCOL") or cur.protocol
+    if explicit == "auto":
+        explicit = None
     if explicit and explicit not in PROTOCOLS:
         print(f"hata: protokol native|json|text olmalı: {explicit}", file=sys.stderr)
         return 2
@@ -734,6 +1239,7 @@ def _chat_cmd(args: argparse.Namespace) -> int:
         allowed_hosts=hosts,
         context_window=window,
         model_control=control,
+        symbol_tools=_symbol_tools(args),
         mcp_servers=lambda: _mcp_servers(home) or [],
     )
     interactive = sys.stdin.isatty()
@@ -790,6 +1296,10 @@ def main(argv: list[str] | None = None) -> int:
         return _chat_cmd(args)
     if args.cmd == "mcp":
         return _mcp_cmd(args, command)
+    if args.cmd == "sandbox":
+        return _sandbox_cmd(args)
+    if args.cmd == "lab":
+        return _lab_cmd(args)
     if args.cmd == "bench":
         return _bench_cmd(args)
     if args.cmd == "probe":
@@ -818,12 +1328,17 @@ def main(argv: list[str] | None = None) -> int:
     audit = AuditLog(
         _home() / "audit" / f"{hashlib.sha256(str(root).encode()).hexdigest()[:12]}.jsonl"
     )
-    with McpSession(servers, _home()) as mcp:
+    with McpSession(
+        servers, _home(), workspace=root, on_event=lambda k, d: audit.record(k, **d)
+    ) as mcp:
         for warning in mcp.warnings:
             print(f"uyarı: {warning}", file=sys.stderr)
         agent = Agent(
             model,
-            build_registry(ToolContext(root=root, allowed_hosts=hosts), extra=mcp.tools),
+            build_registry(
+                ToolContext(root=root, allowed_hosts=hosts, symbol_tools=_symbol_tools(args)),
+                extra=mcp.tools,
+            ),
             Policy(root, set(hosts), mcp_modes=mcp.modes),
             audit,
             approver=_approver,

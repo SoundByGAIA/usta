@@ -89,6 +89,15 @@ def outline_text(path: str, text: str) -> str:
             if len(syms) > MAX_SYMBOLS:
                 lines.append(f"… {len(syms) - MAX_SYMBOLS} sembol daha")
             return "\n".join([head, *lines])
+    ts = _ts_outline(path, text)
+    if ts is not None:
+        return "\n".join(
+            [
+                head,
+                *ts[:MAX_SYMBOLS],
+                *([f"… {len(ts) - MAX_SYMBOLS} sembol daha"] if len(ts) > MAX_SYMBOLS else []),
+            ]
+        )
     gen = _generic_symbols(text)
     lines = [f"L{n} {t}" for n, t in gen[:MAX_SYMBOLS]]
     if len(gen) > MAX_SYMBOLS:
@@ -115,6 +124,21 @@ def read_symbol(path: str, text: str, name: str) -> str:
                 _d, _q, _sig, s, e, _doc = next(x for x in syms if x[1] == q)
                 return _render(path, q, s, e, src)
             raise LookupError(_not_found(name, names))
+    fs = _ts_symbols(path, text)
+    if fs is not None:
+        hit = [s for s in fs.symbols if name in (s.qualname, s.name)]
+        if len(hit) == 1:
+            return _render(
+                path,
+                hit[0].qualname,
+                hit[0].start,
+                min(hit[0].end, hit[0].start + MAX_SYMBOL_LINES - 1),
+                src,
+            )
+        if len(hit) > 1:
+            raise LookupError(
+                f"'{name}' birden fazla tanımlı: {', '.join(s.qualname for s in hit)}. Nitelikli ad kullan."
+            )
     gen = _generic_symbols(text)
     pat = re.compile(rf"\b{re.escape(name)}\b")
     for idx, (line, label) in enumerate(gen):
@@ -124,6 +148,28 @@ def read_symbol(path: str, text: str, name: str) -> str:
                 end -= 1
             return _render(path, name, line, min(end, line + MAX_SYMBOL_LINES - 1), src)
     raise LookupError(_not_found(name, [lbl for _n, lbl in gen]))
+
+
+def _ts_symbols(path: str, text: str):
+    """Tree-sitter ile semboller (Python dışı diller); paket/dilbilgisi yoksa ya da dosya ayrıştırılamıyorsa None."""
+    if path.endswith(".py"):
+        return None
+    from usta import symbols
+
+    if symbols.language_for(path) is None or not symbols.available(symbols.language_for(path)):
+        return None
+    fs = symbols.extract(path, text)
+    return fs if fs is not None and fs.symbols else None
+
+
+def _ts_outline(path: str, text: str) -> list[str] | None:
+    fs = _ts_symbols(path, text)
+    if fs is None:
+        return None
+    return [
+        f"{'  ' * s.qualname.count('.')}L{s.start}-L{s.end} {s.kind} {s.signature}"
+        for s in fs.symbols
+    ]
 
 
 def _render(path: str, name: str, start: int, end: int, src: list[str]) -> str:

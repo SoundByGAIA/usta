@@ -1,0 +1,11 @@
+{
+  "prompt": "test_find.py başarısız. find.py içindeki has_word fonksiyonu büyük/küçük harfe duyarsız olmalı. Testleri değiştirme.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "dev",
+  "tier": "tiny"
+}

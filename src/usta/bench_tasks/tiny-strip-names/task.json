@@ -1,0 +1,11 @@
+{
+  "prompt": "test_names.py başarısız. Hatayı bul ve names.py içinde düzelt: her ad baştaki/sondaki boşluklardan arınmalı ve boş satırlar atılmalı. Testleri değiştirme.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "dev",
+  "tier": "tiny"
+}

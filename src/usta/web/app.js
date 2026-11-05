@@ -551,6 +551,7 @@
   function catalogCard(c) {
     const card = h("div", "card");
     card.append(h("strong", null, c.title), h("p", null, c.description), h("code", "cmd", c.command.join(" ")));
+    card.appendChild(h("p", "empty", `Yalıtılmış konteynerde çalışır (imaj: ${c.image}; ağ: ${c.allow_hosts.length ? c.allow_hosts.join(", ") : "kapalı"}). İmaj yerelde olmalı: docker pull ${c.image}`));
     if (c.homepage.startsWith("https://")) {
       const a = h("a", null, c.homepage);
       a.href = c.homepage;
@@ -562,7 +563,7 @@
     add.type = "button";
     add.addEventListener("click", async () => {
       add.disabled = true;
-      if (await toolsCall(`/catalog/${encodeURIComponent(c.id)}`, "POST")) { toolsMsg("Eklendi. Anahtarı gir, sonra Test et.", "ok"); await loadTools(); }
+      if (await toolsCall(`/catalog/${encodeURIComponent(c.id)}`, "POST")) { toolsMsg("Eklendi. Önce Hazırla (paketleri indirip sabitler), anahtarı gir, sonra Test et.", "ok"); await loadTools(); }
       else add.disabled = false;
     });
     card.appendChild(add);
@@ -571,7 +572,10 @@
   function serverCard(s) {
     const card = h("div", "card");
     const title = h("strong", null, s.name);
-    card.append(title, h("span", "chip", s.enabled ? "açık" : "kapalı"), h("p", "empty", `onay: ${s.approve === "allow" ? "sormadan çalışır" : "her çağrıda sorulur"}`), h("code", "cmd", s.command.join(" ")));
+    const host = s.isolation === "host";
+    card.append(title, h("span", "chip", s.enabled ? "açık" : "kapalı"), h("span", "chip", host ? "ANA MAKİNE (yalıtımsız)" : "yalıtılmış konteyner"));
+    if (!host) card.appendChild(h("span", "chip", s.pinned ? "sabitlendi" : "sabitlenmedi"));
+    card.append(h("p", "empty", `onay: ${s.approve === "allow" ? "sormadan çalışır" : "her çağrıda sorulur"}${host ? "" : ` · imaj: ${s.image || "YOK"} · ağ: ${s.allow_hosts.length ? s.allow_hosts.join(", ") : "kapalı"}`}`), h("code", "cmd", s.command.join(" ")));
     for (const e of s.env) {
       const row = h("div", "key-row");
       const input = h("input");
@@ -599,10 +603,20 @@
     test.type = "button";
     test.addEventListener("click", async () => {
       test.disabled = true;
-      toolsMsg("Başlatılıyor (ilk seferde paket indirilebilir, biraz sürebilir)...");
+      toolsMsg("Konteyner başlatılıyor...");
       const r = await toolsCall(`/${encodeURIComponent(s.name)}/test`, "POST");
       test.disabled = false;
       if (r) toolsMsg(`${r.tools.length} araç bulundu: ${r.tools.map((t) => t.name).join(", ")}`.slice(0, 600), "ok");
+    });
+    const prepare = h("button", null, s.pinned ? "Yeniden hazırla" : "Hazırla");
+    prepare.type = "button";
+    prepare.hidden = host;
+    prepare.addEventListener("click", async () => {
+      prepare.disabled = true;
+      toolsMsg("Hazırlanıyor: paketler yalnız paket kayıtlarına açık ağda indirilir, kurulum betikleri çalışmaz (birkaç dakika sürebilir)...");
+      const r = await toolsCall(`/${encodeURIComponent(s.name)}/prepare`, "POST");
+      prepare.disabled = false;
+      if (r) { toolsMsg("Hazır: imaj ve paketler sabitlendi.", "ok"); await loadTools(); }
     });
     const toggle = h("button", null, s.enabled ? "Kapat" : "Aç");
     toggle.type = "button";
@@ -621,7 +635,7 @@
       clearTimeout(armed);
       if (await toolsCall(`/${encodeURIComponent(s.name)}`, "DELETE")) await loadTools();
     });
-    actions.append(test, toggle, remove);
+    actions.append(prepare, test, toggle, remove);
     card.appendChild(actions);
     return card;
   }

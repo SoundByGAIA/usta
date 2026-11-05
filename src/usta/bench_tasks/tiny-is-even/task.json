@@ -1,0 +1,11 @@
+{
+  "prompt": "test_parity.py başarısız. parity.py içine is_even(n) fonksiyonunu ekle: n çiftse True, değilse False döndürsün (negatif sayılar ve sıfır dahil). Testleri değiştirme.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "dev",
+  "tier": "tiny"
+}

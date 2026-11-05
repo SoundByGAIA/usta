@@ -71,9 +71,29 @@ Plan modunda ajan yalnız okur ve plan yazar. Onaylayınca iki yol vardır:
 
 Plan sunucuda saklanır ve numarasıyla uygulanır; istem yeniden yazılmaz.
 
+## Güvenilirlik ve ölçüm araçları (v0.2.0)
+
+Usta'nın amacı modeli olduğundan zeki göstermek değil, mevcut model kapasitesini **güvenilir ve doğrulanabilir** kullanmaktır.
+v0.2.0 bunun için güvenlik ve ölçüm altyapısı ekler. Bunların küçük modellerde görev başarısını artırdığı **kanıtlanmış değildir**;
+hangisinin ne işe yaradığı ve maliyeti [docs/v0.2.0-raporu.md](docs/v0.2.0-raporu.md) içinde sayılarla, başarısız sonuçlar dahil yazılıdır.
+
+| Komut | Ne yapar |
+|---|---|
+| `usta lab run/smoke/compare` | **Reliability Lab:** aynı görevi temiz ve saldırılı (araç çıktısı/MCP/README enjeksiyonu, sahte otorite, sızdırma, hafıza zehirleme) çalıştırır; gerçekleşen **araç eylemlerini** değerlendirir (ASR, deneme/gerçekleşme, yanlış ret, toparlanma, token, gecikme). [docs/reliability-lab.md](docs/reliability-lab.md) |
+| `usta bench run --split dev-all\|final` · `diagnose` · `replay` · `regress` | Bench: görevler train/dev/final bölümlü (varsayılan final hariç), her başarısızlık nedene ayrılır (taxonomy), iz kaydı ve **modelsiz tekrar oynatma**, eşleştirilmiş kol karşılaştırması (yalnız yön; küçük örneklemde anlamlılık iddia edilmez), önceki sürüme göre regresyon |
+| `usta probe --deep` · `--protocol auto` | Model yetenek profili: protokol başına 9 sonda (uçtan uca ajan görevleri dahil), model revizyonu + yapılandırmaya bağlı kalıcı profil; `auto` koşu başında bir kez çözülür ve sabitlenir |
+| `usta mcp add --image … / prepare / test` | MCP sunucuları varsayılan olarak **yalıtılmış konteynerde**; paketler `prepare` ile bir kez indirilip sabitlenir |
+| `usta sandbox pin / status` | Sandbox imajının kimliğini sabitler; değişirse çalıştırma reddedilir |
+| `--symbol-tools` (deneysel) | Tree-sitter ile sembol araçları (`pip install 'usta[symbols]'`): `related_files`, `find_symbol`, `symbol_context` |
+
+Yürütme aşamaları (DISCOVER → PLAN → EDIT → VERIFY → DIAGNOSE → REPAIR) **gözlemlenir** ve denetim kaydına yazılır; her görev bir terminal
+durumla biter (`COMPLETE_VERIFIED`, `FAILED_VERIFICATION`, `BLOCKED`, …). Başarısız doğrulama başarı olarak gösterilmez; doğrulama ortamındaki
+eksik bağımlılık (kod hatası değil) ayrıca bildirilir. Deneysel olanlar varsayılan **kapalıdır** ve ölçümle doğrulanmadan açılmaz.
+
 ## Güvenlik özeti
 
 Varsayılan: ağ kapalı, sır yok, yazma yalnız çalışma alanında. Komutlar Docker sandbox'ında; ağ yalnız allowlist proxy'den.
+MCP sunucuları yalıtılmış konteynerde çalışır; kalıcı hafıza notları kaynak izi taşır ve şüpheli notlar onay ister; bağımlılıklar hash'li kilitten kurulur.
 Portal yerel, jetonlu ve CSP'li; model çıktısı hep düz metin basılır. Harici içerik (web, dosya, MCP, ek, plan, hafıza) modele
 *veri* olarak, nonce'lu işaretlerle verilir. Ayrıntı ve açık bildirimi: [SECURITY.md](SECURITY.md), [docs/design.md](docs/design.md).
 
@@ -130,10 +150,20 @@ Tüm oturum olayları `~/.usta/sessions/` altında kalıcıdır (portalda **Geç
 
 ### Ek araçlar: MCP
 
-Hiçbiri varsayılan gelmez; sen eklersin: `usta mcp add arama --env BRAVE_API_KEY -- npx -y @brave/brave-search-mcp-server@2.1.4 --transport stdio`,
-`usta mcp test arama`, `usta mcp list|enable|disable|remove`. Sunucu **bilgisayarında senin yetkilerinle** çalışır; yalnız güvendiğin kaynaklardan ekle.
-Anahtar değerleri komut geçmişine yazılmaz. Varsayılan olarak her MCP çağrısı onayına sunulur. Portal yalnız gözden geçirilmiş katalogdan ekler;
-serbest komut yalnız CLI'dadır.
+Hiçbiri varsayılan gelmez; sen eklersin. Sunucular varsayılan olarak **yalıtılmış Docker konteynerinde** çalışır (ağ kapalı, ev dizini ve
+Docker soketi yok, salt okunur kök, CPU/RAM/PID sınırlı; çalışma alanı yalnız istersen bağlanır). Docker/imaj yoksa sunucu başlamaz.
+
+```bash
+docker pull node:22-slim                              # Usta imajı kendiliğinden çekmez
+usta mcp add arama --image node:22-slim --allow-host api.search.brave.com --env BRAVE_API_KEY \
+  -- npx -y @brave/brave-search-mcp-server@2.1.4 --transport stdio
+usta mcp prepare arama   # paketleri yalnız paket kayıtlarına açık ağda indirir, imajı ve önbelleği sabitler
+usta mcp test arama
+```
+
+`usta mcp list|enable|disable|remove` de vardır. Sunucuyu ana makinede çalıştırmak (yalıtımsız, senin yetkilerinle) ayrı ve açık bir uyumluluk
+modudur: `--isolation host --i-understand-host-risk`. Anahtar değerleri komut geçmişine yazılmaz. Varsayılan olarak her MCP çağrısı onayına
+sunulur. Portal yalnız gözden geçirilmiş katalogdan ekler (her zaman konteynerde); serbest komut yalnız CLI'dadır.
 
 ### Beceriler
 

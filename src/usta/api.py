@@ -20,7 +20,7 @@ from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from usta import apis, attachments, filetree, mcpcatalog, mcpconfig, memory, skills
+from usta import apis, attachments, filetree, mcp_runtime, mcpcatalog, mcpconfig, memory, skills
 from usta import settings as usta_settings
 from usta.audit import AuditLog
 from usta.auth import LoginCodes
@@ -494,6 +494,10 @@ def create_app(
                     "approve": s.approve,
                     "command": list(s.command),
                     "env": [{"name": k, "set": k in have} for k in s.env],
+                    "isolation": s.isolation,
+                    "image": s.image,
+                    "allow_hosts": list(s.allow_hosts),
+                    "pinned": bool(s.pin_image and s.pin_cache),
                 }
             )
         catalog = [
@@ -504,6 +508,8 @@ def create_app(
                 "homepage": e.homepage,
                 "command": list(e.command),
                 "env": list(e.env),
+                "image": e.image,
+                "allow_hosts": list(e.allow_hosts),
                 "added": e.id in servers,
             }
             for e in mcpcatalog.CATALOG
@@ -516,7 +522,16 @@ def create_app(
         if entry is None:
             raise HTTPException(404, "katalogda yok")
         try:
-            mcpconfig.add_server(home, entry.id, list(entry.command), list(entry.env), "ask")
+            mcpconfig.add_server(
+                home,
+                entry.id,
+                list(entry.command),
+                list(entry.env),
+                "ask",
+                isolation="container",  # katalog sunucuları her zaman yalıtılmış çalışır
+                image=entry.image,
+                allow_hosts=list(entry.allow_hosts),
+            )
         except mcpconfig.McpConfigError as e:
             raise HTTPException(409 if "zaten" in str(e) else 400, str(e)) from None
         return {"name": entry.id}
@@ -547,11 +562,32 @@ def create_app(
         server = mcp_server(name)
         env = mcpconfig.resolve_env(home, server, os.environ)
         try:
-            with McpClient(list(server.command), env, timeout=90) as client:
-                tools = client.list_tools()
+            if server.isolation == "host":  # yalnız CLI'dan açıkça eklenmiş uyumluluk modu
+                with McpClient(list(server.command), env, timeout=90) as client:
+                    tools = client.list_tools()
+            else:
+                handle = mcp_runtime.start(server, home=home, env=env, workspace=None, timeout=90)
+                try:
+                    tools = handle.client.list_tools()
+                finally:
+                    handle.close()
         except McpError as e:
             raise HTTPException(502, str(e)) from None
         return {"tools": [{"name": t.name, "description": t.description[:200]} for t in tools]}
+
+    @api.post("/mcp/{name}/prepare")
+    def mcp_prepare(name: ServerName) -> dict:
+        server = mcp_server(name)
+        if server.isolation != "container":
+            raise HTTPException(400, "yalnız konteyner izolasyonlu sunucular hazırlanır")
+        try:
+            iid, digest = mcp_runtime.prepare(
+                server, home=home, env=mcpconfig.resolve_env(home, server, os.environ)
+            )
+            mcpconfig.set_pin(home, name, iid, digest)
+        except McpError as e:
+            raise HTTPException(502, str(e)) from None
+        return {"pinned": True}
 
     @api.post("/workspaces/{workspace}/tasks", status_code=202)
     def create_task(workspace: WorkspaceId, body: TaskIn) -> dict:

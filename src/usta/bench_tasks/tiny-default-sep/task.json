@@ -1,0 +1,11 @@
+{
+  "prompt": "test_words.py başarısız. words.py içindeki join_words fonksiyonuna sep parametresi için varsayılan değer olarak tek boşluk ekle. Mevcut çağrıları bozma, testleri değiştirme.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "dev",
+  "tier": "tiny"
+}

@@ -27,11 +27,16 @@ jobs:
       - name: Kurulum
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e '.[dev]'
+          python -m pip install --require-hashes -r requirements-dev.lock
+          python -m pip install --no-deps -e .
       - name: Lint
         run: ruff check src tests
       - name: Test
         run: pytest -q
+      - name: Reliability Lab smoke (harici model gerekmez)
+        run: |
+          usta lab validate
+          usta lab smoke
 
   audit:
     runs-on: ubuntu-latest
@@ -43,5 +48,6 @@ jobs:
       - name: Bağımlılık güvenlik taraması
         run: |
           python -m pip install pip-audit
-          python -m pip install -e .
-          pip-audit --skip-editable
+          python -m pip install --require-hashes -r requirements.lock
+          python -m pip install --no-deps -e .
+          pip-audit --no-deps --disable-pip -r requirements.lock

@@ -15,6 +15,70 @@ from typing import Self
 from usta.workspace import find_protected
 
 MAX_OUTPUT = 1_000_000  # bayt; fazlası kırpılır
+PIN_FILE = "sandbox-pin.json"
+_PIN_OK: set[tuple[str, str]] = set()  # bu süreçte doğrulanmış (imaj, kimlik) çiftleri
+
+
+def _home() -> Path:
+    return Path(os.environ.get("USTA_HOME") or Path.home() / ".usta")
+
+
+def local_image_id(image: str) -> str | None:
+    p = subprocess.run(
+        ["docker", "image", "inspect", "-f", "{{.Id}}", image],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return p.stdout.strip() if p.returncode == 0 and p.stdout.strip() else None
+
+
+def load_pins(home: Path | None = None) -> dict[str, str]:
+    path = (home or _home()) / PIN_FILE
+    try:
+        data = json.loads(path.read_text()) if path.is_file() and not path.is_symlink() else {}
+    except (OSError, ValueError):
+        return {}
+    return (
+        {k: v for k, v in data.items() if isinstance(k, str) and isinstance(v, str)}
+        if isinstance(data, dict)
+        else {}
+    )
+
+
+def pin_image(image: str, home: Path | None = None) -> str:
+    """Yerel imajın kimliğini (sha256) kaydeder; sonraki her çalıştırmada doğrulanır (tedarik zinciri)."""
+    iid = local_image_id(image)
+    if iid is None:
+        raise SandboxError(
+            f"imaj yerelde yok: {image} (docker pull {image}; Usta kendiliğinden çekmez)"
+        )
+    home = home or _home()
+    pins = load_pins(home) | {image: iid}
+    home.mkdir(parents=True, exist_ok=True, mode=0o700)
+    tmp = home / (PIN_FILE + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(pins, f, indent=2)
+    os.replace(tmp, home / PIN_FILE)
+    _PIN_OK.clear()
+    return iid
+
+
+def verify_pin(image: str) -> None:
+    """Sabitlenmiş imajın yerel kimliği değiştiyse çalıştırmayı reddeder (sabitleme yoksa serbest)."""
+    want = load_pins().get(image)
+    if want is None:
+        return
+    if (image, want) in _PIN_OK:
+        return
+    have = local_image_id(image)
+    if have != want:
+        raise SandboxError(
+            f"imaj sabitlemesi tutmuyor: {image} değişmiş (beklenen {want[:19]}…, yerel {(have or 'yok')[:19]}…). "
+            "Güveniyorsan yeniden sabitle: usta sandbox pin"
+        )
+    _PIN_OK.add((image, want))
 
 
 @dataclass(frozen=True)
@@ -126,6 +190,7 @@ def _run_container(
     network: str | None = None,
     env: dict[str, str] | None = None,
 ) -> RunResult:
+    verify_pin(cfg.image)
     name = f"usta-{uuid.uuid4().hex[:12]}"
     args = build_docker_args(cfg, command, name=name, network=network, env=env)
     proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -204,6 +269,7 @@ class ProxyNetwork:
 
     def _start(self) -> None:
         cfg = self.cfg
+        verify_pin(cfg.proxy_image)
         _docker("network", "create", "--internal", *LABELS, self.network)
         run = [
             "run",

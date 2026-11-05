@@ -291,7 +291,9 @@ def echo_call(i=1):
 
 
 def mcp_manager(tmp_path, model):
-    srv = _mcpconfig.Server("fake", (_sys.executable, "-I", _FAKE), (), "ask", True)
+    srv = _mcpconfig.Server(
+        "fake", (_sys.executable, "-I", _FAKE), (), "ask", True, isolation="host"
+    )
     return manager(tmp_path, model, mcp_servers=[srv])
 
 

@@ -1,5 +1,9 @@
 # Değişiklik günlüğü
 
+## Yayınlanmamış
+
+- v0.2.0 öncesi (imajsız) MCP kayıtları için hata mesajı düzeltildi: "docker pull None" yerine `usta mcp add --image` ile yeniden kaydetme yönergesi.
+
 ## 0.2.0 — güvenilirlik ve ölçüm
 
 Sonuçlar, maliyetler ve doğrulanamayan hipotezler: [docs/v0.2.0-raporu.md](docs/v0.2.0-raporu.md).

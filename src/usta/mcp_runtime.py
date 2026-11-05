@@ -176,9 +176,19 @@ def _rm(name: str) -> None:
     subprocess.run(["docker", "rm", "-f", name], capture_output=True, check=False)
 
 
+def _no_image_msg(name: str) -> str:
+    return (
+        f"'{name}' için imaj tanımlı değil (v0.2.0 öncesi kayıt). MCP sunucuları artık yalıtılmış konteynerde çalışır: "
+        f"`usta mcp add {name} --image <imaj> ...` ile yeniden kaydet "
+        "(ana makinede çalıştırmak yalnız `--isolation host --i-understand-host-risk` ile)"
+    )
+
+
 def _verify_pins(home: Path, srv: mcpconfig.Server) -> list[str]:
     notes = []
-    current = image_id(srv.image or "")
+    if not srv.image:
+        raise McpIsolationError(_no_image_msg(srv.name))
+    current = image_id(srv.image)
     if current is None:
         raise McpIsolationError(
             f"imaj yerelde yok: {srv.image} (Usta imajı kendiliğinden çekmez: docker pull {srv.image})"
@@ -299,7 +309,9 @@ def prepare(
     problem = docker_problem()
     if problem:
         raise McpIsolationError(f"{problem}: sunucu hazırlanamaz")
-    iid = image_id(srv.image or "")
+    if not srv.image:
+        raise McpIsolationError(_no_image_msg(srv.name))
+    iid = image_id(srv.image)
     if iid is None:
         raise McpIsolationError(
             f"imaj yerelde yok: {srv.image} (docker pull {srv.image}; Usta kendiliğinden çekmez)"

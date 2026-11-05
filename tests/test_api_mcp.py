@@ -21,6 +21,7 @@ def test_requires_auth_everywhere(tmp_path):
         ("post", "/mcp/x/enabled"),
         ("delete", "/mcp/x"),
         ("post", "/mcp/x/test"),
+        ("post", "/mcp/x/prepare"),
     ]:
         assert getattr(c, method)(url).status_code == 401, url
 
@@ -108,8 +109,8 @@ def test_enable_disable_and_remove(tmp_path):
 
 def test_test_endpoint_lists_tools_or_reports_friendly_error(tmp_path):
     c, home, _ = setup(tmp_path)
-    mcpconfig.add_server(home, "fake", [sys.executable, "-I", FAKE])
-    mcpconfig.add_server(home, "kirik", ["/yok/komut"])
+    mcpconfig.add_server(home, "fake", [sys.executable, "-I", FAKE], isolation="host")
+    mcpconfig.add_server(home, "kirik", ["/yok/komut"], isolation="host")
     ok = c.post("/mcp/fake/test", headers=AUTH)
     assert ok.status_code == 200 and "echo" in [t["name"] for t in ok.json()["tools"]]
     assert all(len(t["description"]) <= 200 for t in ok.json()["tools"])
@@ -150,6 +151,43 @@ def test_task_manager_picks_up_servers_added_after_startup(tmp_path):
     ws = tmp_path / "ws"
     ws.mkdir()
     assert m.start("w1", ws, "a").finished.wait(10)
-    mcpconfig.add_server(home, "fake", [sys.executable, "-I", FAKE])
+    mcpconfig.add_server(home, "fake", [sys.executable, "-I", FAKE], isolation="host")
     assert m.start("w1", ws, "b").finished.wait(15)
     assert "mcp__fake__echo" not in seen[0] and "mcp__fake__echo" in seen[1]
+
+
+def test_catalog_servers_are_added_isolated_with_image_and_network_allowlist(tmp_path):
+    c, home, _ = setup(tmp_path)
+    assert c.post("/mcp/catalog/brave-search", headers=AUTH).status_code == 201
+    stored = mcpconfig.load(home)["brave-search"]
+    assert stored.isolation == "container" and stored.image == "node:22-slim"
+    assert stored.allow_hosts == ("api.search.brave.com",) and stored.workspace == "none"
+    listed = next(
+        x for x in c.get("/mcp", headers=AUTH).json()["servers"] if x["name"] == "brave-search"
+    )
+    assert (
+        listed["isolation"] == "container"
+        and listed["image"] == "node:22-slim"
+        and listed["pinned"] is False
+    )
+    cat = next(
+        x for x in c.get("/mcp", headers=AUTH).json()["catalog"] if x["id"] == "brave-search"
+    )
+    assert cat["image"] == "node:22-slim" and cat["allow_hosts"] == ["api.search.brave.com"]
+
+
+def test_prepare_endpoint_refuses_host_mode_servers_and_reports_isolation_problems(
+    tmp_path, monkeypatch
+):
+    from usta import mcp_runtime
+
+    c, home, _ = setup(tmp_path)
+    mcpconfig.add_server(home, "yerel", [sys.executable, "-I", FAKE], isolation="host")
+    assert c.post("/mcp/yerel/prepare", headers=AUTH).status_code == 400
+    mcpconfig.add_server(home, "kap", ["x"], image="py:1")
+    monkeypatch.setattr(mcp_runtime, "docker_problem", lambda: "Docker bulunamadı")
+    r = c.post("/mcp/kap/prepare", headers=AUTH)
+    assert r.status_code == 502 and "Docker bulunamadı" in r.json()["detail"]
+    t = c.post("/mcp/kap/test", headers=AUTH)  # test de aynı kuralla: ana makineye düşmez
+    assert t.status_code == 502 and "geri düşülmez" in t.json()["detail"]
+    assert c.post("/mcp/yok/prepare", headers=AUTH).status_code == 404

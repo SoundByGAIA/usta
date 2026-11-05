@@ -4,16 +4,21 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from usta import context as ctx
 from usta.audit import AuditLog
 from usta.breaker import CircuitBreaker, Trip
 from usta.models import Message, ModelClient, ToolCall
+from usta.phases import PhaseTracker
 from usta.policy import Decision, Policy
 from usta.tools import Registry, ToolError
 from usta.verify import Verifier
 
+ROLLBACK_NOTE = (
+    "(Geri alma yalnız çalışma alanı DOSYALARINI kapsar; komutların dış etkileri — ağ istekleri, paket kurulumu, "
+    "sandbox dışına çıkan her şey — geri alınamaz.)"
+)
 SYSTEM_PROMPT = (
     "Sen Usta'sın: bir çalışma alanında araçlarla görev yapan yardımcı bir ajan. "
     "Dosyalara yalnız çalışma alanında eriş; komutlar sandbox'ta çalışır (ağ kapalı; yalnız operatörün izin verdiği alan adlarına proxy ile açılabilir). "
@@ -35,6 +40,7 @@ class AgentResult:
     messages: list[Message]
     cancelled: bool = False
     blocked: bool = False  # devre kesici akışı kesti, konu kullanıcıya bırakıldı
+    terminal: str = ""  # aşama izleyicinin terminal durumu (phases.TERMINALS); izleyici yoksa boş
 
 
 class Agent:
@@ -55,7 +61,14 @@ class Agent:
         context_window: int | None = None,
         inbox: Callable[[], list[str]] | None = None,
         shrink_writes: int | None = None,
+        phases: PhaseTracker | None = None,
     ):
+        self.phases = phases  # yürütme aşamaları gözlemcisi (isteğe bağlı; döngüyü değiştirmez)
+        if phases is not None and phases.on_transition is None:
+            # geçişler denetim kaydına yazılır; SSE/olay akışı (API sözleşmesi) değişmez
+            phases.on_transition = lambda tr: self.audit.record(
+                "phase", step=tr.step, frm=tr.frm, to=tr.to, reason=tr.reason, t_ms=tr.t_ms
+            )
         self.inbox = inbox
         self.shrink_writes = (
             shrink_writes  # None: kapalı; N: son N yazma tam kalır, eskilerin gövdesi atılır
@@ -77,6 +90,34 @@ class Agent:
         self._dirty = False  # son kapıdan beri başarılı bir düzenleme oldu mu
 
     def run(self, prompt: str) -> AgentResult:
+        try:
+            result = self._run(prompt)
+        except Exception:
+            if self.phases is not None:
+                self.phases.finish(answered=False, error=True)
+            raise
+        if self.phases is not None:
+            result = replace(
+                result,
+                terminal=self.phases.finish(
+                    answered=not (result.cancelled or result.truncated or result.blocked),
+                    truncated=result.truncated,
+                    cancelled=result.cancelled,
+                    blocked=result.blocked,
+                ),
+            )
+            summary = self.phases.summary()
+            self.audit.record(
+                "terminal",
+                state=result.terminal,
+                repairs=summary["repairs"],
+                verify_passes=summary["verify_passes"],
+                verify_fails=summary["verify_fails"],
+                signals=summary["signals"],
+            )
+        return result
+
+    def _run(self, prompt: str) -> AgentResult:
         # Hafıza güvenilmeyen veridir: sistem rolüne değil, işaretli olarak kullanıcı mesajına girer.
         first = f"{self.memory_context}\n\nGörev: {prompt}" if self.memory_context else prompt
         messages = [Message("system", self.system_prompt), Message("user", first)]
@@ -135,6 +176,14 @@ class Agent:
                 stop = self._handle_trip(trip, messages, step)
                 if stop is not None:
                     return stop
+            if self.phases is not None and self.phases.stop_reason:  # yalnız enforce açıkken
+                why = self.phases.stop_reason
+                self.audit.record("phase_stop", reason=why)
+                answer = (
+                    f"Durdum: {why}. Doğrulama hâlâ başarısız; yeni düzeltme denemeleri sonuç vermedi. "
+                    "Kullanıcıdan yönlendirme bekliyorum (çalışma alanı dosyaları olduğu gibi duruyor)."
+                )
+                return AgentResult(answer, step, False, messages, blocked=True)
             if self._cancelled():
                 return self._stopped(step, messages)
         self.audit.record("truncated", steps=self.max_steps)
@@ -182,7 +231,8 @@ class Agent:
         if trip.final:
             answer = (
                 f"Durdum: {trip.reason}. Aynı yaklaşım tekrarlandığı için devam etmiyorum; "
-                f"kullanıcıdan yönlendirme bekliyorum.\nDenenenler:\n{tried}"
+                f"kullanıcıdan yönlendirme bekliyorum.\nDenenenler:\n{tried}\n"
+                f"{ROLLBACK_NOTE}"
             )
             self.breaker.rewind()  # type: ignore[union-attr]
             self._dirty = False
@@ -192,7 +242,7 @@ class Agent:
         messages.append(
             Message(
                 "user",
-                f"Devre kesici: {trip.reason}. Çalışma alanı son güvenli duruma geri alındı.\n"
+                f"Devre kesici: {trip.reason}. Çalışma alanı dosyaları son güvenli duruma geri alındı. {ROLLBACK_NOTE}\n"
                 f"Denenenler:\n{tried}\n"
                 "Bu yaklaşımları tekrarlama. Kök nedeni farklı bir yöntemle ara: ilgili kodu outline/read_file ile "
                 "yeniden incele, hatayı küçük bir komutla yeniden üret, sonra farklı bir düzeltme dene.",
@@ -230,6 +280,11 @@ class Agent:
         return self.cancel is not None and self.cancel.is_set()
 
     def _emit(self, type_: str, **data) -> None:
+        if self.phases is not None:
+            self.phases.observe(type_, data)
+        self._notify(type_, data)
+
+    def _notify(self, type_: str, data: dict) -> None:
         if self.on_event:
             self.on_event(type_, data)
 

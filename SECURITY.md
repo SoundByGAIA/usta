@@ -20,8 +20,26 @@ Ayrıntı: [docs/design.md](docs/design.md) §5. Özet ve **bilinçli sınırlar
   Usta imajı kendiliğinden çekmez.
 - **Oto onay modu** onay isteyen eylemleri sormadan çalıştırır. Yasaklar (DENY) ve sandbox sınırları geçerlidir; izinli olmayan alan adlarına
   `fetch_url` oto modda da reddedilir. Eklediğiniz MCP araçları oto modda sorulmadan çağrılır: **güvenmediğiniz sunucu eklemeyin.**
-- **MCP sunucuları sandbox'ta değildir:** bilgisayarınızda sizin yetkilerinizle çalışır. Katalogdaki paket sürümü sabittir (`npx -y paket@sürüm`),
-  ama alt bağımlılıklar npm tarafından çözülür; kilit dosyası/bütünlük denetimi yoktur.
+- **MCP sunucuları varsayılan olarak yalıtılmış konteynerde çalışır (v0.2.0):** kök dosya sistemi salt okunur, root olmayan kullanıcı,
+  `cap_drop=ALL`, `no-new-privileges`, CPU/RAM/PID sınırı, ağ kapalı (yalnız `--allow-host` ile allowlist proxy), ev dizini ve Docker soketi
+  bağlanmaz, çalışma alanı yalnız istenirse bağlanır (`.git`/`.usta` yine salt okunur), sunucuya yalnız kendi tanımlı sırları verilir.
+  Docker/imaj/sabitleme yoksa sunucu **başlamaz**; ana makineye sessizce düşülmez. `usta mcp prepare` paketleri bir kez, yalnız paket kayıtlarına açık
+  bir ağda (kurulum betikleri kapalı) önbelleğe indirir ve imaj kimliğiyle önbellek özetini sabitler; sonra ağ kapalı çalışır, her başlatmada
+  özet doğrulanır. Sınırlar: Docker erişimi kök yetkisi demektir; konteyner çekirdeği ana makineyle paylaşır (çekirdek/runtime açıkları kapsam dışıdır);
+  izinli alan adlarına giden HTTPS içeriği opaktır; `--isolation host --i-understand-host-risk` açık bir uyumluluk modudur ve sunucuyu
+  **ana makinede, sizin yetkilerinizle** çalıştırır (her başlatmada uyarı verilir). Oto onay modunda MCP araçları sorulmadan çağrılabilir:
+  güvenmediğiniz sunucu eklemeyin.
+- **Kalıcı hafıza zehirleme (v0.2.0):** `remember` ile yazılan her not kaynağını taşır (`[kaynak: model, görev …]`) ve bağlamda "doğrulanmamış"
+  olarak görünür. Komut/bağlantı/gizli bilgi benzeri/onay iddiası/talimat geçersiz kılma içeren notlar kullanıcı onayı ister; oto onay modunda
+  **reddedilir**. Zararsız ama tuhaf notlar (yanlış pozitif) ya da bu kalıplara uymayan ince zehirlemeler yine yazılabilir; notları `/hafıza` ile gözden geçirin.
+- **Dış içerik işaretlemesi güvenlik sınırı DEĞİLDİR:** web/MCP/hafıza içeriği nonce'lu işaretlerle *veri* olarak verilir, ama bu bir modeli ikna edici
+  bir enjeksiyondan korumaz. Asıl sınır izin motorudur (yasak yazma yolları, çalışma alanı dışı okuma, bilinmeyen araç, ağ allowlist'i). Çalışma
+  alanı dosyaları (`read_file`) işaretlenmez. Çalışma alanı **içindeki** yazmaları (ör. bir test dosyasını boşaltmak) ve yanıt metnine sızdırmayı hiçbir kural engelleyemez;
+  `usta lab` bunu ölçer ve açıkça raporlar.
+- **Geri alma yalnız dosyaları kapsar:** devre kesici çalışma alanı dosyalarını geri sarar; komutların dış etkileri (ağ istekleri, paket kurulumu, sandbox dışına çıkan her şey) geri alınamaz.
+- **Tedarik zinciri (v0.2.0):** Python bağımlılıkları hash'li, çok platformlu kilit dosyalarıyla (`requirements*.lock`) kurulur ve CI'da `pip-audit` kilidi tarar.
+  Sandbox ve MCP imajları etiketle seçilir; `usta sandbox pin` / `usta mcp prepare` yerel imaj kimliğini sabitler ve her çalıştırmada doğrular
+  (etiket başka içeriğe işaret ederse çalışmaz). Usta imajı kendiliğinden çekmez; ilk kez çekilen imajın güvenilirliği sizin kararınızdır.
 - **Sızdırma kanalları** (belgeli): izinli alan adlarına HTTPS; model uç noktanız (istemler ve açılan dosya içerikleri o API'ye gider);
   önizlemede ajanın yazdığı sayfanın kendi kendine başka adrese yönlenmesi (iframe sandbox'ı bunu engelleyemez; `connect-src`, `form-action` ve
   `allow-top-navigation` kapalıdır).

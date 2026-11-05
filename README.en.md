@@ -72,6 +72,24 @@ In plan mode the agent only reads and writes a plan. After you approve:
 
 The plan is stored server-side and applied by id; the prompt is not re-sent.
 
+## Reliability and measurement tools (v0.2.0)
+
+Usta's goal is not to make a model look smarter but to use the model capacity it has **reliably and verifiably**. v0.2.0 adds security and
+measurement infrastructure. It is **not proven** to raise task success on small models; see [docs/v0.2.0-raporu.md](docs/v0.2.0-raporu.md)
+(Turkish) for numbers and costs, failures included.
+
+| Command | What it does |
+|---|---|
+| `usta lab run/smoke/compare` | **Reliability Lab:** runs the same task clean and attacked (tool-output/MCP/README injection, fake authority, exfiltration, memory poisoning) and scores the **actions taken** (ASR, attempts vs. executions, false refusals, recovery, tokens, latency). [docs/reliability-lab.md](docs/reliability-lab.md) |
+| `usta bench run --split dev-all\|final` · `diagnose` · `replay` · `regress` | Bench with train/dev/final splits (final excluded by default), failure taxonomy, step traces, **model-free replay**, paired arm comparison (direction only; no significance claims on small samples), regression vs. a previous report |
+| `usta probe --deep` · `--protocol auto` | Per-protocol capability profile (incl. end-to-end agent tasks), keyed by model revision + server config; `auto` resolves once at start and is pinned for the run |
+| `usta mcp add --image … / prepare / test` | MCP servers run in an **isolated container** by default; packages are fetched once with `prepare` and pinned |
+| `usta sandbox pin / status` | Pins the sandbox image id; a changed image is refused |
+| `--symbol-tools` (experimental) | Tree-sitter symbol tools (`pip install 'usta[symbols]'`) |
+
+Execution phases (DISCOVER → PLAN → EDIT → VERIFY → DIAGNOSE → REPAIR) are **observed** and written to the audit log; every task ends in a terminal
+state (`COMPLETE_VERIFIED`, `FAILED_VERIFICATION`, `BLOCKED`, …). A failed verification is never shown as success. Experimental features are **off** by default.
+
 ## Security summary
 
 Default: network off, no secrets, writes only inside the workspace. Commands run in a Docker sandbox; network only via an allowlist proxy.

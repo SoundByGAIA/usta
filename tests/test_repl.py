@@ -200,7 +200,7 @@ def test_manual_approval_prompt_allow_and_deny(tmp_path):
     from usta import mcpconfig
 
     fake = str(Path(__file__).parent / "fake_mcp.py")
-    srv = mcpconfig.Server("fake", (sys.executable, "-I", fake), (), "ask", True)
+    srv = mcpconfig.Server("fake", (sys.executable, "-I", fake), (), "ask", True, isolation="host")
     for answer, expect in (("e", "selam mcp"), ("h", "reddedildi")):
         model = Scripted(call("mcp__fake__echo", {"text": "selam mcp"}), ModelResponse("bitti"))
         ws = tmp_path / f"w{answer}"
@@ -227,7 +227,7 @@ def test_auto_mode_does_not_prompt(tmp_path):
     from usta import mcpconfig
 
     fake = str(Path(__file__).parent / "fake_mcp.py")
-    srv = mcpconfig.Server("fake", (sys.executable, "-I", fake), (), "ask", True)
+    srv = mcpconfig.Server("fake", (sys.executable, "-I", fake), (), "ask", True, isolation="host")
     model = Scripted(call("mcp__fake__echo", {"text": "otomatik"}), ModelResponse("bitti"))
     mgr = TaskManager(lambda: model, home=tmp_path / "h", mcp_servers=[srv])
     ws = tmp_path / "w"

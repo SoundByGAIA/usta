@@ -17,6 +17,8 @@ class Entry:
     command: tuple[str, ...]
     env: tuple[str, ...]
     homepage: str
+    image: str = "node:22-slim"  # yerelde çekilmiş olmalı; Usta imajı kendiliğinden çekmez
+    allow_hosts: tuple[str, ...] = ()  # çalışma anında erişebileceği alan adları (allowlist proxy)
 
 
 CATALOG: tuple[Entry, ...] = (
@@ -28,6 +30,7 @@ CATALOG: tuple[Entry, ...] = (
         command=("npx", "-y", "@brave/brave-search-mcp-server@2.1.4", "--transport", "stdio"),
         env=("BRAVE_API_KEY",),
         homepage="https://github.com/brave/brave-search-mcp-server",
+        allow_hosts=("api.search.brave.com",),
     ),
 )
 

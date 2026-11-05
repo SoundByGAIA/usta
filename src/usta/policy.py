@@ -5,11 +5,17 @@ from __future__ import annotations
 from enum import Enum
 from pathlib import Path
 
+from usta import memory
 from usta.fetch import validate_url
 from usta.proxy import host_allowed
 
 FILE_TOOLS = {"read_file", "write_file", "edit_file", "list_dir", "outline", "read_symbol"}
 WRITE_TOOLS = {"write_file", "edit_file"}
+SYMBOL_TOOLS = {
+    "find_symbol",
+    "symbol_context",
+    "related_files",
+}  # salt okunur, yalnız çalışma alanı indeksi
 # Ajanın yazamayacağı yollar: .git (hook/config ile kullanıcı git çalıştırınca ana makinede kod çalışır),
 # .usta (proje hafızası yalnız `remember` aracıyla ve temizlenerek yazılır).
 PROTECTED_DIRS = frozenset({".git", ".usta"})
@@ -57,6 +63,16 @@ class Policy:
                 if mode == "allow"
                 else Decision.ASK
             )
+        if tool in SYMBOL_TOOLS:
+            path = args.get("path")
+            if (
+                path is not None
+            ):  # symbol_context'te isteğe bağlı dosya yolu: çalışma alanı dışına çıkamaz
+                try:
+                    resolve_path(self.root, path)
+                except PathEscapeError:
+                    return Decision.DENY
+            return Decision.ALLOW
         if tool in FILE_TOOLS:
             try:
                 full = resolve_path(self.root, args.get("path"))
@@ -81,7 +97,8 @@ class Policy:
                 return Decision.DENY  # geçersiz/IP/yerel hedef: onaya bile sunulmaz
             return Decision.ALLOW if host_allowed(host, self.allowed_hosts) else Decision.ASK
         if tool == "remember":
-            return Decision.ALLOW  # yalnız çalışma alanındaki .usta/memory/NOTES.md'ye, sınırlı not
+            # kalıcı hafıza sonraki görevleri etkiler: komut/URL/gizli bilgi/onay iddiası içeren not kullanıcı onayı ister
+            return Decision.ASK if memory.suspicious(args.get("text")) else Decision.ALLOW
         if tool == "web_search":
             return Decision.ASK
         return Decision.DENY

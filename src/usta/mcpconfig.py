@@ -12,13 +12,22 @@ import re
 import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
+from dataclasses import replace as dc_replace
 from pathlib import Path
 
 NAME = re.compile(r"[a-z0-9][a-z0-9_-]{0,29}")
 ENV_NAME = re.compile(r"[A-Z_][A-Z0-9_]{0,63}")
 BLOCKED_ENV_PREFIXES = ("LD_", "DYLD_")
 APPROVE_MODES = ("ask", "allow")
+ISOLATIONS = ("container", "host")  # varsayılan container; host yalnız açık "uyumluluk modu"
+WORKSPACE_MODES = ("none", "ro", "rw")  # sunucuya çalışma alanı bağlanır mı
 MAX_ARG = 4096
+IMAGE = re.compile(
+    r"[a-z0-9][a-z0-9._/-]{0,127}(?::[A-Za-z0-9._-]{1,128})?(?:@sha256:[0-9a-f]{64})?"
+)
+MEMORY = re.compile(r"[1-9][0-9]{1,4}[mg]")
+CPUS = re.compile(r"(?:0\.[1-9][0-9]?|[1-4](?:\.[0-9])?)")
+HOST = re.compile(r"(?:\*\.)?[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?")
 
 
 class McpConfigError(Exception):
@@ -32,6 +41,50 @@ class Server:
     env: tuple[str, ...] = ()
     approve: str = "ask"
     enabled: bool = True
+    # İzolasyon (docs/design.md §5.3). Varsayılan: konteyner (ağ kapalı, çalışma alanı bağlı değil,
+    # kök dosya sistemi salt okunur, sırlar yalnız tanımlı env adları). `host` açık uyumluluk modudur.
+    isolation: str = "container"
+    image: str | None = None
+    allow_hosts: tuple[str, ...] = ()  # yalnız bu alan adlarına allowlist proxy ile çıkış
+    workspace: str = "none"
+    memory: str = "256m"
+    cpus: str = "0.5"
+    pids: int = 64
+    pin_image: str = ""  # `usta mcp prepare` anında kaydedilen yerel imaj kimliği (sha256:...)
+    pin_cache: str = ""  # hazırlanan paket önbelleğinin içerik özeti (sha256)
+
+
+def validate_runtime(
+    isolation: object,
+    image: object,
+    allow_hosts: object,
+    workspace: object,
+    memory: object = "256m",
+    cpus: object = "0.5",
+    pids: object = 64,
+) -> None:
+    if isolation not in ISOLATIONS:
+        raise McpConfigError("isolation 'container' veya 'host' olmalı")
+    if image is not None and (
+        not isinstance(image, str) or not IMAGE.fullmatch(image) or ".." in image
+    ):
+        raise McpConfigError(f"geçersiz imaj adı: {image!r}")
+    if isolation == "container" and image is None:
+        raise McpConfigError("konteyner izolasyonu için imaj gerekir (--image, ör. node:22-slim)")
+    if not isinstance(allow_hosts, (list, tuple)) or not all(
+        isinstance(h, str) and HOST.fullmatch(h) for h in allow_hosts
+    ):
+        raise McpConfigError("allow_hosts, alan adlarının listesi olmalı")
+    if isolation == "host" and allow_hosts:
+        raise McpConfigError("allow_hosts yalnız konteyner izolasyonunda anlamlıdır")
+    if workspace not in WORKSPACE_MODES:
+        raise McpConfigError("workspace 'none', 'ro' veya 'rw' olmalı")
+    if not isinstance(memory, str) or not MEMORY.fullmatch(memory):
+        raise McpConfigError("memory geçersiz (ör. 256m, 1g)")
+    if not isinstance(cpus, str) or not CPUS.fullmatch(cpus):
+        raise McpConfigError("cpus geçersiz (0.1-4)")
+    if not isinstance(pids, int) or isinstance(pids, bool) or not 8 <= pids <= 512:
+        raise McpConfigError("pids 8-512 arasında olmalı")
 
 
 def validate(name: object, command: object, env: object, approve: object) -> None:
@@ -99,8 +152,39 @@ def load(home: Path) -> dict[str, Server]:
             raise McpConfigError(f"mcp.json: '{name}' geçersiz")
         command, env, approve = d.get("command"), d.get("env", []), d.get("approve", "ask")
         validate(name, command, env, approve)
+        # Eski kayıtlarda isolation yoktur: güvenli varsayılan konteynerdir; imajı olmayan eski
+        # kayıt bu yüzden kapalı başarısız olur (sessizce ana makinede çalışmaz).
+        rt = {
+            "isolation": d.get("isolation", "container"),
+            "image": d.get("image"),
+            "allow_hosts": d.get("allow_hosts", []),
+            "workspace": d.get("workspace", "none"),
+            "memory": d.get("memory", "256m"),
+            "cpus": d.get("cpus", "0.5"),
+            "pids": d.get("pids", 64),
+        }
+        if rt["isolation"] == "container" and rt["image"] is None:
+            runtime = Server(
+                name, tuple(command), tuple(env), approve, d.get("enabled", True) is True
+            )
+            out[name] = runtime  # imajsız: başlatma anında "imaj gerekli" hatası verir
+            continue
+        validate_runtime(**rt)
         out[name] = Server(
-            name, tuple(command), tuple(env), approve, d.get("enabled", True) is True
+            name,
+            tuple(command),
+            tuple(env),
+            approve,
+            d.get("enabled", True) is True,
+            isolation=rt["isolation"],
+            image=rt["image"],
+            allow_hosts=tuple(rt["allow_hosts"]),
+            workspace=rt["workspace"],
+            memory=rt["memory"],
+            cpus=rt["cpus"],
+            pids=rt["pids"],
+            pin_image=d.get("pin_image", "") if isinstance(d.get("pin_image"), str) else "",
+            pin_cache=d.get("pin_cache", "") if isinstance(d.get("pin_cache"), str) else "",
         )
     return out
 
@@ -112,6 +196,15 @@ def _save(home: Path, servers: Mapping[str, Server]) -> None:
             "env": list(s.env),
             "approve": s.approve,
             "enabled": s.enabled,
+            "isolation": s.isolation,
+            "image": s.image,
+            "allow_hosts": list(s.allow_hosts),
+            "workspace": s.workspace,
+            "memory": s.memory,
+            "cpus": s.cpus,
+            "pids": s.pids,
+            "pin_image": s.pin_image,
+            "pin_cache": s.pin_cache,
         }
         for s in servers.values()
     }
@@ -125,13 +218,35 @@ def add_server(
     env: list[str] | None = None,
     approve: str = "ask",
     replace: bool = False,
+    *,
+    isolation: str = "container",
+    image: str | None = None,
+    allow_hosts: list[str] | tuple[str, ...] = (),
+    workspace: str = "none",
+    memory: str = "256m",
+    cpus: str = "0.5",
+    pids: int = 64,
 ) -> Server:
     env = list(env or [])
     validate(name, command, env, approve)
+    validate_runtime(isolation, image, list(allow_hosts), workspace, memory, cpus, pids)
     servers = load(home)
     if name in servers and not replace:
         raise McpConfigError(f"'{name}' zaten var (üzerine yazmak için --replace)")
-    servers[name] = Server(name, tuple(command), tuple(env), approve, True)
+    servers[name] = Server(
+        name,
+        tuple(command),
+        tuple(env),
+        approve,
+        True,
+        isolation=isolation,
+        image=image,
+        allow_hosts=tuple(h.lower() for h in allow_hosts),
+        workspace=workspace,
+        memory=memory,
+        cpus=cpus,
+        pids=pids,
+    )
     _save(home, servers)
     return servers[name]
 
@@ -151,8 +266,16 @@ def set_enabled(home: Path, name: str, enabled: bool) -> None:
     servers = load(home)
     if name not in servers:
         raise McpConfigError(f"'{name}' yok")
-    s = servers[name]
-    servers[name] = Server(s.name, s.command, s.env, s.approve, enabled)
+    servers[name] = dc_replace(servers[name], enabled=enabled)
+    _save(home, servers)
+
+
+def set_pin(home: Path, name: str, image_id: str, cache_digest: str) -> None:
+    """`usta mcp prepare` sonrası bütünlük sabitlemesi: imaj kimliği ve paket önbelleği özeti."""
+    servers = load(home)
+    if name not in servers:
+        raise McpConfigError(f"'{name}' yok")
+    servers[name] = dc_replace(servers[name], pin_image=image_id, pin_cache=cache_digest)
     _save(home, servers)
 
 

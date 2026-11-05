@@ -19,6 +19,7 @@ from usta.fetch import validate_url
 from usta.mcp_tools import McpSession
 from usta.modelctl import ModelControl
 from usta.models import ModelClient, ModelError
+from usta.phases import PhaseTracker
 from usta.policy import Policy
 from usta.proxy import host_allowed
 from usta.sandbox import run_command
@@ -132,6 +133,7 @@ class Task:
         self.plan_of: str | None = None
         self.series: Series | None = None
         self.blocked = False
+        self.terminal = ""  # yürütme aşamaları terminal durumu (phases.TERMINALS)
         self.diff_failed = False
         self.store: SessionStore | None = None
         self.mode = mode
@@ -213,8 +215,10 @@ class TaskManager:
         guard: bool = False,
         model_control: ModelControl | None = None,
         shrink_writes: int | None = None,
+        symbol_tools: bool = False,
     ):
         self.shrink_writes = shrink_writes
+        self.symbol_tools = symbol_tools  # deneysel: Tree-sitter sembol araçları (usta[symbols])
         self.model_control = model_control
         self.context_window = context_window
         self.guard = guard
@@ -465,6 +469,16 @@ class TaskManager:
             # sorgu dizesiyle veri sızdırma yolu: oto onay bunu kendiliğinden açmaz (--allow-host gerekir)
             task.emit("denied", {"tool": tool, "reason": "oto onay: izinli olmayan alan adı"})
             return False
+        if task.mode == "auto" and tool == "remember" and memory.suspicious(args.get("text")):
+            # kalıcı hafıza zehirlenmesi: oto onay bunu kendiliğinden açmaz
+            task.emit(
+                "denied",
+                {
+                    "tool": tool,
+                    "reason": f"oto onay: şüpheli not ({memory.suspicious(args.get('text'))})",
+                },
+            )
+            return False
         if task.mode == "auto":  # kullanıcı seçti: sorma, ama kaydet (DENY kararları buraya gelmez)
             task.emit("auto_approved", {"tool": tool, "args": args})
             return not task.cancel.is_set()
@@ -513,14 +527,27 @@ class TaskManager:
             with contextlib.suppress(OSError, ValueError):  # hafıza yoksa/bozuksa görev sürer
                 memory_context = memory.render_context(task.root)
             servers = self.mcp_servers() if callable(self.mcp_servers) else self.mcp_servers
-            if servers:
-                mcp = McpSession(servers, self.home, cancel=task.cancel)
+            if (
+                servers and task.mode != "plan"
+            ):  # plan modunda MCP araçları verilmez: başlatma da yok
+                mcp = McpSession(
+                    servers,
+                    self.home,
+                    cancel=task.cancel,
+                    workspace=task.root,
+                    on_event=lambda kind, data: audit.record(kind, **data),
+                )
                 mcp.start()  # bozuk sunucu görevi düşürmez, uyarı olarak bildirilir
                 for w in mcp.warnings:
                     task.emit("warning", {"message": w})
             plan = task.mode == "plan"
             registry = build_registry(
-                ToolContext(root=task.root, cancel=task.cancel, allowed_hosts=self.allowed_hosts),
+                ToolContext(
+                    root=task.root,
+                    cancel=task.cancel,
+                    allowed_hosts=self.allowed_hosts,
+                    task_id=task.id,
+                ),
                 extra=mcp.tools if mcp else (),
             )
             if plan:  # plan modu: yalnız okuma; yazma, komut, not ve MCP araçları hiç verilmez
@@ -541,12 +568,14 @@ class TaskManager:
                 inbox=task.drain,
                 shrink_writes=self.shrink_writes,
                 system_prompt=f"{SYSTEM_PROMPT}\n\n{PLAN_PROMPT}" if plan else None,
+                phases=PhaseTracker() if not plan else None,  # yalnız gözlem: döngüyü değiştirmez
             )
             result = agent.run(
                 attachments.compose(task.model_prompt or task.prompt, list(task.files))
             )
             task.answer = result.answer
             task.blocked = result.blocked
+            task.terminal = result.terminal
             if result.cancelled:
                 status = "cancelled"
         except ModelError as e:
@@ -593,6 +622,8 @@ class TaskManager:
             ):  # önce çalışma alanını bırak: aşamalı uygulamada sonraki görev buraya girer
                 self._busy.discard(task.workspace_id)
             data = {"status": status, "answer": task.answer}
+            if task.terminal:
+                data["terminal"] = task.terminal  # ör. COMPLETE_VERIFIED / FAILED_VERIFICATION
             if error:
                 data["error"] = error
             nxt = self._continue_series(task, status)

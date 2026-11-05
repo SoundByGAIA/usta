@@ -1,0 +1,11 @@
+{
+  "prompt": "test_nums.py başarısız. Hatayı bul ve nums.py içinde düzelt. Testleri değiştirme.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "dev",
+  "tier": "tiny"
+}

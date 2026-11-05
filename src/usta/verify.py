@@ -74,9 +74,33 @@ def failure_signature(output: str) -> str:
     return hashlib.sha1(text.strip().encode(), usedforsecurity=False).hexdigest()
 
 
+_ENV_PATTERNS = (
+    re.compile(r"(?:ModuleNotFoundError|ImportError): No module named '?([A-Za-z0-9_.\-]+)'?"),
+    re.compile(r"(?:sh|bash): (?:\d+: )?([A-Za-z0-9_.\-]+): (?:command )?not found"),
+)
+
+
+def env_problem(output: str, root: Path | None = None) -> str | None:
+    """Doğrulama çıktısı KOD hatası mı yoksa ORTAM sorunu mu: sandbox'ta olmayan bir paket/komut aranıyorsa ortamdır.
+
+    Proje kendi modülünü bulamıyorsa (ör. `No module named 'shop.cart'`) bu kod hatasıdır; kökte karşılığı olmayan
+    bir üçüncü taraf paket ya da komut (pytest, numpy, ...) bulunamıyorsa ortam sorunudur: sandbox'ta ağ kapalı olduğundan
+    ajan bunu kodla düzeltemez ve yeniden denemek onarım bütçesini boşa harcar."""
+    for rx in _ENV_PATTERNS:
+        for m in rx.finditer(output):
+            name = m.group(1)
+            top = name.split(".")[0]
+            if root is not None and (
+                (Path(root) / f"{top}.py").exists() or (Path(root) / top).is_dir()
+            ):
+                continue  # projenin kendi modülü: kod hatası
+            return f"eksik {'komut' if rx is not _ENV_PATTERNS[0] else 'bağımlılık'}: {name}"
+    return None
+
+
 @dataclass(frozen=True)
 class GateResult:
-    status: str  # passed | failed | unavailable
+    status: str  # passed | failed | unavailable | env_error
     command: str = ""
     output: str = ""
     reason: str = ""
@@ -121,6 +145,9 @@ class CompletionGate:
                 return GateResult("unavailable", text, out, "keşif hiç test bulamadı")
             self.failures, self._last_sig = 0, None
             return GateResult("passed", text, summarize_failure(out, 400))
+        env = env_problem(out, self.root)
+        if env:  # kod hatası değil: onarım turu/devre kesici sayılmaz, ajan kodla düzeltemez
+            return GateResult("env_error", text, summarize_failure(out, 600), env)
         self.failures += 1
         sig = failure_signature(out)
         repeated = sig == self._last_sig
@@ -189,6 +216,13 @@ class Verifier:
                 "Hatayı düzelt; bitirmeden önce testin geçtiğinden emin ol."
             )
             return Intervention(False, message=msg, status="failed", command=r.command)
+        if r.status == "env_error":
+            note = (
+                f"Doğrulama YAPILAMADI: doğrulama ortamı sorunu, kod hatası değil ({r.reason}). "
+                "Sandbox'ta ağ kapalı olduğundan paket kurulamaz; ortamı (imaj/doğrulama komutu) düzeltmek kullanıcıya kalır. "
+                f"Çıktının sonu:\n{r.output}"
+            )
+            return Intervention(True, note=note, status="env_error", command=r.command)
         if self.nudge_no_tests and not self._nudged and "test bulunamadı" in r.reason:
             self._nudged = True
             msg = (

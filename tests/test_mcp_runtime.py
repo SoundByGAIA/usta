@@ -114,6 +114,9 @@ def test_legacy_config_without_isolation_defaults_to_container_and_never_runs_on
     assert srv.isolation == "container" and srv.image is None
     with McpSession([srv], tmp_path) as s:
         assert s.tools == [] and any("imaj" in w for w in s.warnings)
+        if mcp_runtime.docker_problem() is None:  # eski kayıt: anlaşılır yönlendirme, "None" yok
+            assert all("None" not in w for w in s.warnings)
+            assert any("usta mcp add eski --image" in w for w in s.warnings)
     assert not (tmp_path / "HOST-RAN").exists()  # sessizce ana makinede çalışmadı
 
 

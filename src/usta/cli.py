@@ -173,11 +173,26 @@ def _add_model_args(p: argparse.ArgumentParser) -> None:
         help="DENEYSEL: find_symbol/symbol_context/related_files araçlarını aç (pip install 'usta[symbols]'; USTA_SYMBOL_TOOLS=1)",
     )
     p.add_argument(
+        "--taint-gate",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="kaynak izi kapısı (varsayılan AÇIK): okunan içerikten türeyen yazma/komut hedefleri onay ister, "
+        "oto modda reddedilir; kapatmak için --no-taint-gate ya da USTA_TAINT_GATE=0",
+    )
+    p.add_argument(
         "--protocol",
         choices=(*PROTOCOLS, "auto"),
         help="native: yerel araç çağrısı; json: şemayla kısıtlı JSON; text: JSON-metin yedek protokolü; "
         "auto: profilden seç ve koşu boyunca sabitle (USTA_PROTOCOL)",
     )
+
+
+def _taint_gate(args: argparse.Namespace) -> bool:
+    """Kaynak izi kapısı: varsayılan açık; --no-taint-gate ya da USTA_TAINT_GATE=0 kapatır."""
+    flag = getattr(args, "taint_gate", None)
+    if flag is not None:
+        return bool(flag)
+    return os.environ.get("USTA_TAINT_GATE") != "0"
 
 
 def _symbol_tools(args: argparse.Namespace) -> bool:
@@ -730,6 +745,7 @@ def _lab_cmd(args: argparse.Namespace) -> int:
     harness = labrunner.HarnessConfig(
         id=args.harness_id,
         breaker=args.breaker,
+        taint=_taint_gate(args),
         protocol=args.protocol or os.environ.get("USTA_PROTOCOL") or "native",
     )
     rev = args.model_revision or capability.detect_revision(endpoint, name)
@@ -960,6 +976,7 @@ def _serve_cmd(args: argparse.Namespace) -> int:
         max_steps=args.max_steps,
         allowed_hosts=hosts,
         symbol_tools=_symbol_tools(args),
+        taint_gate=_taint_gate(args),
         mcp_servers=lambda: (
             _mcp_servers(home) or []
         ),  # panelden eklenenler yeniden başlatmadan gelir
@@ -1240,6 +1257,7 @@ def _chat_cmd(args: argparse.Namespace) -> int:
         context_window=window,
         model_control=control,
         symbol_tools=_symbol_tools(args),
+        taint_gate=_taint_gate(args),
         mcp_servers=lambda: _mcp_servers(home) or [],
     )
     interactive = sys.stdin.isatty()

@@ -12,6 +12,7 @@ from usta.breaker import CircuitBreaker, Trip
 from usta.models import Message, ModelClient, ToolCall
 from usta.phases import PhaseTracker
 from usta.policy import Decision, Policy
+from usta.taint import Taint
 from usta.tools import Registry, ToolError
 from usta.verify import Verifier
 
@@ -62,7 +63,13 @@ class Agent:
         inbox: Callable[[], list[str]] | None = None,
         shrink_writes: int | None = None,
         phases: PhaseTracker | None = None,
+        taint: bool = False,
     ):
+        self.taint = (
+            taint  # DENEYSEL: güvenilmeyen içerikten türeyen yazma/komut hedefleri onay ister
+        )
+        self._taint: Taint | None = None
+        self.approval_note = ""  # onay istenirken gerekçe (görev yöneticisi onay olayına ekler)
         self.phases = phases  # yürütme aşamaları gözlemcisi (isteğe bağlı; döngüyü değiştirmez)
         if phases is not None and phases.on_transition is None:
             # geçişler denetim kaydına yazılır; SSE/olay akışı (API sözleşmesi) değişmez
@@ -122,6 +129,7 @@ class Agent:
         first = f"{self.memory_context}\n\nGörev: {prompt}" if self.memory_context else prompt
         messages = [Message("system", self.system_prompt), Message("user", first)]
         self.audit.record("task", prompt=prompt)
+        self._taint = Taint(prompt) if self.taint else None
         self._usage_base = self._usage_now()
         if self.breaker is not None:
             self.breaker.start()
@@ -195,6 +203,8 @@ class Agent:
         for text in got:
             messages.append(Message("user", f"Kullanıcıdan ek mesaj (görev sürerken): {text}"))
             self.audit.record("user_message", chars=len(text))
+            if self._taint is not None:
+                self._taint.add_user(text)
         return bool(got)
 
     def _calibrate(self, estimated: int, requests_before: int) -> None:
@@ -296,8 +306,18 @@ class Agent:
         self.audit.record("tool_call", tool=call.name, args=call.arguments)
         self._emit("tool_call", tool=call.name, args=call.arguments)
         decision = self.policy.check(call.name, call.arguments)
+        note = ""
+        if decision is Decision.ALLOW and self._taint is not None:
+            note = self._taint.check(call.name, call.arguments)
+            if note:  # hedef güvenilmeyen içerikten türedi: onay şartı (oto modda reddedilir)
+                self.audit.record("taint", tool=call.name, reason=note)
+                decision = Decision.ASK
         if decision is Decision.ASK:
-            approved = bool(self.approver and self.approver(call.name, call.arguments))
+            self.approval_note = note
+            try:
+                approved = bool(self.approver and self.approver(call.name, call.arguments))
+            finally:
+                self.approval_note = ""
             decision = Decision.ALLOW if approved else Decision.DENY
             self.audit.record("approval", tool=call.name, approved=approved)
         if decision is Decision.DENY:
@@ -306,6 +326,8 @@ class Agent:
             return "reddedildi: bu eylem izin politikasına aykırı veya onaylanmadı"
         try:
             result = self.registry.call(call.name, call.arguments)
+            if self._taint is not None:
+                self._taint.observe(call.name, result)
             if self.verifier is not None and call.name in ("write_file", "edit_file"):
                 self._dirty = True
                 warn = self.verifier.after_edit(call.name, call.arguments, self._root())

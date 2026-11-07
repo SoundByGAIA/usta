@@ -87,6 +87,7 @@ measurement infrastructure. It is **not proven** to raise task success on small 
 | `usta probe --deep` · `--protocol auto` | Per-protocol capability profile (incl. end-to-end agent tasks), keyed by model revision + server config; `auto` resolves once at start and is pinned for the run |
 | `usta mcp add --image … / prepare / test` | MCP servers run in an **isolated container** by default; packages are fetched once with `prepare` and pinned |
 | `usta sandbox pin / status` | Pins the sandbox image id; a changed image is refused |
+| `--no-taint-gate` | Turns off the provenance gate (on by default): write/command targets derived from untrusted content ask for approval, denied in auto mode |
 | `--symbol-tools` (experimental) | Tree-sitter symbol tools (`pip install 'usta[symbols]'`) |
 
 Execution phases (DISCOVER → PLAN → EDIT → VERIFY → DIAGNOSE → REPAIR) are **observed** and written to the audit log; every task ends in a terminal

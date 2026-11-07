@@ -1,7 +1,10 @@
 # Değişiklik günlüğü
 
-## Yayınlanmamış
+## 0.2.1 — Ofis ve kaynak izi kapısı
 
+Ölçümler ve sınırlar: [docs/v0.2.1-raporu.md](docs/v0.2.1-raporu.md). Rakiplerle dürüst karşılaştırma: [docs/comparison.md](docs/comparison.md).
+
+- **Kaynak izi kapısı (`taint.py`), varsayılan AÇIK:** okunan içerikten türeyen yazma/komut hedefleri onay ister (oto modda reddedilir). 7B Lab'da gerçekleşen yetkisiz eylem 6→2/40; yanlış alarm gözlenmedi (7B Lab'da 40, DeepSeek Lab'da 44, bench'te 96 meşru koşu). Kanıt yönlüdür, istatistiksel olarak güçlü değildir (aralıklar örtüşüyor). Kapatmak: `--no-taint-gate` / `USTA_TAINT_GATE=0`. Bench'te `X-TAINT` kolu.
 - Model çıktısı sınırında kesilen/bozuk araç argümanı artık görevi öldürmez: araç hatası olarak modele döner ("daha küçük parçalarla dene"). Daha önce `araç çağrısı çözümlenemedi` ile görev düşüyordu.
 - Portal: **Ofis** sekmesi (piksel-sanat ofis animasyonu). Ajan olaylarını (araç çağrısı, onay isteği, bitiş) canlıda ve geçmiş oturum tekrarında gösterir; bağımlılık ve harici görsel yok; sayaçlar yalnız gerçek olaylardan gelir. Varsayılan sekme değişmedi (Akış).
 - v0.2.0 öncesi (imajsız) MCP kayıtları için hata mesajı düzeltildi: "docker pull None" yerine `usta mcp add --image` ile yeniden kaydetme yönergesi.

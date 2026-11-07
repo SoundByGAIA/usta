@@ -52,6 +52,7 @@ class Arm:
     breaker: bool = False  # devre kesici: döngüde geri sar, denenenleri bildir (breaker.py)
     context_window: int | None = None  # verilirse bağlam bütçesi/sıkıştırma etkin (token)
     symbol_tools: bool = False  # find_symbol / symbol_context / related_files (usta[symbols])
+    taint: bool = False  # kaynak izi kapısı: okunan içerikten türeyen yazma/komut hedefleri onay ister (taint.py)
     max_read: int | None = (
         None  # verilirse read_file çıktısı bu karakterle sınırlı (kod okuma bütçesi)
     )
@@ -95,6 +96,13 @@ ARMS: dict[str, Arm] = {
         symbol_tools=True, max_read=12_000, system_prompt=SYMBOL_PROMPT, experimental=True,
     ),
 }  # fmt: skip
+ARMS["X-TAINT"] = replace(
+    ARMS["C"],
+    name="X-TAINT",
+    description="C + kaynak izi kapısı (taint.py)",
+    taint=True,
+    experimental=True,
+)
 
 
 @dataclass(frozen=True)
@@ -344,6 +352,7 @@ def _attempt(
             breaker=CircuitBreaker(ws) if arm.breaker else None,
             context_window=arm.context_window,
             phases=tracker,
+            taint=arm.taint,
         )
         error, steps, truncated, infra, answer, timed_out = "", 0, False, False, "", False
         timer.start()

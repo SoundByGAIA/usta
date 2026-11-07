@@ -216,8 +216,12 @@ class TaskManager:
         model_control: ModelControl | None = None,
         shrink_writes: int | None = None,
         symbol_tools: bool = False,
+        taint_gate: bool = True,
     ):
         self.shrink_writes = shrink_writes
+        self.taint_gate = (
+            taint_gate  # güvenilmeyen içerikten türeyen yazma/komut hedefleri onay ister (taint.py)
+        )
         self.symbol_tools = symbol_tools  # deneysel: Tree-sitter sembol araçları (usta[symbols])
         self.model_control = model_control
         self.context_window = context_window
@@ -464,7 +468,11 @@ class TaskManager:
         task.diff = ""
         task.emit("reverted")
 
-    def _approver(self, task: Task, tool: str, args: dict) -> bool:
+    def _approver(self, task: Task, tool: str, args: dict, note: str = "") -> bool:
+        if task.mode == "auto" and note:
+            # hedef güvenilmeyen içerikten türedi (kaynak izi kapısı): oto onay bunu kendiliğinden açmaz
+            task.emit("denied", {"tool": tool, "reason": f"oto onay: {note}"})
+            return False
         if task.mode == "auto" and tool == "fetch_url" and not self._fetch_allowed(args):
             # sorgu dizesiyle veri sızdırma yolu: oto onay bunu kendiliğinden açmaz (--allow-host gerekir)
             task.emit("denied", {"tool": tool, "reason": "oto onay: izinli olmayan alan adı"})
@@ -486,7 +494,10 @@ class TaskManager:
         task.approvals[aid] = ap
         previous = task.status
         task.set_status("awaiting_approval")
-        task.emit("approval_required", {"approval_id": aid, "tool": tool, "args": args})
+        data = {"approval_id": aid, "tool": tool, "args": args}
+        if note:
+            data["reason"] = note  # neden onay isteniyor (güvenilmeyen içerikten türeyen hedef)
+        task.emit("approval_required", data)
         deadline = time.monotonic() + self.approval_timeout
         while not ap.event.wait(0.1):
             if task.cancel.is_set() or time.monotonic() >= deadline:
@@ -557,7 +568,7 @@ class TaskManager:
                 registry,
                 Policy(task.root, set(self.allowed_hosts), mcp_modes=mcp.modes if mcp else None),
                 audit,
-                approver=lambda t, a: self._approver(task, t, a),
+                approver=lambda t, a: self._approver(task, t, a, agent.approval_note),
                 max_steps=self.max_steps,
                 on_event=task.emit,
                 cancel=task.cancel,
@@ -569,6 +580,7 @@ class TaskManager:
                 shrink_writes=self.shrink_writes,
                 system_prompt=f"{SYSTEM_PROMPT}\n\n{PLAN_PROMPT}" if plan else None,
                 phases=PhaseTracker() if not plan else None,  # yalnız gözlem: döngüyü değiştirmez
+                taint=self.taint_gate,
             )
             result = agent.run(
                 attachments.compose(task.model_prompt or task.prompt, list(task.files))

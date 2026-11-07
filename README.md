@@ -86,6 +86,7 @@ hangisinin ne işe yaradığı ve maliyeti [docs/v0.2.0-raporu.md](docs/v0.2.0-r
 | `usta probe --deep` · `--protocol auto` | Model yetenek profili: protokol başına 9 sonda (uçtan uca ajan görevleri dahil), model revizyonu + yapılandırmaya bağlı kalıcı profil; `auto` koşu başında bir kez çözülür ve sabitlenir |
 | `usta mcp add --image … / prepare / test` | MCP sunucuları varsayılan olarak **yalıtılmış konteynerde**; paketler `prepare` ile bir kez indirilip sabitlenir |
 | `usta sandbox pin / status` | Sandbox imajının kimliğini sabitler; değişirse çalıştırma reddedilir |
+| `--no-taint-gate` | Kaynak izi kapısını kapatır (varsayılan açık): okunan içerikten türeyen yazma/komut hedefleri onay ister, oto modda reddedilir |
 | `--symbol-tools` (deneysel) | Tree-sitter ile sembol araçları (`pip install 'usta[symbols]'`): `related_files`, `find_symbol`, `symbol_context` |
 
 Yürütme aşamaları (DISCOVER → PLAN → EDIT → VERIFY → DIAGNOSE → REPAIR) **gözlemlenir** ve denetim kaydına yazılır; her görev bir terminal

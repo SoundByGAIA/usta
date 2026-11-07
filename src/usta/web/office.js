@@ -961,6 +961,17 @@
     phase: "", // çizili sahne katmanının saat dilimi
     phaseAt: 0, // saat diliminin son kontrol zamanı (60 sn'de bir yeniden bakılır)
     scenes: {}, // saat dilimi başına statik katman önbelleği
+    // --- göstergeler (yalnız DOM; canvas'a çizilmez) ---
+    metrics: null, // { token, context, duration, requests, bar, barFill } DÜĞÜMLERİ
+    contextWindow: 0, // modelin bağlam penceresi (app.js köprüsü; 0 = bilinmiyor)
+    durStart: 0, // görevin başladığı istemci saati (ms)
+    durEnd: 0, // görevin bittiği istemci saati (0 = sürüyor)
+    durSeq: 0, // süreyi kuran runSeq (reset'te 0 → yeni görevde yeniden başlar)
+    durTick: 0, // saniyelik süre çizicisi (yalnız görev sürerken çalışır)
+    // --- "Usta'nın son eylemleri" paneli ---
+    panel: null, // { toggle, box, list, now } DÜĞÜMLERİ
+    panelOpen: false,
+    panelSig: "", // son çizilen içerik imzası (gereksiz DOM yazımı yok)
   };
 
   // Çizici saati parametre olarak alır: yerel saat yalnız burada okunur, mantık saf kalır.
@@ -1095,6 +1106,131 @@
     return `Görev: ${STATUS[state.status] || state.status} · ${Logic.countersText(state)}`;
   }
 
+  // --- göstergeler şeridi + eylem paneli (canvas DIŞI, saf DOM: textContent/createElement) ---
+  const $id = (id) => (root.document && root.document.getElementById ? root.document.getElementById(id) : null);
+  const el = (tag, cls) => {
+    const n = root.document.createElement(tag);
+    if (cls) n.className = cls;
+    return n;
+  };
+  const nowMs = () => (root.performance && root.performance.now ? root.performance.now() : Date.now());
+  const clearIntervalFn = (h) => {
+    if (root.clearInterval) root.clearInterval(h);
+    else clearTimeout(h);
+  };
+  const setIntervalFn = (fn, ms) => (root.setInterval ? root.setInterval(fn, ms) : setTimeout(fn, ms));
+
+  function initMetrics() {
+    const token = $id("office-metric-token");
+    const context = $id("office-metric-context");
+    const duration = $id("office-metric-duration");
+    const requests = $id("office-metric-requests");
+    if (!token || !context || !duration || !requests) return;
+    S.metrics = {
+      token,
+      context,
+      duration,
+      requests,
+      bar: $id("office-bar-context"),
+      barFill: $id("office-bar-context-fill"),
+    };
+  }
+
+  // Süre: görev başından beri geçen saniye; istemci saati burada okunur (mantık saf kalır).
+  // Başlangıç/bitiş işaretleri reduce'un runSeq/endSeq alanlarından gelir.
+  function durationText(state) {
+    const run = state.runSeq || 0;
+    if (!run) return Logic.formatDuration(0); // bu görevde `started` görülmedi
+    if (S.durSeq !== run) {
+      // yeni görev (veya ilk `started`): süre burada başlar
+      S.durSeq = run;
+      S.durStart = nowMs();
+      S.durEnd = 0;
+    }
+    const stopped = !!state.endSeq; // görev bitti → süre durur (sayaç ilerlemez)
+    if (stopped && !S.durEnd) S.durEnd = nowMs();
+    const end = S.durEnd || nowMs();
+    return Logic.formatDuration((end - S.durStart) / 1000);
+  }
+
+  function paintMetrics(state) {
+    const m = S.metrics;
+    if (!m) return;
+    const lines = Logic.metricLines(state.usage, S.contextWindow);
+    for (const line of lines) {
+      const node = m[line.key];
+      if (node && node.textContent !== line.value) node.textContent = line.value;
+    }
+    const pct = Logic.contextPercent(state.usage && state.usage.context, S.contextWindow);
+    if (m.bar && m.barFill) {
+      const show = pct != null;
+      if (m.bar.hidden === show) m.bar.hidden = !show; // pencere yoksa çubuk gizli, yalnız sayı kalır
+      const w = show ? `${pct}%` : "0%";
+      if (m.barFill.style.width !== w) m.barFill.style.width = w;
+      const level = pct == null ? "" : pct >= 90 ? "high" : pct >= 70 ? "mid" : "";
+      if (m.barFill.dataset.level !== level) m.barFill.dataset.level = level;
+    }
+    const dur = durationText(state);
+    if (m.duration.textContent !== dur) m.duration.textContent = dur;
+  }
+
+  // Görev sürerken saniyede bir süreyi tazeler (bitince durur; sekme gizliyse de durur).
+  function tickDuration() {
+    if (!S.metrics) return;
+    if (S.state.runSeq && !S.state.endSeq) {
+      paintMetrics(S.state);
+      if (!S.durTick) S.durTick = setIntervalFn(tickDuration, 1000);
+    } else if (S.durTick) {
+      clearIntervalFn(S.durTick);
+      S.durTick = 0;
+      paintMetrics(S.state);
+    }
+  }
+
+  function paintPanel() {
+    const p = S.panel;
+    if (!p) return;
+    const { lines, now } = Logic.actionLines(S.state);
+    const sig = lines.join("\n") + "\n" + now;
+    if (S.panelSig === sig) return;
+    S.panelSig = sig;
+    const items = lines.map((text) => {
+      const li = el("li");
+      li.textContent = text;
+      return li;
+    });
+    p.list.replaceChildren(...items);
+    p.now.textContent = now;
+  }
+
+  function setPanel(open) {
+    S.panelOpen = !!open;
+    const p = S.panel;
+    if (!p) return;
+    p.box.hidden = !S.panelOpen;
+    p.toggle.setAttribute("aria-expanded", S.panelOpen ? "true" : "false");
+    if (S.panelOpen) paintPanel();
+  }
+
+  function initPanel() {
+    const toggle = $id("office-actions-toggle");
+    const box = $id("office-actions-panel");
+    const list = $id("office-actions-list");
+    const now = $id("office-actions-now");
+    if (!toggle || !box || !list || !now) return;
+    S.panel = { toggle, box, list, now };
+    setPanel(false);
+    toggle.addEventListener("click", () => setPanel(!S.panelOpen));
+    // ek kolaylık: canvas'a tıklamak da paneli açar (asıl yol düğme)
+    if (S.canvas) S.canvas.addEventListener("click", () => setPanel(true)); // açıkken yalnız tazelenir, kapanmaz
+  }
+
+  function setContextWindow(n) {
+    const v = Number(n);
+    S.contextWindow = Number.isFinite(v) && v > 0 ? Math.round(v) : 0; // 0 = pencere bilinmiyor
+    if (S.metrics) paintMetrics(S.state);
+  }
+
   function updateText() {
     const line = describe(S.state);
     if (S.live && S.live.textContent !== line) S.live.textContent = line;
@@ -1104,6 +1240,9 @@
       const label = `Usta ofis animasyonu. ${line}. ${board}`;
       if (S.canvas.getAttribute("aria-label") !== label) S.canvas.setAttribute("aria-label", label);
     }
+    paintMetrics(S.state); // göstergeler yalnız olayla değişir (token/bağlam/istek)
+    tickDuration(); // süre çizicisi yalnız görev sürerken ayakta kalır
+    if (S.panelOpen) paintPanel(); // panel kapalıyken DOM'a yazılmaz (gürültü yok)
   }
 
   function fit() {
@@ -1152,6 +1291,11 @@
     S.fx = createFx(); // efektler ve boş zaman davranışı da sıfırlanır
     S.prevZone = "desk";
     S.walkStart = 0;
+    // göstergeler: yeni görev → süre sıfırdan; yeni görevde ilk `started` süreyi yeniden kurar
+    S.durStart = 0;
+    S.durEnd = 0;
+    S.durSeq = 0;
+    S.panelSig = "";
     S.dirty = true;
     updateText();
     if (!S.running) drawOnce(true);
@@ -1167,6 +1311,8 @@
     if (on) {
       S.dirty = true;
       fit();
+      paintMetrics(S.state); // sekme açılınca göstergeler güncel duruma tazelenir
+      tickDuration();
     }
     sync();
   }
@@ -1177,6 +1323,8 @@
     S.hooks = root.OfficeTestHooks || null; // test: saat/tohum enjeksiyonu (tarayıcıda yok)
     S.live = root.document.getElementById("office-live");
     S.word = root.document.getElementById("office-status");
+    initMetrics();
+    initPanel();
     S.reduced = reduceMotion();
     S.scene = makeCanvas(W, H, drawScene);
     S.buf = makeCanvas(W, H, () => {});
@@ -1259,6 +1407,14 @@
     COFFEE_MS,
   };
 
-  root.Office = { init, onEvent, reset, setVisible, getState: () => S.state, describe };
+  root.Office = {
+    init,
+    onEvent,
+    reset,
+    setVisible,
+    setContextWindow, // app.js köprüsü: modelin bağlam penceresi (state.contextWindow)
+    getState: () => S.state,
+    describe,
+  };
   root.OfficeDraw = drawApi;
 })(typeof globalThis !== "undefined" ? globalThis : this);

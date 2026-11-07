@@ -119,9 +119,15 @@
   function officeReset() {
     const O = window.Office;
     if (O && typeof O.reset === "function") O.reset();
+    officeContextWindow(); // sıfırlanan sahneye penceresi bilgisi yeniden verilir
+  }
+  // Ofis köprüsü: modelin bağlam penceresi göstergelere aktarılır (0/null = bilinmiyor)
+  function officeContextWindow() {
+    const O = window.Office;
+    if (O && typeof O.setContextWindow === "function") O.setContextWindow(state.contextWindow || 0);
   }
   function renderEvent(type, data) {
-    if (type === "usage") { officeEvent(type, data); showUsage(data, state.contextWindow); return; } // usage sayaçları değiştirmez
+    if (type === "usage") { officeEvent(type, data); showUsage(data, state.contextWindow); officeContextWindow(); return; } // usage sayaçları değiştirmez
     officeEvent(type, data);
     const s = L.summarize(type, data);
     if (type === "message" && !s.body) return;
@@ -502,6 +508,7 @@
     const task = await res.json();
     state.contextWindow = task.context_window || null;
     showUsage(null);
+    officeContextWindow(); // modelin bağlam penceresi Ofis göstergelerine
     $("prompt").value = "";
     $("diff-files").replaceChildren();
     $("diff-count").textContent = "";

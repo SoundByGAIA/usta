@@ -140,6 +140,19 @@
         </div>
         <p id="office-live" class="office-live" aria-live="polite">Usta ofiste, yeni görev bekliyor</p>
         <p id="office-status" class="office-board"></p>
+        <ul id="office-metrics" class="office-metrics" aria-label="Görev göstergeleri">
+          <li class="office-metric"><span class="office-metric-label">Token</span><span class="office-metric-value" id="office-metric-token">0</span></li>
+          <li class="office-metric"><span class="office-metric-label">Bağlam</span><span class="office-metric-value" id="office-metric-context">—</span><span class="office-bar" id="office-bar-context" hidden><span class="office-bar-fill" id="office-bar-context-fill"></span></span></li>
+          <li class="office-metric"><span class="office-metric-label">Süre</span><span class="office-metric-value" id="office-metric-duration">0:00</span></li>
+          <li class="office-metric"><span class="office-metric-label">İstek</span><span class="office-metric-value" id="office-metric-requests">0</span></li>
+        </ul>
+        <div class="office-actions">
+          <button id="office-actions-toggle" class="office-actions-toggle" type="button" aria-expanded="false" aria-controls="office-actions-panel">Usta'nın son eylemleri</button>
+          <div id="office-actions-panel" class="office-actions-panel" aria-label="Usta'nın son eylemleri" hidden>
+            <ul id="office-actions-list" class="office-actions-list"></ul>
+            <p id="office-actions-now" class="office-actions-now"></p>
+          </div>
+        </div>
       </div>
 
       <div id="preview" hidden>

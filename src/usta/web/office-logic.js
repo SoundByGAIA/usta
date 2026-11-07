@@ -95,6 +95,13 @@
       counts: { tool_calls: 0, edits: 0, tests_pass: 0, tests_fail: 0 },
       log: [], // son 5 eylem: { type, text }
       ended: null, // bitti durumunun ayrıntısı (done/failed/cancelled)
+      // Son `usage` olayının anlık görüntüsü (yalnız bu olayla değişir; araç/düzenleme/test
+      // sayaçlarına DOKUNMAZ). Alan adları agent.py `_emit_usage` ile aynıdır.
+      usage: null, // { prompt, completion, requests, cached, context }
+      // Süre yalnız sıra numaralarıyla işaretlenir: gerçek zaman DOM tarafında ölçülür
+      // (mantık saf kalır, olay zamanı verisine ihtiyaç duymaz).
+      runSeq: 0, // görevin başladığı olayın fx.seq değeri (0 = bu görevde başlamadı)
+      endSeq: 0, // görevin bittiği olayın fx.seq değeri (0 = bitmedi)
       // Efekt tetikleyicileri: yalnız GERÇEK olaylardan türetilir (uydurma yok).
       // seq her olayda artar → çizici "yeni tetikleyici mi" diye karşılaştırır.
       fx: { seq: 0, test: "", testSeq: 0, end: "", endSeq: 0 },
@@ -141,6 +148,9 @@
       },
       log: state.log,
       ended: state.ended,
+      usage: state.usage || null,
+      runSeq: state.runSeq || 0,
+      endSeq: state.endSeq || 0,
       idle: !!state.idle,
       fx: {
         seq: fx0.seq + 1, // her olay tek üretim numarası → aynı olay dizisi aynı durumu verir
@@ -158,6 +168,8 @@
         s.idle = false;
         s.bubble = "İşe koyuluyorum.";
         s.bubbleKind = "say";
+        s.runSeq = s.fx.seq; // süre ölçümünün başlangıç işareti (yerel saat DOM tarafında)
+        s.endSeq = 0;
         pushLog(s, "started", "Görev başladı" + (d.mode ? ` (${d.mode})` : ""));
         break;
 
@@ -275,6 +287,7 @@
         s.zone = "desk";
         s.target = "desk";
         s.ended = st;
+        if (!s.endSeq) s.endSeq = s.fx.seq; // süre burada durur (ilk bitiş işareti korunur)
         s.fx.end = st;
         s.fx.endSeq = s.fx.seq;
         s.idle = true; // görev bitti → boş zaman davranışı artık cosmetic olarak serbest
@@ -309,6 +322,17 @@
 
       case "usage":
         // Sayaçlar yalnız araç/düzenleme/test olaylarından; token bilgisi ofis sayaçlarına girmez.
+        // Yalnız `usage` anlık görüntüsü yenilenir (agent.py `_emit_usage` alanları).
+        if (d.prompt != null || d.completion != null || d.requests != null || d.context != null) {
+          const num = (v) => (Number.isFinite(Number(v)) ? Math.max(0, Math.round(Number(v))) : 0);
+          s.usage = {
+            prompt: num(d.prompt),
+            completion: num(d.completion),
+            requests: num(d.requests),
+            cached: num(d.cached),
+            context: num(d.context),
+          };
+        }
         break;
 
       default:
@@ -356,6 +380,78 @@
     return "A:" + fmt(c.tool_calls, "") + " D:" + fmt(c.edits, ""); // aşırı büyük sayılarda test sayacı düşer (tahtaya sığmaz)
   }
 
+  // --- göstergeler şeridi için DOM'suz biçimlendirme (node testlerinde doğrudan sınanır) ---
+  // Not: logic.js'teki formatTokens kopyalanmaz; orada yuvarlama kuralı farklı (812 → "812").
+  // Buradaki kural göstergeler şeridi için: 1000 altı tam sayı, üstü tek ondalık (Türkçe virgül).
+  function formatTokens(n) {
+    const v = Math.round(Number(n));
+    if (!Number.isFinite(v) || v <= 0) return "0";
+    const f = (x, unit) => {
+      const r = x >= 10 ? String(Math.round(x)) : x.toFixed(1).replace(".", ",").replace(/,0$/, "");
+      return r + unit;
+    };
+    if (v >= 1e6) return f(v / 1e6, "M");
+    if (v >= 1e3) return f(v / 1e3, "K");
+    return String(v);
+  }
+
+  // Toplam token: prompt + completion (usage yoksa 0)
+  function totalTokens(u) {
+    if (!u) return 0;
+    const p = Number(u.prompt),
+      c = Number(u.completion);
+    return Math.max(0, Math.round((Number.isFinite(p) ? p : 0) + (Number.isFinite(c) ? c : 0)));
+  }
+
+  // Bağlam doluluğu yüzdesi: pencere bilinmiyorsa/sıfırsa null (yalnız sayı gösterilir),
+  // %100 üstü 100'e kenetlenir (pencere aşımı 100'den büyük yüzde üretmez).
+  function contextPercent(context, windowSize) {
+    if (context == null || windowSize == null) return null; // Number(null) === 0 olduğundan açıkça ele alınır
+    const c = Number(context),
+      w = Number(windowSize);
+    if (!Number.isFinite(c) || !Number.isFinite(w) || w <= 0) return null;
+    if (c < 0) return 0;
+    return Math.min(100, Math.round((c / w) * 100));
+  }
+
+  // Göstergeler için tek metin: "Token", "Bağlam" (yüzde + pencere biliniyorsa oran), "İstek".
+  // Süre buraya girmez: doğrudan istemci saatinden ölçülür (saf mantıkta saat okunmaz).
+  function metricLines(usage, windowSize) {
+    const u = usage || {};
+    const total = totalTokens(usage);
+    const ctx = Math.max(0, Math.round(Number(u.context) || 0));
+    const pct = ctx > 0 ? contextPercent(ctx, windowSize) : null; // bağlam 0 ise yüzde uydurulmaz
+    const win = Number(windowSize);
+    const ctxText = !ctx
+      ? "—"
+      : pct == null || !Number.isFinite(win) || win <= 0
+        ? formatTokens(ctx)
+        : `${formatTokens(ctx)} / ${formatTokens(win)} · %${pct}`;
+    return [
+      { key: "token", label: "Token", value: formatTokens(total), pct: null },
+      { key: "context", label: "Bağlam", value: ctxText, pct },
+      { key: "requests", label: "İstek", value: String(Math.max(0, Math.round(Number(u.requests) || 0))), pct: null },
+    ];
+  }
+
+  // Süre: saniye → "0:07", "2:05", "1:02:03" (saat yalnız gerektiğinde)
+  function formatDuration(seconds) {
+    let t = Math.floor(Number(seconds));
+    if (!Number.isFinite(t) || t < 0) t = 0;
+    const h = Math.floor(t / 3600);
+    const m = Math.floor((t % 3600) / 60);
+    const s = t % 60;
+    const two = (v) => (v < 10 ? "0" + v : String(v));
+    return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`;
+  }
+
+  // Son 5 eylem + "şu an: ..." satırı (düz metin; DOM bu satırları çizer)
+  function actionLines(state) {
+    const lines = ((state && state.log) || []).map((e) => String(e.text || ""));
+    const now = describe(state || initial());
+    return { lines, now: `şu an: ${now}` };
+  }
+
   const api = {
     initial,
     reduce,
@@ -365,6 +461,12 @@
     describe,
     countersText,
     shortCounters,
+    formatTokens,
+    totalTokens,
+    contextPercent,
+    metricLines,
+    formatDuration,
+    actionLines,
     SHORT_MAX,
     areaName,
     MAX_LOG,

@@ -261,3 +261,151 @@ test("erişilebilirlik metni bölgeyi düz yazıyla söyler", () => {
   assert.match(O.describe(O.initial()), /bekliyor/);
   assert.match(O.countersText(s), /araç 1/);
 });
+
+// --- tur B1: kullanım (usage) alanı + gösterge biçimleme yardımcıları ---
+
+test("usage: son anlık görüntü saklanır, sayaçlara dokunmaz", () => {
+  const u = { prompt: 1200, completion: 340, requests: 3, cached: 900, context: 2048 };
+  const s = run([["started", {}], ["usage", u]]);
+  assert.deepEqual(s.usage, u);
+  assert.deepEqual(s.counts, { tool_calls: 0, edits: 0, tests_pass: 0, tests_fail: 0 }, "tool/edit/test sayaçları değişmez");
+  // sonraki usage öncekinin üzerine yazılır (anlık görüntü, birikim değil)
+  const s2 = O.reduce(s, "usage", { prompt: 10, completion: 2, requests: 1, context: 0 });
+  assert.deepEqual(s2.usage, { prompt: 10, completion: 2, requests: 1, cached: 0, context: 0 });
+  assert.deepEqual(s2.counts, s.counts);
+});
+
+test("usage araç/düzenleme/test sayaçlarını etkilemez (gerçek olaylarla aynı dizide)", () => {
+  const events = [
+    ["started", {}],
+    ["tool_call", { tool: "edit_file", args: { path: "a.py" } }],
+    ["tool_call", { tool: "run", args: { command: "pytest -q" } }],
+    ["tool_result", { tool: "run", result: "exit_code: 0" }],
+  ];
+  const without = run(events);
+  const withUsage = run(events.slice(0, 2).concat([["usage", { prompt: 5, completion: 5, requests: 1, context: 5 }]], events.slice(2)));
+  assert.deepEqual(withUsage.counts, without.counts);
+  assert.deepEqual(without.usage, null);
+});
+
+test("usage: bozuk/eksik alanlar güvenli; usage alanı taşımayan olay anlık görüntüyü silmez", () => {
+  const base = run([["started", {}], ["usage", { prompt: 7, completion: 3 }]]);
+  assert.deepEqual(base.usage, { prompt: 7, completion: 3, requests: 0, cached: 0, context: 0 });
+  const bad = O.reduce(base, "usage", { prompt: "x", completion: -4, requests: null, context: "abc" });
+  assert.deepEqual(bad.usage, { prompt: 0, completion: 0, requests: 0, cached: 0, context: 0 });
+  const empty = O.reduce(bad, "usage", {});
+  assert.deepEqual(empty.usage, bad.usage, "alansız usage olayı anlık görüntüyü bozmaz");
+  assert.deepEqual(O.reduce(base, "usage", undefined).usage, base.usage, "veri yoksa (undefined) anlık görüntü korunur");
+  assert.equal(O.initial().usage, null);
+});
+
+test("reduce saf: usage alanı dahil aynı dizi aynı durumu üretir, girdi değişmez", () => {
+  const events = [
+    ["started", { mode: "manual" }],
+    ["usage", { prompt: 100, completion: 20, requests: 1, context: 500 }],
+    ["tool_call", { tool: "read_file", args: { path: "a.py" } }],
+    ["usage", { prompt: 200, completion: 30, requests: 2, context: 700, cached: 100 }],
+    ["done", { status: "done" }],
+  ];
+  const a = run(events);
+  const b = run(events);
+  assert.deepEqual(a, b);
+  assert.deepEqual(a.usage, { prompt: 200, completion: 30, requests: 2, cached: 100, context: 700 });
+  const base = run(events.slice(0, 2));
+  const snap = JSON.stringify(base);
+  O.reduce(base, "usage", { prompt: 999, completion: 999, requests: 9, context: 999 });
+  assert.equal(JSON.stringify(base), snap, "girdi durumu paylaşılan referansla değişmez");
+});
+
+test("süre işaretleri: runSeq started'da, endSeq done'da (saat okunmaz)", () => {
+  assert.equal(O.initial().runSeq, 0);
+  assert.equal(O.initial().endSeq, 0);
+  const started = run([["started", {}]]);
+  assert.equal(started.runSeq, started.fx.seq, "başlangıç işareti olayın sıra numarası");
+  assert.equal(started.endSeq, 0);
+  const running = O.reduce(started, "tool_call", { tool: "read_file", args: { path: "a" } });
+  assert.equal(running.endSeq, 0, "çalışırken bitiş işareti yok → süre ilerler");
+  const done = O.reduce(running, "done", { status: "done" });
+  assert.equal(done.endSeq, done.fx.seq, "bitiş işareti → süre durur");
+  const again = O.reduce(done, "verification", { status: "passed" });
+  assert.equal(again.endSeq, done.endSeq, "ilk bitiş işareti korunur");
+});
+
+test("formatTokens: göstergeler için kısa Türkçe biçim", () => {
+  assert.equal(O.formatTokens(0), "0");
+  assert.equal(O.formatTokens(null), "0");
+  assert.equal(O.formatTokens("x"), "0");
+  assert.equal(O.formatTokens(-12), "0");
+  assert.equal(O.formatTokens(9), "9");
+  assert.equal(O.formatTokens(999), "999");
+  assert.equal(O.formatTokens(1000), "1K", "1,0 → 1 (sondaki sıfır atılır)");
+  assert.equal(O.formatTokens(1540), "1,5K");
+  assert.equal(O.formatTokens(12345), "12K", "10 ve üstü tam sayıya yuvarlanır");
+  assert.equal(O.formatTokens(2500000), "2,5M");
+});
+
+test("totalTokens: prompt + completion", () => {
+  assert.equal(O.totalTokens(null), 0);
+  assert.equal(O.totalTokens({ prompt: 100, completion: 50 }), 150);
+  assert.equal(O.totalTokens({ prompt: 100 }), 100);
+  assert.equal(O.totalTokens({ completion: "80" }), 80);
+  assert.equal(O.totalTokens({ prompt: 0.4, completion: 0.4 }), 1, "toplam tam sayıya yuvarlanır");
+});
+
+test("contextPercent: pencere 0/bilinmiyor → null, %100 üstü 100'e kenetlenir", () => {
+  assert.equal(O.contextPercent(1000, 8192), 12);
+  assert.equal(O.contextPercent(4096, 8192), 50);
+  assert.equal(O.contextPercent(7000, 8192), 85);
+  assert.equal(O.contextPercent(99999, 8192), 100, "pencere aşımı 100'ü geçmez");
+  assert.equal(O.contextPercent(100, 0), null, "pencere 0 → bilinmiyor");
+  assert.equal(O.contextPercent(100, null), null);
+  assert.equal(O.contextPercent(100, undefined), null);
+  assert.equal(O.contextPercent(null, 8192), null, "bağlam yok → yüzde yok");
+  assert.equal(O.contextPercent(-5, 8192), 0);
+});
+
+test("metricLines: Token/Bağlam/İstek; pencere yoksa bağlam yalnız sayı", () => {
+  const usage = { prompt: 1200, completion: 340, requests: 3, cached: 0, context: 2000 };
+  const noWin = O.metricLines(usage, 0);
+  const byKey = Object.fromEntries(noWin.map((r) => [r.key, r]));
+  assert.equal(byKey.token.value, "1,5K");
+  assert.equal(byKey.context.value, "2K");
+  assert.equal(byKey.context.pct, null);
+  assert.equal(byKey.requests.value, "3");
+  const withWin = Object.fromEntries(O.metricLines(usage, 8000).map((r) => [r.key, r]));
+  assert.equal(withWin.context.pct, 25);
+  assert.match(withWin.context.value, /%25/);
+  assert.match(withWin.context.value, /2K \/ 8K/);
+  const empty = Object.fromEntries(O.metricLines(null, 8000).map((r) => [r.key, r]));
+  assert.equal(empty.token.value, "0");
+  assert.equal(empty.context.value, "—");
+  assert.equal(empty.requests.value, "0");
+  const zeroCtx = Object.fromEntries(O.metricLines({ prompt: 10, completion: 0, requests: 1, context: 0 }, 8000).map((r) => [r.key, r]));
+  assert.equal(zeroCtx.context.value, "—", "bağlam 0 ise yüzde uydurulmaz");
+  assert.equal(zeroCtx.context.pct, null);
+});
+
+test("formatDuration: saniye → dk:sn, saat yalnız gerektiğinde", () => {
+  assert.equal(O.formatDuration(0), "0:00");
+  assert.equal(O.formatDuration(7), "0:07");
+  assert.equal(O.formatDuration(65), "1:05");
+  assert.equal(O.formatDuration(125.9), "2:05", "küsurat aşağı yuvarlanır");
+  assert.equal(O.formatDuration(3725), "1:02:05");
+  assert.equal(O.formatDuration(-3), "0:00");
+  assert.equal(O.formatDuration("x"), "0:00");
+});
+
+test("actionLines: son 5 eylem düz metin + 'şu an: ...' satırı", () => {
+  const events = [["started", {}]];
+  for (let i = 0; i < 7; i++) events.push(["tool_call", { tool: "read_file", args: { path: `f${i}.py` } }]);
+  const s = run(events);
+  const { lines, now } = O.actionLines(s);
+  assert.equal(lines.length, 5);
+  assert.match(lines[4], /f6\.py$/, "araç dosya biçiminde düz satır");
+  assert.match(lines[4], /^[a-z_]+ /, "satır araç adıyla başlar (düz metin)");
+  assert.match(now, /^şu an: /);
+  assert.ok(now.indexOf(O.describe(s)) > 0);
+  const empty = O.actionLines(O.initial());
+  assert.deepEqual(empty.lines, []);
+  assert.match(empty.now, /bekliyor/);
+});

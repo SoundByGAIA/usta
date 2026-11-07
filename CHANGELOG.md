@@ -2,6 +2,8 @@
 
 ## Yayınlanmamış
 
+- Model çıktısı sınırında kesilen/bozuk araç argümanı artık görevi öldürmez: araç hatası olarak modele döner ("daha küçük parçalarla dene"). Daha önce `araç çağrısı çözümlenemedi` ile görev düşüyordu.
+- Portal: **Ofis** sekmesi (piksel-sanat ofis animasyonu). Ajan olaylarını (araç çağrısı, onay isteği, bitiş) canlıda ve geçmiş oturum tekrarında gösterir; bağımlılık ve harici görsel yok; sayaçlar yalnız gerçek olaylardan gelir. Varsayılan sekme değişmedi (Akış).
 - v0.2.0 öncesi (imajsız) MCP kayıtları için hata mesajı düzeltildi: "docker pull None" yerine `usta mcp add --image` ile yeniden kaydetme yönergesi.
 
 ## 0.2.0 — güvenilirlik ve ölçüm

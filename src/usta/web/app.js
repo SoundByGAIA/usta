@@ -121,6 +121,13 @@
     if (O && typeof O.reset === "function") O.reset();
     officeContextWindow(); // sıfırlanan sahneye penceresi bilgisi yeniden verilir
   }
+  // Ofis'teki onay şeridi: karar MEVCUT akışa (decideApproval) iletilir; dönen metni şerit yazar.
+  // Köprü tek satır: `Office.onDecide = (id, decision) => decideApproval(id, decision)` (init içinde).
+  // Geçmiş oturum: olaylar tek tek değil toplu verilir (replay durumu saf reduce ile hesaplanır)
+  function officeReplay(events) {
+    const O = window.Office;
+    if (O && typeof O.loadReplay === "function") O.loadReplay(events);
+  }
   // Ofis köprüsü: modelin bağlam penceresi göstergelere aktarılır (0/null = bilinmiyor)
   function officeContextWindow() {
     const O = window.Office;
@@ -142,6 +149,27 @@
     box.textContent = s.title && s.body ? `${s.title}\n${s.body}` : s.title || s.body;
     addNode(box);
   }
+  // Onay kararı: tek akış (onay uç noktasına POST + durum "running"). Akış'taki onay düğmeleri ve
+  // Ofis'teki onay şeridi aynı işlevi çağırır (kopya kod yok). Çözüm metni çağırana döner.
+  const approvalRows = new Map(); // onay kimliği -> Akış'taki düğme satırı (karar iki yerden de verilebilir)
+  async function decideApproval(approvalId, decision) {
+    const row = approvalRows.get(approvalId);
+    if (row) for (const b of row.querySelectorAll("button")) b.disabled = true; // çift gönderim yok
+    const msg = await decideSend(approvalId, decision);
+    let text;
+    if (msg === "ok") { setStatus("running"); text = decision === "allow" ? "İzin verildi" : "Reddedildi"; }
+    else text = msg === "stale" ? "İstek artık geçerli değil" : msg;
+    if (row) row.textContent = text; // Akış'taki onay arayüzü de karar Ofis'ten verilse bile güncellenir
+    return text;
+  }
+  // Karar isteğini gönderir; ağ/sunucu sonucunu düz metne çevirir. Akış'taki onay düğmesi de
+  // (decideApproval üzerinden) aynı yolu kullanır — kopya kod yok.
+  async function decideSend(id, decision) {
+    try {
+      const res = await api(`/approvals/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify({ decision }) });
+      return res.ok ? "ok" : "stale";
+    } catch (_) { return "Gönderilemedi"; }
+  }
   function approvalNode(s) {
     const box = h("div", "msg approval");
     box.appendChild(h("strong", null, s.title));
@@ -150,14 +178,8 @@
     const allow = h("button", "primary", "İzin ver");
     const deny = h("button", null, "Reddet");
     allow.type = deny.type = "button";
-    const decide = async (decision) => {
-      allow.disabled = deny.disabled = true;
-      try {
-        const res = await api(`/approvals/${encodeURIComponent(s.approvalId)}`, { method: "POST", body: JSON.stringify({ decision }) });
-        row.textContent = res.ok ? (decision === "allow" ? "İzin verildi" : "Reddedildi") : "İstek artık geçerli değil";
-        if (res.ok) setStatus("running");
-      } catch (_) { row.textContent = "Gönderilemedi"; }
-    };
+    if (s.approvalId != null) approvalRows.set(s.approvalId, row);
+    const decide = (decision) => decideApproval(s.approvalId, decision);
     allow.addEventListener("click", () => decide("allow"));
     deny.addEventListener("click", () => decide("deny"));
     row.append(allow, deny);
@@ -265,6 +287,8 @@
       if (e.type === "done") setStatus(e.data.status);
       renderEvent(e.type, e.data);
     }
+    // Ofis sekmesi: olaylar tek tek değil toplu verilir → sahne zaman çubuğuyla gezilebilir
+    officeReplay(s.events.map((e) => ({ type: e.type, data: e.data })));
     if (s.status === "interrupted") addNode(h("div", "msg warn", "Bu görev yarıda kesilmiş (sunucu kapanmış olabilir)."));
     $("replay-text").textContent = `Geçmiş oturum · ${fmtTs(m.ts)} · ${HIST_STATUS[s.status] || s.status} (salt okunur)`;
     showTab("stream");
@@ -1066,6 +1090,8 @@
   });
   applyZoom();
   if (window.Office && typeof window.Office.init === "function") window.Office.init();
+  // Ofis onay şeridi → mevcut karar akışı (tek yol: decideApproval)
+  if (window.Office) window.Office.onDecide = (id, decision) => decideApproval(id, decision);
   $("theme").addEventListener("change", () => { applyTheme($("theme").value); saveSetting({ theme: $("theme").value }); });
   $("guard").addEventListener("change", () => saveSetting({ guard: $("guard").checked }));
   $("mode").addEventListener("change", () => { applyMode($("mode").value); saveSetting({ mode: $("mode").value }); });

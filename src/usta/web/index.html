@@ -138,6 +138,20 @@
         <div class="office-stage" id="office-stage">
           <canvas id="office-canvas" role="img" aria-label="Usta ofis animasyonu"></canvas>
         </div>
+        <div id="office-approval" class="office-approval" role="group" aria-label="Onay isteği" hidden>
+          <p id="office-approval-text" class="office-approval-text"></p>
+          <div class="office-approval-row">
+            <button id="office-approval-allow" class="primary" type="button">İzin ver</button>
+            <button id="office-approval-deny" type="button">Reddet</button>
+          </div>
+        </div>
+        <div id="office-replay" class="office-replay" role="group" aria-label="Geçmiş oturum zaman çubuğu" hidden>
+          <button id="office-replay-play" class="office-replay-play" type="button" aria-pressed="false">▶ Oynat</button>
+          <label for="office-replay-range" class="sr">Olay</label>
+          <input id="office-replay-range" type="range" min="0" max="0" step="1" value="0">
+          <span id="office-replay-text" class="office-replay-text"></span>
+          <button id="office-replay-speed" class="office-replay-speed" type="button">1x</button>
+        </div>
         <p id="office-live" class="office-live" aria-live="polite">Usta ofiste, yeni görev bekliyor</p>
         <p id="office-status" class="office-board"></p>
         <ul id="office-metrics" class="office-metrics" aria-label="Görev göstergeleri">

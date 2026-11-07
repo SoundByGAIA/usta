@@ -91,6 +91,8 @@
       bubble: "", // konuşma balonu
       bubbleKind: "say", // say | ask | alarm | none
       pendingReason: "",
+      pendingApprovalId: "", // onay bekleyen isteğin kimliği ("" = bekleyen yok); şerit yalnız bu doluyken çizilir
+      lastApproval: null, // son onay aracı {tool}: şerit "Usta onay bekliyor: <araç>" yazısını buradan kurar
       lastCall: null, // son tool_call {tool, args}: tool_result olayı args taşımaz, komutu buradan öğreniriz
       counts: { tool_calls: 0, edits: 0, tests_pass: 0, tests_fail: 0 },
       log: [], // son 5 eylem: { type, text }
@@ -139,6 +141,8 @@
       bubble: state.bubble,
       bubbleKind: state.bubbleKind,
       pendingReason: state.pendingReason,
+      pendingApprovalId: state.pendingApprovalId || "",
+      lastApproval: state.lastApproval || null,
       lastCall: state.lastCall,
       counts: {
         tool_calls: state.counts.tool_calls,
@@ -233,6 +237,10 @@
         s.zone = "desk";
         s.target = "desk";
         s.pendingReason = `İzin içeren eylem: ${tool}`;
+        // Onay kimliği yalnız GERÇEK olaydan gelir (logic.js summarize `approvalId` = data.approval_id);
+        // kimlik yoksa şerit çizilmez (uydurma kimlik üretilmez).
+        s.pendingApprovalId = d.approval_id == null ? "" : String(d.approval_id);
+        s.lastApproval = { tool };
         s.bubble = `Şuna izin verir misin: ${tool}?`;
         s.bubbleKind = "ask";
         pushLog(s, "approval_required", `İzin istendi: ${tool}`);
@@ -243,6 +251,7 @@
         const tool = String(d.tool || "araç");
         s.hand = false;
         s.pendingReason = "";
+        s.pendingApprovalId = ""; // bekleyen onay kalmadı → ofis şeridi kapanır
         s.bubble = `Oto onay: ${tool}.`;
         s.bubbleKind = "say";
         pushLog(s, "auto_approved", `Oto onay: ${tool}`);
@@ -253,6 +262,7 @@
         const tool = String(d.tool || "araç");
         s.hand = false;
         s.pendingReason = "";
+        s.pendingApprovalId = "";
         s.mood = "alert";
         s.zone = "desk";
         s.target = "desk";
@@ -284,6 +294,7 @@
         s.status = st;
         s.hand = false;
         s.pendingReason = "";
+        s.pendingApprovalId = "";
         s.zone = "desk";
         s.target = "desk";
         s.ended = st;
@@ -445,6 +456,27 @@
     return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`;
   }
 
+  // Onay şeridinin başlığı: "Usta onay bekliyor: <araç>" (yalnız gerçek araç adından; uydurma yok)
+  function approvalLine(state) {
+    const tool = state && state.lastApproval && state.lastApproval.tool ? String(state.lastApproval.tool) : "";
+    return tool ? `Usta onay bekliyor: ${tool}` : "Usta onay bekliyor";
+  }
+
+  // Geçmiş oturum zaman çubuğu: olay dizisini BAŞTAN sarılı indekse kadar uygular (saf, tekrarlanabilir).
+  // i kenetlenir (<0 → 0, >N → N); boş dizi → initial; girdi dizisi ve olay nesneleri DEĞİŞTİRİLMEZ.
+  function replayState(events, i) {
+    const list = Array.isArray(events) ? events : [];
+    const n = list.length;
+    const raw = Math.floor(Number(i));
+    const upTo = Number.isFinite(raw) ? Math.min(n, Math.max(0, raw)) : 0;
+    let s = initial();
+    for (let k = 0; k < upTo; k++) {
+      const e = list[k] || {};
+      s = reduce(s, e.type, e.data || {});
+    }
+    return s;
+  }
+
   // Son 5 eylem + "şu an: ..." satırı (düz metin; DOM bu satırları çizer)
   function actionLines(state) {
     const lines = ((state && state.log) || []).map((e) => String(e.text || ""));
@@ -467,6 +499,8 @@
     metricLines,
     formatDuration,
     actionLines,
+    approvalLine,
+    replayState,
     SHORT_MAX,
     areaName,
     MAX_LOG,

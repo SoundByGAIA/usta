@@ -185,6 +185,24 @@ select { font: inherit; color: inherit; background: var(--bg); border: 1px solid
 .office-actions-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-family: var(--mono); font-size: 12px; color: var(--text); }
 .office-actions-list li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .office-actions-now { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+/* Onay şeridi: canvas altında, YALNIZ onay beklerken görünür (odak kendiliğinden gitmez) */
+.office-approval { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--warn, #9a6700); border-radius: 10px; background: rgba(224,176,74,.10); }
+.office-approval-text { margin: 0; color: var(--text); }
+.office-approval-row { display: flex; gap: 6px; }
+.office-approval button { font: inherit; padding: 4px 12px; border: 1px solid var(--line, #2a3442); border-radius: 8px; background: rgba(255,255,255,.04); color: var(--text); cursor: pointer; }
+.office-approval button:hover:not(:disabled) { background: rgba(255,255,255,.08); }
+.office-approval button:focus-visible { outline: 2px solid var(--accent, #6cc0a0); outline-offset: 2px; }
+.office-approval button.primary { background: var(--accent, #6cc0a0); color: var(--accent-text, #08121f); border-color: transparent; font-weight: 600; }
+.office-approval button:disabled { opacity: .6; cursor: default; }
+/* Geçmiş oturum zaman çubuğu: yalnız replay modunda (▶/⏸, aralık, "olay i / N", hız) */
+.office-replay { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line, #2a3442); border-radius: 10px; background: rgba(0,0,0,.2); }
+.office-replay button { font: inherit; font-family: var(--mono); font-size: 12px; padding: 4px 10px; border: 1px solid var(--line, #2a3442); border-radius: 8px; background: rgba(255,255,255,.04); color: var(--text); cursor: pointer; }
+.office-replay button:hover:not(:disabled) { background: rgba(255,255,255,.08); }
+.office-replay button:focus-visible { outline: 2px solid var(--accent, #6cc0a0); outline-offset: 2px; }
+.office-replay-play { min-width: 84px; }
+.office-replay-range { flex: 1 1 160px; min-width: 120px; accent-color: var(--accent, #6cc0a0); }
+.office-replay-text { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.office-replay-speed { min-width: 44px; }
 @media (prefers-reduced-motion: reduce) {
   .office-stage { transition: none; }
   .office-bar-fill { transition: none; }

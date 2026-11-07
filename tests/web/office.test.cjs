@@ -409,3 +409,90 @@ test("actionLines: son 5 eylem düz metin + 'şu an: ...' satırı", () => {
   assert.deepEqual(empty.lines, []);
   assert.match(empty.now, /bekliyor/);
 });
+
+// --- tur B2: onay etkileşimi + geçmiş oturum zaman çubuğu ---
+test("pendingApprovalId: approval_required'da gerçek kimlik konur", () => {
+  assert.equal(O.initial().pendingApprovalId, "");
+  const s = run([["started", {}], ["approval_required", { approval_id: "ap-7", tool: "run", args: { command: "pytest" } }]]);
+  assert.equal(s.pendingApprovalId, "ap-7");
+  assert.equal(s.hand, true, "el kaldırma davranışı değişmez");
+  assert.deepEqual(s.lastApproval, { tool: "run" });
+  assert.equal(O.approvalLine(s), "Usta onay bekliyor: run");
+  // kimlik yoksa uydurulmaz (şerit çizilmez)
+  const noId = O.reduce(O.initial(), "approval_required", { tool: "edit_file" });
+  assert.equal(noId.pendingApprovalId, "");
+  assert.equal(O.approvalLine(noId), "Usta onay bekliyor: edit_file"); // araç adı bilinir, kimlik yok → şerit çizilmez
+});
+
+test("pendingApprovalId: auto_approved/denied/done temizler", () => {
+  const asked = run([["started", {}], ["approval_required", { approval_id: "a1", tool: "run" }]]);
+  assert.equal(asked.pendingApprovalId, "a1");
+  for (const [type, data] of [["auto_approved", { tool: "run" }], ["denied", { tool: "run" }], ["done", { status: "done" }]]) {
+    const s = O.reduce(asked, type, data);
+    assert.equal(s.pendingApprovalId, "", type);
+    assert.equal(s.hand, false, type);
+  }
+  // ilgisiz olay kimliği silmez (bekleyen onay hâlâ geçerli)
+  const other = O.reduce(asked, "warning", { message: "dikkat" });
+  assert.equal(other.pendingApprovalId, "a1");
+  // girdi durumu değişmez
+  assert.equal(asked.pendingApprovalId, "a1");
+});
+
+test("pendingApprovalId: aynı dizi aynı durumu üretir (girdi değişmez)", () => {
+  const events = [
+    ["started", {}],
+    ["approval_required", { approval_id: "x9", tool: "fetch_url", args: { url: "https://example.com" } }],
+    ["auto_approved", { tool: "fetch_url" }],
+    ["approval_required", { approval_id: "y1", tool: "write_file" }],
+    ["denied", { tool: "write_file" }],
+  ];
+  const a = run(events);
+  const b = run(events);
+  assert.deepEqual(a, b);
+  assert.equal(a.pendingApprovalId, "");
+  assert.equal(run(events.slice(0, 2)).pendingApprovalId, "x9");
+  assert.equal(JSON.stringify(events).includes("approval_id"), true, "olay verisi korunur");
+});
+
+test("replayState: baştan uygular, i kenetlenir, boş dizi initial", () => {
+  const events = [
+    { type: "started", data: { mode: "manual" } },
+    { type: "tool_call", data: { tool: "run", args: { command: "pytest -q" } } },
+    { type: "tool_result", data: { tool: "run", result: "exit_code: 0" } },
+    { type: "done", data: { status: "done" } },
+  ];
+  assert.deepEqual(O.replayState([], 0), O.initial());
+  assert.deepEqual(O.replayState([], 5), O.initial());
+  assert.deepEqual(O.replayState(events, 0), O.initial(), "0 olay → initial");
+  const one = O.replayState(events, 1);
+  assert.equal(one.status, "running");
+  assert.equal(one.counts.tool_calls, 0);
+  const three = O.replayState(events, 3);
+  assert.equal(three.counts.tool_calls, 1);
+  assert.equal(three.counts.tests_pass, 1, "olay sırası korunur (lastCall bağlamı)");
+  assert.deepEqual(O.replayState(events, 4), run(events.map((e) => [e.type, e.data])), "son olay = canlı sonuç");
+  // kenetleme
+  assert.deepEqual(O.replayState(events, -3), O.replayState(events, 0));
+  assert.deepEqual(O.replayState(events, 99), O.replayState(events, 4));
+  assert.deepEqual(O.replayState(events, NaN), O.replayState(events, 0));
+  assert.deepEqual(O.replayState(events, 2.7), O.replayState(events, 2), "kesir aşağı yuvarlanır");
+});
+
+test("replayState: saf ve girdiyi DEĞİŞTİRMEZ", () => {
+  const events = [
+    { type: "started", data: {} },
+    { type: "approval_required", data: { approval_id: "r1", tool: "run" } },
+    { type: "denied", data: { tool: "run" } },
+    { type: "usage", data: { prompt: 10, completion: 2, requests: 1, context: 50 } },
+  ];
+  const snap = JSON.stringify(events);
+  const a = O.replayState(events, 2);
+  const b = O.replayState(events, 2);
+  assert.deepEqual(a, b, "aynı girdi aynı çıktı");
+  assert.equal(JSON.stringify(events), snap, "girdi dizisi/olayları değişmez");
+  assert.notEqual(a, b, "her çağrı yeni durum nesnesi döner");
+  assert.equal(a.pendingApprovalId, "r1");
+  assert.equal(O.replayState(events, 3).pendingApprovalId, "");
+  assert.deepEqual(O.replayState(events, 4).usage, { prompt: 10, completion: 2, requests: 1, cached: 0, context: 50 });
+});

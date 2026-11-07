@@ -972,6 +972,16 @@
     panel: null, // { toggle, box, list, now } DÜĞÜMLERİ
     panelOpen: false,
     panelSig: "", // son çizilen içerik imzası (gereksiz DOM yazımı yok)
+    // --- onay şeridi (yalnız canlı modda ve bekleyen onay kimliği varken) ---
+    approval: null, // { box, text, allow, deny } DÜĞÜMLERİ
+    approvalId: "", // şeridin bağlı olduğu onay kimliği
+    approvalDone: "", // karar sonrası şerit yazısı ("İzin verildi"/"Reddedildi")
+    approvalBusy: false,
+    approvalDoneTick: 0, // karar sonrası şeridin görünme sayacı
+    // --- geçmiş oturum zaman çubuğu ---
+    // { events, i, playing, speed, box, play, range, text, rate, tick } DURUMU
+    // (ad `replay`; loadReplay/leaveReplay işlevleriyle çakışma yok — ikisi de farklı ad alanında)
+    replay: null,
   };
 
   // Çizici saati parametre olarak alır: yerel saat yalnız burada okunur, mantık saf kalır.
@@ -1231,6 +1241,215 @@
     if (S.metrics) paintMetrics(S.state);
   }
 
+  // --- onay şeridi: app.js'teki MEVCUT karar akışı Office.onDecide ile çağrılır (kopya kod yok) ---
+  function initApproval() {
+    if (S.approval) return; // ikinci init'te düğüm dinleyicileri yeniden bağlanmaz
+    const box = $id("office-approval");
+    const text = $id("office-approval-text");
+    const allow = $id("office-approval-allow");
+    const deny = $id("office-approval-deny");
+    if (!box || !text || !allow || !deny) return;
+    S.approval = { box, text, allow, deny };
+    allow.type = deny.type = "button";
+    box.hidden = true;
+    allow.addEventListener("click", () => sendDecision("allow"));
+    deny.addEventListener("click", () => sendDecision("deny"));
+  }
+
+  // Karar: köprü işlevi (app.js `Office.onDecide = (id, decision) => decideApproval(...)`).
+  // Dönen metin şeritte gösterilir, sonra şerit kapanır; Akış'taki onay düğmeleri aynı akıştan güncellenir.
+  function sendDecision(decision) {
+    const id = S.approvalId;
+    if (!id || S.approvalBusy) return;
+    const fn = root.Office && root.Office.onDecide;
+    if (typeof fn !== "function") return; // köprü bağlı değilse istek gönderilmez (uydurma yok)
+    S.approvalBusy = true;
+    if (S.approval) {
+      S.approval.allow.disabled = true;
+      S.approval.deny.disabled = true;
+    }
+    const settle = (msg) => {
+      S.approvalBusy = false;
+      S.approvalId = "";
+      S.approvalDone = msg || "";
+      paintApproval();
+      if (!S.approvalDone) return;
+      if (S.approvalDoneTick) clearTimeout(S.approvalDoneTick);
+      // şerit kısa süre sonucu yazar, sonra gizlenir (yeni onay gelirse yeniden açılır)
+      S.approvalDoneTick = setTimeout(() => {
+        S.approvalDoneTick = 0;
+        S.approvalDone = "";
+        paintApproval();
+      }, 2500);
+    };
+    let out;
+    try {
+      out = fn(id, decision);
+    } catch (_) {
+      settle("Gönderilemedi");
+      return;
+    }
+    if (out && typeof out.then === "function") out.then(settle, () => settle("Gönderilemedi"));
+    else settle(decision === "allow" ? "İzin verildi" : "Reddedildi");
+  }
+
+  // Şerit yalnız CANLI modda, onay bekleyen kimlik varken (veya karar sonucu kısa süre) görünür.
+  function paintApproval() {
+    const a = S.approval;
+    if (!a) return;
+    if (!S.approvalDone && !S.approvalBusy) {
+      a.allow.disabled = false;
+      a.deny.disabled = false;
+    }
+    const id = S.approvalId;
+    const replaying = !!(S.replay && S.replay.events);
+    const show = replaying ? false : !!(S.approvalDone || id); // replay'de onay şeridi ÇIKMAZ
+    a.box.hidden = !show;
+    const text = S.approvalDone || Logic.approvalLine(S.state); // başlık gerçek onay olayından
+    if (a.text.textContent !== text) a.text.textContent = text;
+    a.allow.hidden = !!S.approvalDone;
+    a.deny.hidden = !!S.approvalDone;
+  }
+
+  // Canlı akışta bekleyen onay kimliği değişince şerit bağlanır (replay kendi durumunu gösterir)
+  function trackApproval(state) {
+    if (S.replay && S.replay.events) return;
+    if (state.pendingApprovalId) {
+      if (state.pendingApprovalId !== S.approvalId) {
+        S.approvalId = state.pendingApprovalId;
+        S.approvalDone = "";
+      }
+    } else if (!S.approvalDone) {
+      S.approvalId = ""; // akışta onay çözüldü (auto_approved/denied/done) → şerit kapanır
+    }
+    paintApproval();
+  }
+
+  // --- geçmiş oturum zaman çubuğu: durum saf Logic.replayState ile BAŞTAN hesaplanır ---
+  const REPLAY_MS = 700; // olay başına oynatma süresi (hıza bölünür)
+
+  function initReplay() {
+    if (S.replay) return; // ikinci init'te düğüm dinleyicileri yeniden bağlanmaz
+    const box = $id("office-replay");
+    const play = $id("office-replay-play");
+    const range = $id("office-replay-range");
+    const text = $id("office-replay-text");
+    const rate = $id("office-replay-speed");
+    if (!box || !play || !range || !text || !rate) return;
+    S.replay = { events: null, i: 0, playing: false, speed: 1, box, play, range, text, rate, tick: 0 };
+    play.type = rate.type = "button";
+    box.hidden = true;
+    play.addEventListener("click", () => {
+      const r = S.replay;
+      if (!r || !r.events) return;
+      // sonda oynat → baştan başlar (deterministik: aynı dizi, aynı durumlar)
+      if (!r.playing && r.i >= r.events.length) seekReplay(0);
+      startPlayback(!r.playing);
+    });
+    range.addEventListener("input", () => {
+      if (!S.replay || !S.replay.events) return;
+      const want = Math.round(Number(range.value) || 0); // önce oku: stopPlayback çubuğu r.i'ye geri boyar
+      stopPlayback();
+      seekReplay(want);
+    });
+    rate.addEventListener("click", () => {
+      const r = S.replay;
+      if (!r) return;
+      r.speed = r.speed === 1 ? 2 : r.speed === 2 ? 4 : 1;
+      rate.textContent = `${r.speed}x`;
+      rate.setAttribute("aria-label", `Oynatma hızı: ${r.speed}x (değiştir)`);
+      if (r.playing) startPlayback(true); // yeni hızla yeniden zamanlanır
+    });
+    rate.textContent = "1x";
+    rate.setAttribute("aria-label", "Oynatma hızı: 1x (değiştir)");
+  }
+
+  function replayPaint() {
+    const r = S.replay;
+    if (!r || !r.events) return;
+    const n = r.events.length;
+    if (r.range.max !== String(n)) r.range.max = String(n);
+    if (r.range.value !== String(r.i)) r.range.value = String(r.i);
+    const label = `Olay ${r.i} / ${n}`;
+    if (r.text.textContent !== label) r.text.textContent = label;
+    const playText = r.playing ? "⏸ Duraklat" : "▶ Oynat";
+    if (r.play.textContent !== playText) r.play.textContent = playText;
+    r.play.setAttribute("aria-pressed", r.playing ? "true" : "false");
+    r.play.setAttribute("aria-label", r.playing ? "Oynatmayı duraklat" : "Oynatmayı başlat");
+  }
+
+  // Çubuğu i. olaya sar: durum olay dizisine BAŞTAN uygulanarak hesaplanır (saf, tekrarlanabilir)
+  function seekReplay(i) {
+    const r = S.replay;
+    if (!r || !r.events) return;
+    const n = r.events.length;
+    const raw = Math.floor(Number(i));
+    r.i = !Number.isFinite(raw) ? 0 : Math.min(n, Math.max(0, raw));
+    applyState(Logic.replayState(r.events, r.i));
+    replayPaint();
+  }
+
+  function startPlayback(on) {
+    const r = S.replay;
+    if (!r) return;
+    if (!on) return stopPlayback();
+    if (S.reduced) {
+      // prefers-reduced-motion: otomatik oynatma YOK (yalnız çubukla gezinme)
+      r.playing = false;
+      replayPaint();
+      return;
+    }
+    r.playing = true;
+    if (r.tick) clearIntervalFn(r.tick);
+    r.tick = setIntervalFn(replayStep, Math.max(50, Math.round(REPLAY_MS / r.speed)));
+    replayPaint();
+  }
+
+  function replayStep() {
+    const r = S.replay;
+    if (!r || !r.playing) return;
+    if (r.i >= r.events.length) return stopPlayback(); // sonda durur
+    seekReplay(r.i + 1);
+    if (r.i >= r.events.length) stopPlayback();
+  }
+
+  function stopPlayback() {
+    const r = S.replay;
+    if (!r) return;
+    r.playing = false;
+    if (r.tick) clearIntervalFn(r.tick);
+    r.tick = 0;
+    replayPaint();
+  }
+
+  function loadReplay(events) {
+    const r = S.replay;
+    if (!r) return;
+    const list = Array.isArray(events) ? events.slice() : []; // app.js'in dizisi paylaşılmaz
+    r.events = list;
+    r.i = 0;
+    stopPlayback();
+    r.box.hidden = false; // yalnız replay modunda görünür
+    S.approvalId = ""; // geçmiş kararı değiştirilemez → onay şeridi ÇIKMAZ
+    S.approvalDone = "";
+    paintApproval();
+    applyState(Logic.replayState(list, 0));
+    replayPaint();
+    startPlayback(true); // otomatik oynatma; reduced-motion'da başlamaz
+  }
+
+  function leaveReplay() {
+    const r = S.replay;
+    if (!r) return;
+    stopPlayback();
+    r.events = null;
+    r.i = 0;
+    r.box.hidden = true; // canlı mod aynen döner
+    S.approvalId = "";
+    S.approvalDone = "";
+    paintApproval();
+  }
+
   function updateText() {
     const line = describe(S.state);
     if (S.live && S.live.textContent !== line) S.live.textContent = line;
@@ -1243,6 +1462,7 @@
     paintMetrics(S.state); // göstergeler yalnız olayla değişir (token/bağlam/istek)
     tickDuration(); // süre çizicisi yalnız görev sürerken ayakta kalır
     if (S.panelOpen) paintPanel(); // panel kapalıyken DOM'a yazılmaz (gürültü yok)
+    paintApproval(); // onay şeridi başlığı güncel durumdan gelir
   }
 
   function fit() {
@@ -1274,22 +1494,35 @@
     drawOnce(true);
   }
 
-  function onEvent(type, data) {
+  // Yeni durumu sahneye uygular: canlı olay (reduce) ve replay (replayState) aynı yoldan geçer.
+  function applyState(next) {
     const prev = S.state;
-    S.state = Logic.reduce(prev, type, data || {});
-    fxEvent(S.fx, S.state, frameNow(0)); // efekt zamanı olay anından başlar
-    if (S.state.target !== prev.target) S.walkStart = root.performance ? root.performance.now() : 0;
-    if (prev.zone !== S.state.zone) S.prevZone = prev.zone;
+    S.state = next;
+    fxEvent(S.fx, next, frameNow(0)); // efekt zamanı olay anından başlar
+    if (next.target !== prev.target) S.walkStart = root.performance ? root.performance.now() : 0;
+    if (prev.zone !== next.zone) S.prevZone = prev.zone;
     S.dirty = true;
     updateText();
     if (!S.running) drawOnce(false);
-    else if (S.state.target !== prev.target) restartWalk();
+    else if (next.target !== prev.target) restartWalk();
+  }
+
+  function onEvent(type, data) {
+    const prev = S.state;
+    applyState(Logic.reduce(prev, type, data || {}));
+    trackApproval(S.state); // onay şeridi yalnız bekleyen gerçek kimlikle açılır
   }
 
   function reset() {
+    leaveReplay(); // yeni görev: replay modu ve zaman çubuğu kapanır, canlı mod döner
+    S.approvalId = "";
+    S.approvalDone = "";
+    S.approvalBusy = false;
+    paintApproval();
+    const prev = S.state;
     S.state = Logic.initial();
     S.fx = createFx(); // efektler ve boş zaman davranışı da sıfırlanır
-    S.prevZone = "desk";
+    S.prevZone = prev.zone || "desk"; // karakter masaya yürür (bölge değişimi animasyonu)
     S.walkStart = 0;
     // göstergeler: yeni görev → süre sıfırdan; yeni görevde ilk `started` süreyi yeniden kurar
     S.durStart = 0;
@@ -1325,6 +1558,8 @@
     S.word = root.document.getElementById("office-status");
     initMetrics();
     initPanel();
+    initApproval();
+    initReplay();
     S.reduced = reduceMotion();
     S.scene = makeCanvas(W, H, drawScene);
     S.buf = makeCanvas(W, H, () => {});
@@ -1397,6 +1632,8 @@
     stageMode,
     confettiBits,
     confettiParts,
+    replay: () => S.replay, // testte zaman çubuğu durumu (DOM düğümleri yoksa null)
+    sendDecision, // testte onay şeridi kararı (köprü Office.onDecide çağrılır)
     mix32,
     createFx,
     fxEvent,
@@ -1413,6 +1650,9 @@
     reset,
     setVisible,
     setContextWindow, // app.js köprüsü: modelin bağlam penceresi (state.contextWindow)
+    loadReplay, // app.js köprüsü: geçmiş oturum olayları [{type,data}] → zaman çubuğu
+    leaveReplay, // replay modundan çık (yeni görev / reset ile de kapanır)
+    onDecide: null, // app.js köprüsü: onay kararı akışı (decideApproval)
     getState: () => S.state,
     describe,
   };

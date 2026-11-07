@@ -15,6 +15,12 @@ function load(opts) {
   win.window = win;
   win.globalThis = win;
   win.document = { hidden: false, createElement: () => makeCanvas() };
+  // sahte pencerede zamanlayıcılar (süreç testten sonra çıkabilsin diye unref'li)
+  const un = (t) => (t && t.unref ? (t.unref(), t) : t);
+  win.setTimeout = (f, ms) => un(setTimeout(f, ms));
+  win.clearTimeout = (t) => clearTimeout(t);
+  win.setInterval = (f, ms) => un(setInterval(f, ms));
+  win.clearInterval = (t) => clearInterval(t);
   if (opts && opts.canvas) {
     win.document.getElementById = (id) => (id === "office-canvas" ? makeCanvas() : null);
   }
@@ -226,4 +232,155 @@ test("office.js: hazırlık katmanı güvenli (innerHTML/eval/ağ yok)", () => {
     const stripped = bad === "font=" ? js.replace("ctx.font", "") : js;
     assert.ok(!stripped.includes(bad), bad);
   }
+});
+
+// --- tur B2: onay şeridi kararı mevcut akışa (Office.onDecide) gider ---
+// Sahte düğüm: ofis şeritlerinin dinleyicilerini tetiklemeyi sağlar (yalnız DOM yüzeyi)
+function fakeEl() {
+  const listeners = {};
+  const el = {
+    hidden: false,
+    disabled: false,
+    textContent: "",
+    value: "0",
+    max: "0",
+    type: "",
+    attrs: {},
+    listeners,
+    addEventListener: (name, fn) => {
+      listeners[name] = fn;
+    },
+    fire: (name) => listeners[name] && listeners[name](),
+    setAttribute: function (k, v) {
+      this.attrs[k] = String(v);
+    },
+    getAttribute: function (k) {
+      return this.attrs[k] == null ? null : this.attrs[k];
+    },
+  };
+  return el;
+}
+
+test("Office.loadReplay: zaman çubuğu durumu saf replayState ile hesaplanır, kenetlenir", () => {
+  const win = load();
+  assert.equal(win.OfficeDraw.replay(), null, "DOM düğümü yoksa çubuk kurulmaz (çizim yine çalışır)");
+  const events = [
+    { type: "started", data: {} },
+    { type: "tool_call", data: { tool: "run", args: { command: "pytest -q" } } },
+    { type: "tool_result", data: { tool: "run", result: "exit_code: 0" } },
+    { type: "done", data: { status: "done" } },
+  ];
+  win.Office.loadReplay(events);
+  assert.equal(JSON.stringify(win.Office.getState()), JSON.stringify(win.OfficeLogic.replayState(events, 0)));
+  win.Office.leaveReplay();
+  win.Office.reset();
+  assert.deepEqual(JSON.stringify(win.Office.getState()), JSON.stringify(win.OfficeLogic.initial()));
+});
+
+test("Office.onDecide köprüsü: şerit kararı app.js akışını çağırır (replay'de onay yok)", () => {
+  const win = load();
+  const calls = [];
+  win.Office.onDecide = (id, decision) => {
+    calls.push([id, decision]);
+    return Promise.resolve(decision === "allow" ? "İzin verildi" : "Reddedildi");
+  };
+  const events = [
+    { type: "started", data: {} },
+    { type: "approval_required", data: { approval_id: "q1", tool: "run" } },
+  ];
+  win.Office.loadReplay(events); // replay: onay şeridi çıkmaz → karar gönderilmez
+  win.OfficeDraw.sendDecision("allow");
+  assert.deepEqual(calls, []);
+  win.Office.leaveReplay();
+  win.Office.onEvent("approval_required", { approval_id: "q1", tool: "run" });
+  assert.equal(win.Office.getState().pendingApprovalId, "q1");
+  win.OfficeDraw.sendDecision("deny");
+  assert.deepEqual(calls, [["q1", "deny"]]);
+  win.OfficeDraw.sendDecision("deny"); // kimlik tüketildi → ikinci istek yok (kopya gönderim yok)
+  assert.equal(calls.length, 1);
+});
+
+test("ofis şeritleri (DOM düğümleriyle): onay yalnız beklerken görünür, replay'de çıkmaz, karar köprüye gider", async () => {
+  const nodes = {};
+  for (const id of [
+    "office-canvas",
+    "office-live",
+    "office-status",
+    "office-approval",
+    "office-approval-text",
+    "office-approval-allow",
+    "office-approval-deny",
+    "office-replay",
+    "office-replay-play",
+    "office-replay-range",
+    "office-replay-text",
+    "office-replay-speed",
+  ]) nodes[id] = makeCanvas();
+  for (const id of Object.keys(nodes)) {
+    const base = nodes[id];
+    base.listeners = {};
+    base.hidden = false;
+    base.disabled = false;
+    base.textContent = "";
+    base.attrs = {};
+    base.value = "0";
+    base.max = "0";
+    base.style = {};
+    base.addEventListener = (name, fn) => {
+      base.listeners[name] = fn;
+    };
+    base.setAttribute = (k, v) => {
+      base.attrs[k] = String(v);
+    };
+    base.getAttribute = (k) => (base.attrs[k] == null ? null : base.attrs[k]);
+  }
+  const win = load();
+  win.document.getElementById = (id) => nodes[id] || null;
+  win.Office.init();
+  const A = nodes["office-approval"];
+  const play = nodes["office-replay-play"];
+  assert.equal(A.hidden, true, "başlangıçta onay şeridi gizli");
+  assert.equal(nodes["office-replay"].hidden, true, "başlangıçta zaman çubuğu gizli");
+  const calls = [];
+  win.Office.onDecide = (id, decision) => {
+    calls.push([id, decision]);
+    return Promise.resolve("İzin verildi");
+  };
+  win.Office.onEvent("approval_required", { approval_id: "b2", tool: "write_file", args: { path: "a.py" } });
+  assert.equal(A.hidden, false, "onay beklerken şerit görünür");
+  assert.equal(nodes["office-approval-text"].textContent, "Usta onay bekliyor: write_file");
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  nodes["office-approval-allow"].listeners.click(); // "İzin ver"
+  assert.deepEqual(calls, [["b2", "allow"]], "karar app.js akışına (Office.onDecide) gitti");
+  await tick(); // köprü Promise döner → şerit sonucu bir tur sonra yazar
+  assert.equal(nodes["office-approval-text"].textContent, "İzin verildi", "şerit karar sonucunu yazar");
+  assert.equal(calls.length, 1, "çift gönderim yok");
+  // replay: zaman çubuğu görünür, onay şeridi çıkmaz
+  win.Office.loadReplay([{ type: "started", data: {} }, { type: "approval_required", data: { approval_id: "z1", tool: "run" } }]);
+  assert.equal(nodes["office-replay"].hidden, false, "replay modunda çubuk görünür");
+  assert.equal(nodes["office-replay-range"].max, "2", "aralık 0..N");
+  assert.equal(nodes["office-replay-text"].textContent, "Olay 0 / 2");
+  assert.equal(A.hidden, true, "replay'de onay şeridi ÇIKMAZ (geçmiş kararı değiştirilemez)");
+  nodes["office-replay-range"].value = "1";
+  nodes["office-replay-range"].listeners.input();
+  assert.equal(nodes["office-replay-text"].textContent, "Olay 1 / 2", "çubuk sürüklenince değer geri sıfırlanmaz");
+  assert.equal(win.Office.getState().pendingApprovalId, "", "1 olay uygulandı (yalnız started): onay henüz yok");
+  nodes["office-replay-range"].value = "2";
+  nodes["office-replay-range"].listeners.input();
+  assert.equal(nodes["office-replay-text"].textContent, "Olay 2 / 2");
+  assert.equal(win.Office.getState().pendingApprovalId, "z1", "çubuk saf reduce ile o olaya kadar uygulandı");
+  nodes["office-replay-play"].listeners.click(); // oynat/duraklat (elle; reduced-motion testte yok)
+  assert.equal(play.attrs["aria-pressed"], "true", "oynatma düğmesi aria-pressed ile durumu söyler");
+  nodes["office-replay-play"].listeners.click(); // duraklat: sayaç ilerlemez (zamanlayıcı temiz)
+  assert.equal(play.attrs["aria-pressed"], "false");
+  nodes["office-replay-speed"].listeners.click();
+  assert.equal(nodes["office-replay-speed"].textContent, "2x", "hız 1x → 2x");
+  win.Office.onEvent("approval_required", { approval_id: "c1", tool: "run" });
+  assert.equal(A.hidden, true, "replay sürerken canlı onay olayı şeridi açmaz");
+  win.Office.reset(); // yeni görev: replay kapanır, canlı mod döner
+  assert.equal(nodes["office-replay"].hidden, true, "replay'den çıkınca çubuk gizlenir");
+  assert.equal(A.hidden, true);
+  // canlı mod aynen döndü: yeni onay şeridi yine açılır
+  win.Office.onEvent("approval_required", { approval_id: "d1", tool: "run" });
+  assert.equal(A.hidden, false, "canlı modda onay şeridi yeniden görünür");
 });

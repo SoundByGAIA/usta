@@ -8,8 +8,9 @@
   const WALK_MS = 750;
   const MIN_SCALE = 3; // küçük ekranda bile en az 3x (CSS max-width taşmayı engeller)
   const MAX_SCALE = 6; // geniş ekranda dev sahne yerine ölçülü büyütme
-  // Beyaz tahtanın iç (yazı) alanı: drawScene'deki 128x27 çerçeve + 3 px kenar → 68,8 120x19 (iç sınır 187,26)
-  const BOARD_IN_X = 68, BOARD_IN_Y = 8, BOARD_IN_W = 120, BOARD_IN_H = 19;
+  // Beyaz tahtanın iç (yazı) alanı: drawScene'deki 144x27 çerçeve + 3 px kenar → 62,8 136x19 (iç sınır 197,26)
+  // Genişlik 5x7 fontta 22 karaktere yeter: "ONAY BEKLİYOR" (13) ve kısa sayaçlar (≤19, Logic.shortCounters) taşmaz.
+  const BOARD_IN_X = 62, BOARD_IN_Y = 8, BOARD_IN_W = 136, BOARD_IN_H = 19;
 
   const PAL = {
     ".": null,
@@ -87,9 +88,12 @@
     return out;
   })();
 
+  // Dikdörtgen: ctx.ops varsa (testte sahte bağlam) çizim kaydı da tutulur — ağ/PATH yok
   function rect(ctx, x, y, w, h, col) {
     ctx.fillStyle = col;
     ctx.fillRect(x, y, w, h);
+    const ops = ctx.ops;
+    if (ops) ops.push({ k: "r", x, y, w, h, c: col });
   }
 
   // Piksel fontu (5x7, kodla tanımlı; harici font yok). Yazı mantıksal ölçekte net durur.
@@ -134,22 +138,29 @@
     return FONT[ascii] || FONT[up] || FONT["?"];
   }
 
+  // Gerçek piksel genişliği: her glif 5 px + 1 px aralık, son aralık düşülür (n karakter → 6n-1 px)
   function textWidth(s, scale) {
-    return String(s).length * (6 * scale) - scale;
+    const n = String(s).length;
+    return n ? n * 6 * scale - scale : 0;
   }
 
   // Satırı maxW genişliğe sığdırır: sığmıyorsa sonuna "…" ekleyip karakter keser (tahta dışına asla çizilmez)
-  function fitLine(s, maxW, scale) {
+  function fitLine(s, maxW, scale, maxChars0) {
     const str = String(s || "");
-    const maxChars = Math.max(1, Math.floor((maxW + scale) / (6 * scale)));
-    if (str.length <= maxChars) return str;
-    return str.slice(0, Math.max(1, maxChars - 1)).trimEnd() + "…";
+    const cap = maxChars0 == null ? Math.floor((maxW + scale) / (6 * scale)) : maxChars0; // ölçek 1: 136 px → 22 karakter
+    const maxChars = Math.max(1, cap);
+    if (str.length <= maxChars && textWidth(str, scale) <= maxW) return str;
+    const keep = Math.max(1, Math.min(str.length, maxChars - 1));
+    return str.slice(0, keep).trimEnd() + "…";
   }
 
   function drawText(ctx, s, x, y, col, scale) {
     scale = scale || 1;
     ctx.fillStyle = col;
     const str = String(s);
+    const ops = ctx.ops;
+    // testte tek kayıt yeter: glifleri tek tek yazmak yerine metnin sınırları
+    if (ops) ops.push({ k: "t", s: str, x, y, w: textWidth(str, scale), h: 7 * scale, c: col });
     for (let i = 0; i < str.length; i++) {
       const g = glyph(str[i]);
       const gx = x + i * 6 * scale;
@@ -200,17 +211,111 @@
     ZONES.forEach((z) => drawSign(ctx, z, z.key === inZone));
   }
 
-  // --- sahne katmanı: bir kez çizilir, kare başına yeniden çizilmez ---
-  function drawScene(ctx) {
-    // duvar: koyu mavi-gri panel dokusu
-    rect(ctx, 0, 0, W, 92, "#252e3b");
-    for (let y = 0; y < 92; y += 8) {
-      rect(ctx, 0, y, W, 1, "#202834");
-      const off = (y / 8) % 2 ? 8 : 0;
-      for (let x = off; x < W; x += 16) rect(ctx, x, y, 1, 8, "#222b37");
+  // --- gündüz / gün batımı / gece: yerel saate göre ton ve gökyüzü (saf fonksiyon, test edilebilir) ---
+  function dayPhase(hour) {
+    const h = Number(hour);
+    const v = h >= 0 && h < 24 ? Math.floor(h) : 12; // geçersiz saat → gündüz varsayılanı
+    if (v >= 6 && v < 18) return "day";
+    if (v >= 18 && v < 20) return "sunset";
+    return "night";
+  }
+
+  // Saat dilimine göre duvar ve pencere renkleri (06-18 gündüz, 18-20 gün batımı, gerisi gece)
+  function skyPalette(phase) {
+    if (phase === "day") {
+      return {
+        wall: ["#2a3546", "#253041", "#28344a"], // ana, doku çizgisi, dikey çizgi
+        strip: ["#38465c", "#42526b"],
+        sky: ["#5ba7dd", "#7cc0ea", "#dcf0ff"],
+        dir: "day",
+      };
     }
-    rect(ctx, 0, 58, W, 2, "#303a4a"); // lambri bandı
-    rect(ctx, 0, 58, W, 1, "#3a4557");
+    if (phase === "sunset") {
+      return {
+        wall: ["#332e3d", "#2d2937", "#312c3f"],
+        strip: ["#463c4c", "#57475a"],
+        sky: ["#d97b3a", "#f0a85a", "#6b4a6e"],
+        dir: "sunset",
+      };
+    }
+    return { wall: ["#252e3b", "#202834", "#222b37"], strip: ["#303a4a", "#3a4557"], sky: ["#12243d"], dir: "night" };
+  }
+
+  // Pencere içi: gündüz mavi gökyüzü + güneş/bulut, gün batımı turuncu + alçak güneş, gece ay + yıldız
+  function drawWindowSky(ctx, dir, sky) {
+    rect(ctx, 14, 20, 40, 28, sky[0]);
+    if (dir === "day") {
+      rect(ctx, 14, 20, 40, 10, sky[1]);
+      rect(ctx, 14, 20, 40, 4, sky[2]);
+      // güneş (sağ üst köşe) + hafif hale
+      rect(ctx, 44, 23, 7, 7, "#f6e07a");
+      rect(ctx, 45, 22, 5, 9, "#f6e07a");
+      rect(ctx, 43, 24, 9, 5, "#f6e07a");
+      ctx.fillStyle = "rgba(246,224,122,.16)";
+      ctx.beginPath();
+      ctx.ellipse(47, 26, 9, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // iki küçük bulut
+      [[20, 27, 10], [30, 33, 8]].forEach(([cx, cy, cw]) => {
+        rect(ctx, cx, cy, cw, 3, "#ffffff");
+        rect(ctx, cx + 2, cy - 1, cw - 4, 1, "#ffffff");
+        rect(ctx, cx, cy + 3, cw, 1, "#cfe3f2");
+      });
+    } else if (dir === "sunset") {
+      rect(ctx, 14, 20, 40, 12, sky[1]);
+      rect(ctx, 14, 20, 40, 5, sky[2]);
+      // ufka yakın güneş (turuncu-kızıl disk)
+      rect(ctx, 36, 36, 9, 6, "#fbd07a");
+      rect(ctx, 37, 35, 7, 8, "#fbd07a");
+      rect(ctx, 44, 32, 1, 1, "#ffe3a8");
+      rect(ctx, 23, 30, 1, 1, "#ffe3a8");
+    } else {
+      rect(ctx, 44, 24, 5, 5, "#f2e7c0"); // ay
+      rect(ctx, 45, 23, 3, 7, "#f2e7c0");
+      rect(ctx, 43, 25, 7, 3, "#f2e7c0");
+      [[18, 24], [25, 27], [36, 24], [20, 30], [40, 30], [48, 34], [34, 30]].forEach(([sx, sy], i) =>
+        rect(ctx, sx, sy, i % 3 === 0 ? 2 : 1, i % 3 === 0 ? 1 : 2, "#cfd8e6"));
+    }
+    rect(ctx, 30, 22, 1, 26, "#3b4657"); // kanat ayırıcı
+    rect(ctx, 14, 34, 40, 1, "#3b4657");
+  }
+
+  // Tavan lambası: "on" → sarı ampul + iki yumuşak hale; "off" → sönük ampul (sahne kararır)
+  function drawLamp(ctx, mode) {
+    const on = mode !== "off";
+    rect(ctx, 116, 4, 12, 2, on ? "#e7c65a" : "#4a4a44");
+    rect(ctx, 116, 4, 12, 1, on ? "#f6e6a8" : "#5a5a50");
+    if (!on) return;
+    ctx.fillStyle = "rgba(231,198,90,.10)";
+    ctx.beginPath();
+    ctx.moveTo(114, 6);
+    ctx.lineTo(130, 6);
+    ctx.lineTo(186, 92);
+    ctx.lineTo(58, 92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(231,198,90,.08)";
+    ctx.beginPath();
+    ctx.ellipse(122, 94, 54, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(231,198,90,.06)";
+    ctx.beginPath();
+    ctx.ellipse(122, 58, 60, 38, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // --- sahne katmanı: saat dilimi başına bir kez çizilir, kare başına yeniden çizilmez ---
+  function drawScene(ctx, phase) {
+    const pal = skyPalette(dayPhase(phase));
+    // duvar: saat dilimine göre tonlu panel dokusu
+    rect(ctx, 0, 0, W, 92, pal.wall[0]);
+    for (let y = 0; y < 92; y += 8) {
+      rect(ctx, 0, y, W, 1, pal.wall[1]);
+      const off = (y / 8) % 2 ? 8 : 0;
+      for (let x = off; x < W; x += 16) rect(ctx, x, y, 1, 8, pal.wall[2]);
+    }
+    rect(ctx, 0, 58, W, 2, pal.strip[0]); // lambri bandı
+    rect(ctx, 0, 58, W, 1, pal.strip[1]);
 
     // zemin: parke döşeme (ızgara + dama deseni), üstte süpürgelik
     rect(ctx, 0, 92, W, H - 92, "#2f3a49");
@@ -231,18 +336,9 @@
     rect(ctx, 102, 100, 92, 7, "#6b4a3a");
     for (let i = 0; i < 11; i++) rect(ctx, 105 + i * 8, 103, 4, 1, "#c98a4e");
 
-    // gece pencereli duvar (sol üst)
+    // pencereli duvar (sol üst): gökyüzü saat dilimine göre çizilir
     rect(ctx, 12, 18, 44, 32, "#161d28"); // çerçeve
-    rect(ctx, 14, 20, 40, 28, "#12243d"); // gece göğü
-    rect(ctx, 30, 22, 1, 26, "#3b4657"); // kanat ayırıcı
-    rect(ctx, 14, 34, 40, 1, "#3b4657");
-    // ay
-    rect(ctx, 44, 24, 5, 5, "#f2e7c0");
-    rect(ctx, 45, 23, 3, 7, "#f2e7c0");
-    rect(ctx, 43, 25, 7, 3, "#f2e7c0");
-    // yıldızlar
-    [[18, 24], [25, 27], [36, 24], [20, 30], [40, 30], [48, 34], [34, 30]].forEach(([sx, sy], i) =>
-      rect(ctx, sx, sy, i % 3 === 0 ? 2 : 1, i % 3 === 0 ? 1 : 2, "#cfd8e6"));
+    drawWindowSky(ctx, pal.dir, pal.sky);
     // şehir silueti + ışıklı pencereler
     rect(ctx, 14, 41, 40, 7, "#0b1420");
     [[16, 43, 6], [24, 39, 7], [33, 44, 5], [40, 41, 7], [48, 46, 6]].forEach(([tx, ty, tw], i) => {
@@ -256,32 +352,15 @@
     // tavan lambası (üst orta) + yumuşak ışık halesi
     rect(ctx, 121, 0, 2, 2, "#3b4657");
     rect(ctx, 114, 2, 16, 2, PAL.D);
-    rect(ctx, 116, 4, 12, 2, "#e7c65a");
-    rect(ctx, 116, 4, 12, 1, "#f6e6a8");
-    ctx.fillStyle = "rgba(231,198,90,.10)";
-    ctx.beginPath();
-    ctx.moveTo(114, 6);
-    ctx.lineTo(130, 6);
-    ctx.lineTo(186, 92);
-    ctx.lineTo(58, 92);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "rgba(231,198,90,.08)";
-    ctx.beginPath();
-    ctx.ellipse(122, 94, 54, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(231,198,90,.06)";
-    ctx.beginPath();
-    ctx.ellipse(122, 58, 60, 38, 0, 0, Math.PI * 2);
-    ctx.fill();
+    drawLamp(ctx, "on");
 
     // üstte beyaz tahta (görev durumu + sayaçlar; yazı drawBoard ile her karede basılır)
-    rect(ctx, 64, 4, 128, 27, "#5a6472");
-    rect(ctx, 65, 5, 126, 25, "#2a2018");
-    rect(ctx, 68, 8, 120, 19, "#e6e8df");
-    rect(ctx, 68, 8, 120, 1, PAL.w);
-    rect(ctx, 68, 26, 120, 1, "#b9b3a3");
-    rect(ctx, 168, 22, 8, 3, PAL.o); // tahta kalemi
+    rect(ctx, 58, 4, 144, 27, "#5a6472");
+    rect(ctx, 59, 5, 142, 25, "#2a2018");
+    rect(ctx, 62, 8, 136, 19, "#e6e8df");
+    rect(ctx, 62, 8, 136, 1, PAL.w);
+    rect(ctx, 62, 26, 136, 1, "#b9b3a3");
+    rect(ctx, 190, 22, 8, 3, PAL.o); // tahta kalemi
 
     // sol: kitaplık
     rect(ctx, 4, 54, 54, 40, PAL.B);
@@ -405,44 +484,49 @@
     if (testState === "pass") drawText(ctx, "OK", 202, 57, "#dff3e6", 1);
   }
 
-  function drawOffice(ctx, state, frame, moving) {
+  // mode: "work" | "coffee" | "sleep" | "lamp" (yalnız cosmetic; drawOffice'e enjekte edilir)
+  function drawOffice(ctx, state, frame, moving, mode) {
     const inZone = state.target || state.zone || "desk";
     const busy = state.status === "running" || state.status === "awaiting";
-    drawBooks(ctx, frame, inZone === "library" && busy && !moving);
+    const away = mode === "sleep" || mode === "coffee";
+    drawBooks(ctx, frame, inZone === "library" && busy && !moving && !away);
     let testState = "idle";
     if (inZone === "testbench" && busy) {
       testState = state.mood === "alert" && !state.hand ? "fail" : "run";
     }
     if (inZone === "testbench" && state.ended === "done") testState = "pass";
     drawScreen(ctx, frame, testState);
-    if (inZone === "post" && !moving) {
+    if (inZone === "post" && !moving && !away) {
       // mektup kutudan yukarı süzülür
       const lift = busy ? frame % 3 : state.ended === "done" ? 0 : 0;
       rect(ctx, 219, 122 - lift, 16, 5, PAL.w);
       rect(ctx, 226, 122 - lift, 1, 5, "#cfc8b8");
       rect(ctx, 225, 121 - lift, 4, 1, PAL.p);
     }
-    if (inZone === "memory" && busy && !moving) {
+    if (inZone === "memory" && busy && !moving && !away) {
       const led = frame % 6 < 3;
       rect(ctx, 24, 129, 3, 2, led ? PAL.y : PAL.o);
     }
   }
 
-  // Tahta yazısı: görev durumu (üst satır) + sayaçlar (alt satır); her karede tazelenir
+  // Tahta yazısı: görev durumu (üst satır) + kısa sayaçlar (alt satır); her karede tazelenir
   function drawBoard(ctx, state) {
     if (!ctx || !state || !state.counts) return;
     const STATUS = { idle: "HAZIR", running: "ÇALIŞIYOR", awaiting: "ONAY BEKLİYOR", done: "BİTTİ", failed: "BAŞARISIZ", cancelled: "İPTAL" };
-    const c = state.counts;
-    // her iki satır ölçek 1: 7 px yükseklik, aralarında 2 px boşluk → 8..16 ve 18..24 (iç alan 8..26)
+    // her iki satır ölçek 1, 5x7 font: 7 px yükseklik, aralarında 2 px boşluk → 8..16 ve 18..24 (iç alan 8..26)
     const maxW = BOARD_IN_W;
-    const line1 = fitLine(String(STATUS[state.status] || state.status || ""), maxW, 1);
-    // sayaçlar yalnız gerçek olaylardan (Logic.counts); sığmazsa karakter kesilir, tahta dışına çizilmez
-    const line2 = fitLine(`ARAÇ ${c.tool_calls} · DÜZ ${c.edits} · TEST ${c.tests_pass}/${c.tests_pass + c.tests_fail}`, maxW, 1);
+    // satır başına en çok 22 karakter (136 px / 6 px); sayaç satırı ≤19 olduğu için kesilmez
+    const maxChars = 22;
+    const line1 = fitLine(STATUS[state.status] || state.status || "", maxW, 1, maxChars);
+    // sayaçlar kısa biçimde (A araç, D düzenleme, T test geçti/kaldı); sığmazsa kesilir, tahta dışına çizilmez
+    const line2 = fitLine(String(Logic.shortCounters ? Logic.shortCounters(state) : ""), maxW, 1, maxChars);
     const y1 = BOARD_IN_Y + 1;
     const y2 = y1 + 7 + 2;
     const col = state.status === "failed" || state.status === "cancelled" ? "#8c2f24" : state.status === "done" ? "#1f5f3a" : "#23282e";
-    drawText(ctx, line1, BOARD_IN_X + Math.round((maxW - textWidth(line1, 1)) / 2), y1, col, 1); // ortalı
-    drawText(ctx, line2, BOARD_IN_X + Math.round((maxW - textWidth(line2, 1)) / 2), y2, "#3c4652", 1); // ortalı
+    const c1 = Math.max(BOARD_IN_X, BOARD_IN_X + Math.round((maxW - textWidth(line1, 1)) / 2));
+    const c2 = Math.max(BOARD_IN_X, BOARD_IN_X + Math.round((maxW - textWidth(line2, 1)) / 2));
+    drawText(ctx, line1, c1, y1, col, 1); // ortalı
+    drawText(ctx, line2, c2, y2, "#3c4652", 1); // ortalı
   }
 
   // --- karakter ---
@@ -479,7 +563,14 @@
     ctx.beginPath();
     ctx.ellipse(x + CHAR_W / 2, pos.y + CHAR_H, 8, 2.5, 0, 0, Math.PI * 2);
     ctx.fill();
-    if (state.hand) {
+    const up = armsUp(state) && !moving; // görev başarıyla bitti → kollar havada
+    if (up) {
+      // kollar havada: omuzdan yukarı (gövde y..y+22; yüz y+3..y+8 → eller başın iki yanında y+3..y+10)
+      rect(ctx, x + 1, y + 10, 3, 5, PAL.o); // sol kol yukarı
+      rect(ctx, x + 1, y + 7, 3, 3, PAL.s);
+      rect(ctx, x + 12, y + 10, 3, 5, PAL.o); // sağ kol yukarı
+      rect(ctx, x + 12, y + 7, 3, 3, PAL.s);
+    } else if (state.hand) {
       // el kaldırma: başın yanında görünen kol + ten el
       rect(ctx, x + (pos.dx >= 0 ? 13 : 1), y + 9, 3, 6, PAL.o);
       rect(ctx, x + (pos.dx >= 0 ? 13 : 1), y + 6, 3, 3, PAL.s);
@@ -499,6 +590,11 @@
       rect(ctx, x + 11, y + 7, 1, 1, PAL.S);
     } else if (state.mood === "happy") {
       rect(ctx, x + 7, y + 8, 3, 1, PAL.O);
+    }
+    if (up) {
+      // kollar havada: iki yanda küçük "kutlama" çizgileri (ellerin üstünde, y+4..y+7)
+      rect(ctx, x - 3, y + 4, 1, 3, PAL.y);
+      rect(ctx, x + CHAR_W + 2, y + 4, 1, 3, PAL.y);
     }
   }
 
@@ -604,6 +700,244 @@
   }
 
 
+  // --- parçacık sistemi: tek küçük yardımcı, kütüphane yok, kare başına en çok 40 parçacık ---
+  const FX_CAP = 40; // aynı karede en çok 40 parçacık çizilir
+  const CONF_TTL = 1500; // konfeti: 1,5 sn sonra durur
+  const COFFEE_MS = 4200; // çay içme süresi
+  const ZZZ_MS = 3200; // uyuklama süresi
+  const NAP_MS = 20000; // bekleme eşiği: bu kadar sessizlikten sonra uyuklar
+  const NAP_GAP_MS = 24000; // uyandıktan sonra tekrar uyuma arası
+
+  // Çay içme anları (tohum ± jitter, hepsi sabit): 6,5 / 15 / 19,3 sn — "ara sıra"
+  function coffeeTimes(seed) {
+    const j = seed == null ? 0 : mix32(seed) % 5;
+    return [6500 + j * 100, 15000 - j * 100, 19300 + j * 50];
+  }
+
+  // Deterministik sözde-rastgele: tohum (42) sabit → testte ve tek karede aynı çıktı
+  function mix32(seed) {
+    let x = (Number(seed) | 0) + 0x6d2b79f5;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return (x ^ (x >>> 14)) >>> 0;
+  }
+
+  // Konfeti parçacıklarını üretir: az sayıda (12), aynı çağrıda hep aynı (tohum enjekte edilebilir)
+  function confettiBits(seed, n) {
+    const out = [];
+    const cols = [PAL.o, PAL.y, PAL.g, PAL.c, PAL.p];
+    const count = Math.max(0, Math.min(FX_CAP, n == null ? 12 : n));
+    for (let i = 0; i < count; i++) {
+      const r = mix32((seed || 0) * 31 + i * 7 + 3);
+      out.push({
+        x: 110 + (r % 52),
+        vx: ((r >>> 5) % 17) - 8,
+        vy: -12 - ((r >>> 9) % 8),
+        col: cols[(r >>> 13) % cols.length],
+      });
+    }
+    return out;
+  }
+
+  // Sahne efektleri yalnız GERÇEK olaylardan gelen tetikleyicilere (state.fx) tepki verir.
+  // Zaman kaynağı enjekte edilir (now) → testte sabit, uydurma zaman yok.
+  function createFx() {
+    return { seenTest: 0, testAt: -1e9, testKind: "", seenEnd: 0, endAt: -1e9, endKind: "", confetti: [], coffeeAt: -1e9, coffeeSlot: -1, napAt: -1e9, idleAt: -1e9 };
+  }
+
+  function fxEvent(fx, state, now) {
+    const f = state && state.fx;
+    if (!f) return;
+    if (f.testSeq && f.testSeq !== fx.seenTest) {
+      fx.seenTest = f.testSeq; // yalnız yeni tetikleyici (aynı seq tekrar efekt üretmez)
+      fx.testAt = now;
+      fx.testKind = f.test;
+    }
+    if (f.endSeq && f.endSeq !== fx.seenEnd) {
+      fx.seenEnd = f.endSeq;
+      fx.endAt = now;
+      fx.endKind = f.end;
+      fx.confetti = f.end === "done" ? confettiBits(f.endSeq, 12) : [];
+      if (f.end === "cancelled") fx.coffeeAt = -1e9; // lambayı söndürdü: çay/uyku da durur
+    }
+  }
+
+  // Cosmetic boş zaman durumu: yalnız `state.idle` iken (görev yok/bitmiş) ve masadayken.
+  // Çay "ara sıra" (sabit anlarda), uzun bekleyişte (20 sn+) uyku. Çalışırken hiçbiri.
+  function stageMode(state, fx, now, seed) {
+    if (state && state.fx && fx.seenEnd && state.fx.endSeq === fx.seenEnd && fx.endKind === "cancelled" && now - fx.endAt >= 0 && now - fx.endAt < 1500) {
+      return "lamp"; // iptal: lamba söner gibi kısa kararma
+    }
+    const idle = !!(state && state.idle) && (state.target || "desk") === "desk";
+    if (!idle) {
+      fx.idleAt = -1e9; // görev sürüyor: boş zaman sayacı (ve çay anı) sıfırlanır
+      fx.napAt = -1e9; // sonraki boş zamanda uyku eşiği baştan sayılır
+      fx.coffeeSlot = -1;
+      return "work";
+    }
+    if (fx.idleAt < 0) fx.idleAt = now; // boş zaman başladı (ilk kare)
+    const sinceIdle = now - fx.idleAt;
+    if (now - fx.coffeeAt >= 0 && now - fx.coffeeAt < COFFEE_MS && fx.coffeeAt >= fx.napAt) return "coffee";
+    // uyku yalnız NAP_MS sessizlikten SONRA başlar: eşiğe kadar work/coffee, sonra ZZZ_MS boyunca sleep
+    if (sinceIdle >= NAP_MS && now - fx.idleAt < NAP_MS + ZZZ_MS) {
+      fx.napAt = fx.idleAt + NAP_MS;
+      return "sleep";
+    }
+    if (sinceIdle >= NAP_MS) {
+      const lastNap = fx.napAt > 0 ? fx.napAt : fx.idleAt;
+      if (now - lastNap >= NAP_GAP_MS) {
+        fx.napAt = now; // uzun bekleme → tekrar uyuklar
+        return "sleep";
+      }
+      return "work";
+    }
+    const slots = coffeeTimes(seed == null ? 42 : seed);
+    for (let i = 0; i < slots.length; i++) {
+      // yalnız "yeni" içtiğimiz an: geçen son an, son çaydan ilerideyse bir kez
+      if (sinceIdle >= slots[i] && (fx.coffeeSlot < 0 || slots[i] > slots[fx.coffeeSlot])) {
+        fx.coffeeSlot = i;
+        fx.coffeeAt = now;
+        return "coffee";
+      }
+    }
+    return "work";
+  }
+
+  // Dikdörtgen parçacık: en fazla FX_CAP tanesi çizilir (sahne boğulmaz)
+  function drawParts(ctx, parts) {
+    const n = Math.min(parts.length, FX_CAP);
+    for (let i = 0; i < n; i++) {
+      const p = parts[i];
+      rect(ctx, Math.round(p.x), Math.round(p.y), p.s || 1, p.s || 1, p.col);
+    }
+  }
+
+  // Konfeti: görev başarıyla bittiğinde 1,5 sn yağar, sonra durur
+  function confettiParts(fx, now) {
+    const age = now - fx.endAt;
+    if (fx.endKind !== "done" || !(age >= 0 && age < CONF_TTL)) return [];
+    const pieces = [];
+    for (const b of fx.confetti) {
+      const t = age / 1000;
+      const y = 44 + b.vy * t + 46 * t * t;
+      if (y > 130) continue; // yere düşen parçacık kaybolur
+      pieces.push({ x: b.x + b.vx * t, y, col: b.col, s: age > CONF_TTL - 400 ? 1 : 2 });
+    }
+    return pieces;
+  }
+
+  // Karakterin başı üstündeki küçük efektler: test sonucu ✓/ünlem, bitti konfeti başlangıcı
+  function successParts(fx, pivot, now) {
+    const age = now - fx.testAt;
+    if (fx.testKind !== "pass" || !(age >= 0 && age < 900)) return [];
+    const pieces = [];
+    const head = { x: pivot.x + 8, y: pivot.y - 4 };
+    for (let i = 0; i < 6; i++) {
+      const r = mix32(fx.seenTest * 17 + i * 5);
+      const a = ((r % 360) * Math.PI) / 180;
+      const d = 3 + ((r >>> 7) % 9) * (age / 900);
+      pieces.push({
+        x: head.x + Math.cos(a) * d,
+        y: head.y + Math.sin(a) * d - age / 220,
+        col: i % 2 ? "#a6e8bf" : PAL.g,
+        s: 1,
+      });
+    }
+    return pieces;
+  }
+
+  function drawSuccessMark(ctx, fx, pivot, now) {
+    const age = now - fx.testAt;
+    if (!(age >= 0 && age < 1300)) return;
+    // küçük yeşil "✓" (5x5 glif, kodla)
+    const x = Math.round(pivot.x + 11), y = Math.round(pivot.y - 6);
+    const ink = "#7fe0a3";
+    rect(ctx, x, y + 3, 1, 1, ink);
+    rect(ctx, x + 1, y + 4, 1, 1, ink);
+    rect(ctx, x + 2, y + 3, 1, 1, ink);
+    rect(ctx, x + 3, y + 2, 1, 1, ink);
+    rect(ctx, x + 4, y + 1, 1, 1, ink);
+    rect(ctx, x + 5, y, 1, 1, ink);
+  }
+
+  // Test kalınca: başın üstünde minik ter damlası + kırmızı ünlem
+  function drawFailMark(ctx, fx, pivot, now, frame) {
+    const age = now - fx.testAt;
+    if (!(age >= 0 && age < 1400)) return;
+    const x = Math.round(pivot.x + 11), y = Math.round(pivot.y - 8 + (frame % 2));
+    rect(ctx, x + 1, y, 1, 1, PAL.r); // ünlem
+    rect(ctx, x + 1, y + 1, 1, 1, PAL.r);
+    rect(ctx, x + 1, y + 2, 1, 1, PAL.r);
+    rect(ctx, x + 1, y + 4, 1, 1, PAL.r);
+    rect(ctx, x - 3, y + 1, 2, 2, "#9fd0ea"); // ter damlası
+    rect(ctx, x - 3, y + 3, 1, 1, "#9fd0ea");
+  }
+
+  // Üzgün: tepede küçük gri bulut (yavaşça süzülür)
+  function drawCloud(ctx, pivot, now) {
+    const x = Math.round(pivot.x + 2), y = Math.round(pivot.y - 9 + ((now / 700) | 0) % 2);
+    rect(ctx, x, y + 2, 13, 3, "#7d8796");
+    rect(ctx, x + 3, y, 7, 2, "#8f99a8");
+    rect(ctx, x + 1, y + 5, 3, 1, "#5a6472");
+    rect(ctx, x + 7, y + 5, 3, 1, "#5a6472");
+  }
+
+  // Çay içme: fincan + yükselen buhar (yalnız cosmetic, yalnız bekleme durumunda)
+  function drawCoffee(ctx, pivot, now, frame) {
+    const x = Math.round(pivot.x + 13), y = Math.round(pivot.y + 11);
+    rect(ctx, x, y, 6, 5, PAL.o); // fincan
+    rect(ctx, x, y, 6, 1, "#f0b070");
+    rect(ctx, x + 6, y + 1, 2, 2, PAL.o); // kulp
+    rect(ctx, x + 1, y - 1, 4, 1, "#6b4a3a"); // çay yüzeyi
+    for (let i = 0; i < 3; i++) {
+      const ph = ((frame + i * 4) % 12) / 12;
+      rect(ctx, x + 1 + i, Math.round(y - 2 - ph * 7), 1, 1, "rgba(230,240,255,.55)");
+    }
+  }
+
+  // Uyuklama: z z z (soldan sağa yükselir)
+  function drawZzz(ctx, pivot, now, frame) {
+    const zs = ["z", "z", "z"];
+    for (let i = 0; i < 3; i++) {
+      const ph = ((frame + i * 5) % 15) / 15;
+      const x = Math.round(pivot.x + 9 + i * 4 + ph * 3);
+      const y = Math.round(pivot.y - 8 - i * 4 - ph * 5);
+      drawText(ctx, zs[i], x, y, "rgba(220,230,245," + (0.8 - ph * 0.5).toFixed(2) + ")", 1);
+    }
+  }
+
+  // Sahne geneli ekler: ekran parlaması (test geçti/kaldı) ve iptal kararması
+  function drawStageFx(ctx, state, fx, now, frame) {
+    const sig = !!fx.seenTest; // yalnız gerçek bir test sonucu geldiyse parlama var
+    const age = now - fx.testAt;
+    if (sig && age >= 0 && age < 900) {
+      // test tezgâhı ekranı: geçti → yeşil parlar, kaldı → kırmızı yanıp söner
+      const on = fx.testKind === "pass" || frame % 2 === 0;
+      if (on) {
+        ctx.fillStyle = fx.testKind === "pass" ? "rgba(127,224,163,.30)" : "rgba(207,90,74,.34)";
+        ctx.beginPath();
+        ctx.moveTo(186, 52);
+        ctx.lineTo(222, 52);
+        ctx.lineTo(232, 74);
+        ctx.lineTo(178, 74);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    if (state && state.fx && state.fx.endSeq === fx.seenEnd && fx.endKind === "cancelled" && state.fx.end === "cancelled") {
+      const cage = now - fx.endAt;
+      if (cage >= 0 && cage < 1200) {
+        rect(ctx, 0, 0, W, H, "rgba(6,8,14,.42)"); // sahne hafif kararır (lamba söndü)
+        drawLamp(ctx, "off");
+      }
+    }
+  }
+
+  // Kollarını kaldırma niyeti: yalnız başarılı bittiğinde
+  function armsUp(state) {
+    return !!state && state.fx && state.fx.end === "done" && state.status === "done";
+  }
+
   // --- çalışma zamanı ---
   const S = {
     canvas: null,
@@ -623,7 +957,36 @@
     visibleTab: false,
     dirty: true,
     lastDrawn: null,
+    fx: createFx(), // efekt/çay/uyku durumu (yalnız gerçek tetikleyicilerle ilerler)
+    phase: "", // çizili sahne katmanının saat dilimi
+    phaseAt: 0, // saat diliminin son kontrol zamanı (60 sn'de bir yeniden bakılır)
+    scenes: {}, // saat dilimi başına statik katman önbelleği
   };
+
+  // Çizici saati parametre olarak alır: yerel saat yalnız burada okunur, mantık saf kalır.
+  function localHour(d) {
+    try {
+      const t = d || new Date();
+      const h = t.getHours();
+      return typeof h === "number" && h >= 0 && h < 24 ? h : 12;
+    } catch (_) {
+      return 12;
+    }
+  }
+
+  function sceneFor(phase, now) {
+    const cache = S.scenes || (S.scenes = {});
+    if (!cache[phase]) cache[phase] = makeCanvas(W, H, (c) => drawScene(c, phase));
+    return cache[phase];
+  }
+
+  // Kare zamanı: testte sabit (hooks), tarayıcıda performance.now
+  function frameNow(fallback) {
+    const hooks = S.hooks;
+    if (hooks && typeof hooks.now === "function") return hooks.now();
+    if (fallback) return fallback;
+    return root.performance && root.performance.now ? root.performance.now() : 0;
+  }
 
   function reduceMotion() {
     try {
@@ -669,7 +1032,8 @@
   }
 
   function drawOnce(force) {
-    const key = `${S.frame}|${S.state.bubble}|${S.state.zone}|${S.state.target}|${S.state.status}|${S.state.mood}|${S.state.hand}|${S.state.counts.tool_calls},${S.state.counts.edits},${S.state.counts.tests_pass},${S.state.counts.tests_fail}`;
+    const f = S.state.fx || {};
+    const key = `${S.frame}|${S.state.bubble}|${S.state.zone}|${S.state.target}|${S.state.status}|${S.state.mood}|${S.state.hand}|${S.state.idle}|${f.seq},${f.testSeq},${f.endSeq}|${S.state.counts.tool_calls},${S.state.counts.edits},${S.state.counts.tests_pass},${S.state.counts.tests_fail}`;
     if (!force && !S.dirty && S.lastDrawn === key) return;
     S.dirty = false;
     S.lastDrawn = key;
@@ -683,18 +1047,42 @@
     const ctx = S.buf && S.buf.getContext("2d");
     if (!out || !ctx) return;
     out.imageSmoothingEnabled = false;
-    const now = ts || 0;
+    const now = frameNow(ts || 0);
+    const hooks = S.hooks || {};
+    // saat enjekte edilebilir: testte sabit saat dilimi, tarayıcıda yerel saat (60 sn'de bir bakılır)
+    if (!S.phase || now - S.phaseAt > 60000) {
+      S.phase = dayPhase(typeof hooks.hour === "function" ? hooks.hour() : localHour());
+      S.phaseAt = now;
+    }
+    fxEvent(S.fx, S.state, now);
+    const mode = stageMode(S.state, S.fx, now, hooks.seed == null ? 42 : hooks.seed);
     const progress = Math.min(1, (now - S.walkStart) / WALK_MS);
     const moving = progress < 1 && !S.reduced;
+    const asleep = mode === "sleep";
+    const f = asleep ? Math.floor(S.frame / 4) : S.frame; // uyurken hareket yavaşlar
+    const anim = S.reduced ? 0 : f; // prefers-reduced-motion: animasyon yok (tek kare sabit)
+    const pos = charPos(S.state, progress);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(S.scene, 0, 0);
-    drawOffice(ctx, S.state, moving ? S.frame : Math.floor(S.frame / 2), moving);
+    ctx.drawImage(sceneFor(S.phase, now), 0, 0); // duvar/pencere tonu saate göre
+    drawOffice(ctx, S.state, moving ? S.frame : Math.floor(S.frame / 2), moving, mode);
     drawBoard(ctx, S.state);
     drawMarker(ctx, S.state, S.frame);
-    const pos = charPos(S.state, progress);
     drawCharacter(ctx, S.state, S.frame, pos, moving);
     drawSigns(ctx, S.state); // tabelalar karakterden SONRA → karakter/masa tabelayı örtmez
-    drawBubble(ctx, S.state);
+    if (S.reduced) drawBubble(ctx, S.state); // reduce: efekt katmanı yok, balon her zaman görünür
+    // --- efekt katmanı (yalnız gerçek olay tetikleyicileri) ---
+    if (mode === "coffee") drawCoffee(ctx, pos, now, anim);
+    if (asleep) drawZzz(ctx, pos, now, anim);
+    drawSuccessMark(ctx, S.fx, pos, now);
+    drawFailMark(ctx, S.fx, pos, now, anim);
+    if (S.state.mood === "sad" && !armsUp(S.state)) drawCloud(ctx, pos, now);
+    if (!S.reduced) {
+      // reduce: parçacık/parlama/kararma yok (animasyon yok kuralı) — tek sabit kare
+      drawParts(ctx, successParts(S.fx, pos, now));
+      drawParts(ctx, confettiParts(S.fx, now));
+      drawStageFx(ctx, S.state, S.fx, now, anim);
+      drawBubble(ctx, S.state);
+    }
     out.drawImage(S.buf, 0, 0, S.canvas.width, S.canvas.height);
   }
 
@@ -750,6 +1138,7 @@
   function onEvent(type, data) {
     const prev = S.state;
     S.state = Logic.reduce(prev, type, data || {});
+    fxEvent(S.fx, S.state, frameNow(0)); // efekt zamanı olay anından başlar
     if (S.state.target !== prev.target) S.walkStart = root.performance ? root.performance.now() : 0;
     if (prev.zone !== S.state.zone) S.prevZone = prev.zone;
     S.dirty = true;
@@ -760,6 +1149,7 @@
 
   function reset() {
     S.state = Logic.initial();
+    S.fx = createFx(); // efektler ve boş zaman davranışı da sıfırlanır
     S.prevZone = "desk";
     S.walkStart = 0;
     S.dirty = true;
@@ -784,6 +1174,7 @@
   function init() {
     S.canvas = root.document ? root.document.getElementById("office-canvas") : null;
     if (!S.canvas) return;
+    S.hooks = root.OfficeTestHooks || null; // test: saat/tohum enjeksiyonu (tarayıcıda yok)
     S.live = root.document.getElementById("office-live");
     S.word = root.document.getElementById("office-status");
     S.reduced = reduceMotion();
@@ -824,5 +1215,50 @@
     sync();
   }
 
+  // Sahte kayıt bağlamı: çizim fonksiyonlarını testte DOM'suz çağırmayı sağlar (yalnız testten)
+  function fakeCtx() {
+    const ops = [];
+    const ctx = {
+      ops,
+      fillStyle: "",
+      imageSmoothingEnabled: false,
+      fillRect() {},
+      drawImage() {
+        ops.push({ k: "img" });
+      },
+      beginPath() {},
+      moveTo() {},
+      lineTo() {},
+      closePath() {},
+      ellipse() {},
+      fill() {},
+      clearRect() {},
+    };
+    return ctx;
+  }
+
+  // Testte kullanılan iç API: çizim fonksiyonları DOM/gerçek tuval istemez (sahte bağlam yeter).
+  const drawApi = {
+    dayPhase,
+    skyPalette,
+    drawScene,
+    drawBoard,
+    drawOffice,
+    drawCharacter,
+    drawWindowSky,
+    stageMode,
+    confettiBits,
+    confettiParts,
+    mix32,
+    createFx,
+    fxEvent,
+    fakeCtx,
+    FX_CAP,
+    CONF_TTL,
+    NAP_MS,
+    COFFEE_MS,
+  };
+
   root.Office = { init, onEvent, reset, setVisible, getState: () => S.state, describe };
+  root.OfficeDraw = drawApi;
 })(typeof globalThis !== "undefined" ? globalThis : this);

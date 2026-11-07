@@ -95,6 +95,11 @@
       counts: { tool_calls: 0, edits: 0, tests_pass: 0, tests_fail: 0 },
       log: [], // son 5 eylem: { type, text }
       ended: null, // bitti durumunun ayrıntısı (done/failed/cancelled)
+      // Efekt tetikleyicileri: yalnız GERÇEK olaylardan türetilir (uydurma yok).
+      // seq her olayda artar → çizici "yeni tetikleyici mi" diye karşılaştırır.
+      fx: { seq: 0, test: "", testSeq: 0, end: "", endSeq: 0 },
+      // Boş zaman davranışı yalnız cosmetic; yalnızca görev yokken/bitmişken true olur.
+      idle: false,
     };
   }
 
@@ -116,6 +121,8 @@
 
   function reduce(state, type, data) {
     const d = data || {};
+    // eski biçimde fx/idle taşımayan durum da kabul edilir (geriye uyum, testte kolaylık)
+    const fx0 = state.fx || { seq: 0, test: "", testSeq: 0, end: "", endSeq: 0 };
     const s = {
       status: state.status,
       zone: state.zone,
@@ -132,14 +139,23 @@
         tests_pass: state.counts.tests_pass,
         tests_fail: state.counts.tests_fail,
       },
-      log: state.log.slice(),
+      log: state.log,
       ended: state.ended,
+      idle: !!state.idle,
+      fx: {
+        seq: fx0.seq + 1, // her olay tek üretim numarası → aynı olay dizisi aynı durumu verir
+        test: fx0.test,
+        testSeq: fx0.testSeq,
+        end: fx0.end,
+        endSeq: fx0.endSeq,
+      },
     };
 
     switch (type) {
       case "started":
         s.status = "running";
         s.mood = "calm";
+        s.idle = false;
         s.bubble = "İşe koyuluyorum.";
         s.bubbleKind = "say";
         pushLog(s, "started", "Görev başladı" + (d.mode ? ` (${d.mode})` : ""));
@@ -151,6 +167,7 @@
         s.bubble = text;
         s.bubbleKind = "say";
         s.mood = "calm";
+        s.idle = false; // model konuşuyorsa boşta değil
         s.zone = "desk";
         s.target = "desk";
         pushLog(s, "message", "Açıklama: " + text);
@@ -171,6 +188,7 @@
         s.bubble = `${label}${where ? ": " + where : ""}.`;
         s.bubbleKind = "say";
         s.status = "running";
+        s.idle = false;
         pushLog(s, "tool_call", `${tool || "araç"} ${where}`.trim());
         break;
       }
@@ -185,6 +203,9 @@
           if (!inter) {
             if (Number(m[1]) === 0) s.counts.tests_pass = s.counts.tests_pass + 1;
             else s.counts.tests_fail = s.counts.tests_fail + 1;
+            // Efekt tetikleyicisi: yalnız gerçek bir test sonucundan (zaman aşımı/iptal sayılmaz)
+            s.fx.test = Number(m[1]) === 0 ? "pass" : "fail";
+            s.fx.testSeq = s.fx.seq;
           }
         }
         if (d.tool) s.zone = zoneFor(d.tool, args);
@@ -254,6 +275,9 @@
         s.zone = "desk";
         s.target = "desk";
         s.ended = st;
+        s.fx.end = st;
+        s.fx.endSeq = s.fx.seq;
+        s.idle = true; // görev bitti → boş zaman davranışı artık cosmetic olarak serbest
         if (st === "failed") {
           s.mood = "sad";
           s.bubble = clip("Görev başarısız" + (d.error ? ": " + d.error : "."), MAX_SAID);
@@ -278,6 +302,7 @@
         s.bubbleKind = "say";
         s.zone = "desk";
         s.target = "desk";
+        s.idle = false;
         s.mood = s.status === "done" || s.status === "failed" || s.status === "cancelled" ? "calm" : s.mood;
         pushLog(s, "user_message", "Kullanıcı mesajı");
         break;
@@ -313,6 +338,24 @@
     return `araç ${c.tool_calls} · düzenleme ${c.edits} · test geçti ${c.tests_pass} · test kaldı ${c.tests_fail}`;
   }
 
+  // Tahtadaki kısa sayaç satırı: "A:1  D:1  T:0/0" (A araç, D düzenleme, T test geçti/kaldı).
+  // Metin satırı açıklaması portalın alt yazısında; burada yalnız sığan biçim.
+  // Tahta iç alanı 136 px = en çok 22 karakter (5x7 font, 6 px glif adımı) → satır 19 karakteri geçmez:
+  // normalde iki boşluk, uzunsa tek boşluk, hâlâ uzunsa sayılar "999+" ile kısaltılır.
+  const SHORT_MAX = 19;
+  function shortCounters(state) {
+    const c = state.counts || {};
+    const fmt = (v, gap) => {
+      const n = Number(v) || 0;
+      return n > 999 ? "999+" : String(n) + gap; // kısaltılan sayıdan sonra boşluk yok
+    };
+    for (const gap of ["  ", " "]) {
+      const line = "A:" + fmt(c.tool_calls, gap) + "D:" + fmt(c.edits, gap) + "T:" + fmt(c.tests_pass, "") + "/" + fmt(c.tests_fail, "");
+      if (line.length <= SHORT_MAX) return line;
+    }
+    return "A:" + fmt(c.tool_calls, "") + " D:" + fmt(c.edits, ""); // aşırı büyük sayılarda test sayacı düşer (tahtaya sığmaz)
+  }
+
   const api = {
     initial,
     reduce,
@@ -321,6 +364,8 @@
     isMcpTool,
     describe,
     countersText,
+    shortCounters,
+    SHORT_MAX,
     areaName,
     MAX_LOG,
   };

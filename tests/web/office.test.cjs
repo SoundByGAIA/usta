@@ -124,8 +124,10 @@ test("usage olayı ofis sayaçlarını değiştirmez", () => {
 test("bilinmeyen olay durumu bozmaz", () => {
   const s = run([["started", {}], ["tool_call", { tool: "write_file", args: { path: "a.py" } }], ["approval_required", { tool: "run" }]]);
   for (const type of ["bilinmeyen", "compact", "", "compacted", "breaker", "tool_call_unknown"]) {
-    assert.deepEqual(O.reduce(s, type, { x: 1 }), s, type);
-    assert.deepEqual(O.reduce(s, type, undefined), s, type);
+    // bilinmeyen olay yalnız üretim numarasını (fx.seq) ilerletir; başka hiçbir alan değişmez
+    const same = (r) => assert.deepEqual({ ...r, fx: { ...r.fx, seq: 0 } }, { ...s, fx: { ...s.fx, seq: 0 } }, type);
+    same(O.reduce(s, type, { x: 1 }));
+    same(O.reduce(s, type, undefined));
   }
 });
 
@@ -155,6 +157,102 @@ test("günlük son 5 eylemle sınırlı", () => {
   const s = run(events);
   assert.equal(s.log.length, 5);
   assert.match(s.log[4].text, /f8\.py/);
+});
+
+test("fx: initial tetikleyici yok, seq 0, idle false", () => {
+  const s = O.initial();
+  assert.deepEqual(s.fx, { seq: 0, test: "", testSeq: 0, end: "", endSeq: 0 });
+  assert.equal(s.idle, false);
+});
+
+test("fx.test: yalnız gerçek test sonucu tetikler (geçti=pass, kaldı=fail)", () => {
+  const call = (cmd) => ["tool_call", { tool: "run", args: { command: cmd } }];
+  const res = (txt) => ["tool_result", { tool: "run", result: txt }];
+  const pass = run([["started", {}], call("pytest -q"), res("exit_code: 0\n3 passed")]);
+  assert.equal(pass.fx.test, "pass");
+  assert.ok(pass.fx.testSeq > 0);
+  const fail = run([call("pytest -q"), res("exit_code: 1\n1 failed")], pass);
+  assert.equal(fail.fx.test, "fail");
+  assert.ok(fail.fx.testSeq > pass.fx.testSeq, "her gerçek sonuç yeni tetikleyici üretir");
+  // test olmayan komut ve zaman aşımı tetiklemez
+  const before = fail.fx;
+  const other = run([call("ls"), res("exit_code: 0")], fail);
+  assert.deepEqual([other.fx.test, other.fx.testSeq], [before.test, before.testSeq]);
+  const timeout = run([call("pytest"), res("exit_code: 124 (zaman aşımı)")], fail);
+  assert.deepEqual([timeout.fx.test, timeout.fx.testSeq], [before.test, before.testSeq]);
+  assert.equal(timeout.counts.tests_pass + timeout.counts.tests_fail, 2, "zaman aşımı sayılmaz");
+});
+
+test("fx.end: done olayının gerçek sonucunu taşır; done yoksa boş kalır", () => {
+  const base = run([["started", {}]]);
+  assert.equal(base.fx.end, "");
+  for (const [status, expect] of [["done", "done"], ["failed", "failed"], ["cancelled", "cancelled"], [undefined, "done"]]) {
+    const s = O.reduce(base, "done", { status });
+    assert.equal(s.fx.end, expect);
+    assert.ok(s.fx.endSeq > base.fx.seq, "tetikleyici yayınlandıktan sonraki seq'i taşır");
+  }
+});
+
+test("fx.seq her olayda artar; bilinmeyen olay da tek adım ilerletir", () => {
+  let s = O.initial();
+  let prev = s.fx.seq;
+  for (const type of ["started", "tool_call", "bilinmeyen", "usage", "done"]) {
+    s = O.reduce(s, type, { tool: "read_file", args: { path: "a" }, command: "ls" });
+    assert.equal(s.fx.seq, prev + 1, type);
+    prev = s.fx.seq;
+  }
+});
+
+test("idle yalnız görev yokken/bitmişken true: çalışırken ve model konuşurken false", () => {
+  assert.equal(O.initial().idle, false);
+  let s = run([["started", {}]]);
+  assert.equal(s.idle, false, "çalışırken boşta değil");
+  s = O.reduce(s, "message", { content: "düşünüyorum" });
+  assert.equal(s.idle, false, "model konuşurken boşta değil");
+  s = O.reduce(s, "tool_call", { tool: "read_file", args: { path: "a" } });
+  assert.equal(s.idle, false);
+  s = O.reduce(s, "done", { status: "done" });
+  assert.equal(s.idle, true, "bittikten sonra boş zaman");
+  s = O.reduce(s, "user_message", { text: "yeni iş" });
+  assert.equal(s.idle, false, "yeni mesajla boş zaman biter");
+});
+
+test("shortCounters kısa biçim: 'A:2  D:1  T:0/0' ve tahtaya sığar", () => {
+  const s = run([["started", {}], ["tool_call", { tool: "read_file", args: { path: "a" } }], ["tool_call", { tool: "edit_file", args: { path: "a" } }]]);
+  assert.equal(O.shortCounters(s), "A:2  D:1  T:0/0"); // okuma + düzenleme = 2 araç çağrısı, 1 düzenleme
+  const big = run([["started", {}]]);
+  const wide = O.shortCounters({ counts: { tool_calls: 123, edits: 456, tests_pass: 78, tests_fail: 90 } });
+  assert.equal(wide, "A:123 D:456 T:78/90", "dar alanda iki boşluk yerine tek boşluk");
+  assert.ok(wide.length <= O.SHORT_MAX && O.SHORT_MAX <= 19, "tahta iç alanı ≤19 karakter");
+  assert.equal(
+    O.shortCounters({ counts: { tool_calls: 1234, edits: 5678, tests_pass: 9999, tests_fail: 1000 } }),
+    "A:999+ D:999+",
+    "hâlâ uzunsa sayılar 999+ ile kısaltılır ve test sayacı düşer"
+  );
+  const huge = O.shortCounters({ counts: { tool_calls: 1e9, edits: 1e9, tests_pass: 1e9, tests_fail: 1e9 } });
+  assert.ok(huge.length <= 19, "kısaltma da tahtaya sığar (" + huge + ")");
+  assert.equal(O.shortCounters(big), "A:0  D:0  T:0/0");
+});
+
+test("reduce saf: aynı olay dizisi (efekt alanları dahil) aynı durumu üretir", () => {
+  const events = [
+    ["started", {}],
+    ["tool_call", { tool: "run", args: { command: "pytest" } }],
+    ["tool_result", { tool: "run", result: "exit_code: 1\n1 failed" }],
+    ["tool_call", { tool: "edit_file", args: { path: "a.py" } }],
+    ["tool_result", { tool: "run", result: "exit_code: 0\nok" }],
+    ["done", { status: "failed", error: "x" }],
+  ];
+  const a = run(events);
+  const b = run(events);
+  assert.deepEqual(a, b);
+  assert.deepEqual(a.fx, { seq: 6, test: "fail", testSeq: 3, end: "failed", endSeq: 6 });
+  assert.equal(a.counts.tests_fail, 1, "araç adı uyuşmayan tool_result sayılmaz");
+  // girdi durumu paylaşılan referansla değiştirilmez
+  const base = run(events.slice(0, 1));
+  const snapshot = JSON.stringify(base);
+  O.reduce(base, "done", { status: "done" });
+  assert.equal(JSON.stringify(base), snapshot);
 });
 
 test("erişilebilirlik metni bölgeyi düz yazıyla söyler", () => {

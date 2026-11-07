@@ -129,6 +129,22 @@ def test_app_forwards_events_to_office_and_resets():
     assert 'src="/office.js"' in (WEB / "index.html").read_text()
 
 
+def test_office_approval_strip_and_replay_bar_are_wired():
+    html = (WEB / "index.html").read_text()
+    assert 'id="office-approval"' in html and 'role="group"' in html
+    assert 'id="office-approval-allow"' in html and 'id="office-approval-deny"' in html
+    assert 'id="office-replay-range"' in html and 'type="range"' in html
+    js = (WEB / "app.js").read_text()
+    # onay kararı tek akışta: Ofis şeridi mevcut akışı çağırır (kopya kod yok)
+    assert "Office.onDecide = (id, decision) => decideApproval(id, decision)" in js
+    assert "async function decideApproval(" in js
+    assert "/approvals/" in js and js.count("/approvals/") == 1
+    # geçmiş oturum: olaylar Ofis'e toplu verilir
+    assert "O.loadReplay(events)" in js and "officeReplay(s.events.map" in js
+    office = (WEB / "office.js").read_text()
+    assert "Logic.replayState(" in office and "prefers-reduced-motion" in office
+
+
 def test_js_does_not_persist_token_in_localstorage():
     js = (WEB / "app.js").read_text()
     assert "localStorage" not in js

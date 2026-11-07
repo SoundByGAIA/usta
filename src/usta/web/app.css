@@ -158,3 +158,14 @@ select { font: inherit; color: inherit; background: var(--bg); border: 1px solid
 .bar, #stream, #diff, #memory, #history, #fileview, #composer, .warn-note, #replay-bar { padding-left: var(--gutter); padding-right: var(--gutter); }
 /* Kısa ekran (ör. 16:9 küçük pencere): yazı alanı akışa yer bıraksın */
 @media (max-height: 720px) { #prompt { height: 56px; min-height: 0; } }
+
+/* Ofis sekmesi: piksel sahne kapsayıcıya sığar, tam sayı ölçek office.js'te ayarlanır */
+#office { flex: 1; min-height: 0; overflow: auto; padding: 12px var(--gutter); display: flex; flex-direction: column; gap: 10px; }
+#office .note { margin: 0; color: var(--muted); }
+.office-stage { display: flex; justify-content: center; align-items: flex-start; min-height: 0; max-width: 100%; overflow: hidden; background: #1c232e; border-radius: 10px; padding: 2px; transition: background .3s ease; }
+#office-canvas { display: block; max-width: 100%; height: auto; background: #1c232e; border: 1px solid #101722; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.35); image-rendering: pixelated; image-rendering: crisp-edges; }
+.office-live { margin: 0; color: var(--text); }
+.office-board { margin: 0; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .office-stage { transition: none; }
+}

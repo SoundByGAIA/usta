@@ -16,7 +16,14 @@ def client(tmp_path):
 
 @pytest.mark.parametrize(
     ("path", "ctype"),
-    [("/", "text/html"), ("/app.js", "text/javascript"), ("/app.css", "text/css")],
+    [
+        ("/", "text/html"),
+        ("/app.js", "text/javascript"),
+        ("/app.css", "text/css"),
+        ("/logic.js", "text/javascript"),
+        ("/office-logic.js", "text/javascript"),
+        ("/office.js", "text/javascript"),
+    ],
 )
 def test_ui_files_are_public_with_right_type(tmp_path, path, ctype):
     r = client(tmp_path).get(path)
@@ -66,6 +73,60 @@ def test_html_has_no_inline_script_or_handlers():
 )
 def test_js_never_uses_html_injection_sinks(banned):
     assert banned not in (WEB / "app.js").read_text()
+
+
+OFFICE_JS = ("office-logic.js", "office.js")
+
+
+@pytest.mark.parametrize("name", OFFICE_JS)
+@pytest.mark.parametrize(
+    "banned",
+    [
+        "innerHTML",
+        "outerHTML",
+        "insertAdjacentHTML",
+        "eval(",
+        "document.write",
+        "new Function",
+        "localStorage",
+    ],
+)
+def test_office_js_never_uses_html_injection_sinks(name, banned):
+    assert banned not in (WEB / name).read_text()
+
+
+def test_office_logic_exports_for_browser_and_node():
+    js = (WEB / "office-logic.js").read_text()
+    assert "module.exports" in js and "OfficeLogic" in js
+    assert "interactive" not in js
+
+
+def test_office_js_draws_pixels_and_respects_motion_and_visibility():
+    js = (WEB / "office.js").read_text()
+    assert "image-rendering" in (WEB / "app.css").read_text()
+    assert "prefers-reduced-motion" in js and "visibilitychange" in js
+    assert "matchMedia" in js and "requestAnimationFrame" in js
+    assert "font=" not in js.replace("ctx.font", ""), "harici font yüklenmez"
+
+
+def test_office_tab_present_and_default_stays_stream():
+    html = (WEB / "index.html").read_text()
+    assert 'id="tab-office"' in html and 'id="office-canvas"' in html
+    assert 'aria-live="polite"' in html
+    assert 'aria-label="Usta ofis animasyonu' in html
+    stream = re.search(r'<button id="tab-stream"[^>]*>', html).group(0)
+    assert 'aria-selected="true"' in stream
+    office = re.search(r'<button id="tab-office"[^>]*>', html).group(0)
+    assert 'aria-selected="false"' in office
+
+
+def test_app_forwards_events_to_office_and_resets():
+    js = (WEB / "app.js").read_text()
+    assert "O.onEvent(type, data)" in js and "Office.onEvent(type, data)" in js
+    # yeni görev, geçmiş oturum (aç/kapat), alan değişimi, yeniden bağlanma
+    assert js.count("officeReset()") >= 4
+    assert 'src="/office-logic.js"' in (WEB / "index.html").read_text()
+    assert 'src="/office.js"' in (WEB / "index.html").read_text()
 
 
 def test_js_does_not_persist_token_in_localstorage():

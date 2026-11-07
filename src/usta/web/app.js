@@ -110,8 +110,19 @@
     t.textContent = info.context ? `${info.text} · ${info.context}` : info.text;
     t.dataset.level = info.pct == null ? "" : info.pct >= 90 ? "high" : info.pct >= 70 ? "mid" : "";
   }
+  // Ofis sekmesi: her olayı sahneye iletir; yeni görev/geçmiş oturum sıfırlar (Office.onEvent(type, data))
+  function officeEvent(type, data) {
+    const O = window.Office;
+    // Ofis.onEvent(type, data)
+    if (O && typeof O.onEvent === "function") O.onEvent(type, data);
+  }
+  function officeReset() {
+    const O = window.Office;
+    if (O && typeof O.reset === "function") O.reset();
+  }
   function renderEvent(type, data) {
-    if (type === "usage") { showUsage(data, state.contextWindow); return; }
+    if (type === "usage") { officeEvent(type, data); showUsage(data, state.contextWindow); return; } // usage sayaçları değiştirmez
+    officeEvent(type, data);
     const s = L.summarize(type, data);
     if (type === "message" && !s.body) return;
     if (s.kind === "tool" || s.kind === "result") {
@@ -181,9 +192,11 @@
     $("history").hidden = name !== "history";
     $("fileview").hidden = name !== "file";
     $("preview").hidden = name !== "preview";
+    $("office").hidden = name !== "office";
     $("replay-bar").hidden = !(state.replay && name === "stream");
     $("tab-file").hidden = !state.openFile && name !== "file";
-    for (const t of ["stream", "diff", "memory", "history", "file", "preview"]) $(`tab-${t}`).setAttribute("aria-selected", String(t === name));
+    for (const t of ["stream", "diff", "memory", "history", "file", "preview", "office"]) $(`tab-${t}`).setAttribute("aria-selected", String(t === name));
+    if (window.Office && typeof window.Office.setVisible === "function") window.Office.setVisible(name === "office");
     if (name === "memory") loadMemory();
     if (name === "history") loadHistory();
     if (name === "preview") loadPreview();
@@ -238,6 +251,7 @@
     state.replay = true;
     $("stream").replaceChildren();
     showUsage(null);
+    officeReset(); // geçmiş oturum: sahne baştan aynı olaylarla yeniden oynar
     const m = s.meta || {};
     const names = (m.files || []).length ? `\n📎 ${m.files.join(", ")}` : "";
     addNode(h("div", "msg user", (m.prompt || "") + names));
@@ -257,6 +271,7 @@
     showUsage(null);
     setStatus("");
     $("replay-bar").hidden = true;
+    officeReset();
   }
 
   // --- ekler (metin / Markdown) ---
@@ -494,6 +509,7 @@
     state.files = [];
     renderAttached();
     addNode(h("div", "msg user", files.length ? `${prompt}\n📎 ${files.map((f) => f.name).join(", ")}` : prompt));
+    officeReset(); // yeni görev: ofis sahnesi sıfırdan başlar
     showTab("stream");
     follow(task.id);
   }
@@ -923,6 +939,7 @@
     state.ws = id;
     state.task = null;
     state.replay = false;
+    officeReset();
     state.files = [];
     renderAttached();
     $("replay-bar").hidden = true;
@@ -952,6 +969,7 @@
     const info = await res.json();
     state.contextWindow = info.context_window || null;
     showUsage(info.usage, state.contextWindow);
+    officeReset();
     addNode(h("div", "msg user", info.prompt));
     follow(taskId);
   }
@@ -1030,6 +1048,7 @@
   $("fileview-attach").addEventListener("click", attachOpenFile);
   $("tab-file").addEventListener("click", () => showTab("file"));
   $("tab-preview").addEventListener("click", () => showTab("preview"));
+  $("tab-office").addEventListener("click", () => showTab("office"));
   $("preview-go").addEventListener("click", loadPreview);
   $("preview-reload").addEventListener("click", loadPreview);
   $("preview-path").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); loadPreview(); } });
@@ -1039,6 +1058,7 @@
     applyZoom();
   });
   applyZoom();
+  if (window.Office && typeof window.Office.init === "function") window.Office.init();
   $("theme").addEventListener("change", () => { applyTheme($("theme").value); saveSetting({ theme: $("theme").value }); });
   $("guard").addEventListener("change", () => saveSetting({ guard: $("guard").checked }));
   $("mode").addEventListener("change", () => { applyMode($("mode").value); saveSetting({ mode: $("mode").value }); });

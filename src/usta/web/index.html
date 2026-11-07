@@ -109,6 +109,7 @@
           <button id="tab-stream" role="tab" aria-selected="true" type="button">Akış</button>
           <button id="tab-diff" role="tab" aria-selected="false" type="button">Değişiklikler <span id="diff-count"></span></button>
           <button id="tab-memory" role="tab" aria-selected="false" type="button">Hafıza <span id="memory-count"></span></button>
+          <button id="tab-office" role="tab" aria-selected="false" type="button">Ofis</button>
           <button id="tab-history" role="tab" aria-selected="false" type="button">Geçmiş</button>
           <button id="tab-preview" role="tab" aria-selected="false" type="button">Önizleme</button>
           <button id="tab-file" role="tab" aria-selected="false" type="button" hidden>Dosya</button>
@@ -130,6 +131,15 @@
           <button id="revert" type="button" disabled>Değişiklikleri geri al</button>
         </div>
         <div id="diff-files"></div>
+      </div>
+
+      <div id="office">
+        <p class="note">Usta'nın çalışması küçük bir piksel ofis olarak canlanır: Kitaplık, Atölye, Test tezgâhı, Postane, Hafıza dolabı. Bölge ve sayaçlar yalnız gerçek olaylardan gelir.</p>
+        <div class="office-stage" id="office-stage">
+          <canvas id="office-canvas" role="img" aria-label="Usta ofis animasyonu"></canvas>
+        </div>
+        <p id="office-live" class="office-live" aria-live="polite">Usta ofiste, yeni görev bekliyor</p>
+        <p id="office-status" class="office-board"></p>
       </div>
 
       <div id="preview" hidden>
@@ -192,6 +202,8 @@
   </main>
 
   <script src="/logic.js"></script>
+  <script src="/office-logic.js"></script>
+  <script src="/office.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

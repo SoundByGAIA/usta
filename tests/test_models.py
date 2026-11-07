@@ -1,7 +1,7 @@
 import pytest
 
 from fake_endpoint import text_reply, tool_reply
-from usta.models import Message, ModelError, OpenAICompatClient, ToolCall
+from usta.models import BAD_ARGS_KEY, Message, ModelError, OpenAICompatClient, ToolCall
 
 TOOLS = [{"name": "read_file", "description": "oku", "parameters": {"type": "object"}}]
 
@@ -57,9 +57,20 @@ def test_http_error_raises(endpoint):
         client(endpoint).chat([Message("user", "x")])
 
 
-def test_malformed_tool_arguments_raise(endpoint):
+def test_malformed_tool_arguments_do_not_kill_the_task(endpoint):
+    """Çıktı sınırında kesilen argüman JSON'u görevi öldürmez: işaretli çağrı olarak döner (araç hatası olur)."""
+    bad = tool_reply("write_file", {})
+    bad["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] = (
+        '{"path": "a.js", "content": "kesil'
+    )
+    endpoint.responses = [bad]
+    r = client(endpoint).chat([Message("user", "x")])
+    assert r.tool_calls[0].name == "write_file" and BAD_ARGS_KEY in r.tool_calls[0].arguments
+
+
+def test_missing_function_fields_still_raise(endpoint):
     bad = tool_reply("read_file", {})
-    bad["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] = "{bozuk"
+    del bad["choices"][0]["message"]["tool_calls"][0]["function"]["name"]
     endpoint.responses = [bad]
     with pytest.raises(ModelError):
         client(endpoint).chat([Message("user", "x")])
@@ -78,7 +89,9 @@ def test_http_and_connection_errors_are_infra(endpoint):
 
 def test_malformed_tool_arguments_are_model_errors_not_infra(endpoint):
     bad = tool_reply("read_file", {"path": "a"})
-    bad["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] = "{bozuk"
+    del bad["choices"][0]["message"]["tool_calls"][0]["function"][
+        "name"
+    ]  # yapı bozuk: kurtarılamaz
     endpoint.responses = [bad]
     with pytest.raises(ModelError) as e:
         client(endpoint).chat([Message("user", "x")])

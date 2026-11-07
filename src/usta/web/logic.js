@@ -140,7 +140,7 @@
       case "warning":
         return { kind: "warn", title: String(d.message || "Uyarı").slice(0, 300), body: "" };
       case "approval_required":
-        return { kind: "approval", title: `Onay gerekli: ${d.tool}`, body: clip(JSON.stringify(d.args, null, 2), 20000), approvalId: d.approval_id };
+        return { kind: "approval", title: `Onay gerekli: ${d.tool}`, body: (d.reason ? `Neden: ${clip(String(d.reason), 300)}\n` : "") + clip(JSON.stringify(d.args, null, 2), 20000), approvalId: d.approval_id };
       case "done":
         if (d.status === "failed") return { kind: "error", title: "Görev başarısız", body: d.error || "" };
         if (d.status === "cancelled") return { kind: "status", title: "Durduruldu", body: "" };

@@ -40,6 +40,12 @@ Ayrıntı: [docs/design.md](docs/design.md) §5. Özet ve **bilinçli sınırlar
 - **Tedarik zinciri (v0.2.0):** Python bağımlılıkları hash'li, çok platformlu kilit dosyalarıyla (`requirements*.lock`) kurulur ve CI'da `pip-audit` kilidi tarar.
   Sandbox ve MCP imajları etiketle seçilir; `usta sandbox pin` / `usta mcp prepare` yerel imaj kimliğini sabitler ve her çalıştırmada doğrular
   (etiket başka içeriğe işaret ederse çalışmaz). Usta imajı kendiliğinden çekmez; ilk kez çekilen imajın güvenilirliği sizin kararınızdır.
+- **Dolaylı komut enjeksiyonu (v0.2.1, kısmi savunma):** okunan dosya/sayfa/MCP çıktısındaki gizli talimatlar modeli yönlendirebilir. Kaynak izi
+  kapısı (`taint.py`, varsayılan açık; `--no-taint-gate` ile kapanır) şunu yakalar: `write_file`/`edit_file` yolu ya da `run` komutundaki yol/adres
+  parçası, güvenilmeyen kaynaklardan (dosya içeriği, `fetch_url`, `web_search`, MCP) gelen metinde geçiyor ve sizin isteminizde geçmiyorsa eylem
+  onay ister (manuel modda gerekçeyle sorulur, oto modda reddedilir). **Sınırlar:** komut çıktısındaki talimatlar kapsam dışıdır (test izlerindeki
+  meşru yollar sürekli işaretlenmesin diye); model enjekte metni yazdığı dosyanın *içeriğine* kopyalarsa yakalanmaz; sezgiseldir, kesin koruma
+  değildir. Ölçüm: [docs/v0.2.1-raporu.md](docs/v0.2.1-raporu.md).
 - **Sızdırma kanalları** (belgeli): izinli alan adlarına HTTPS; model uç noktanız (istemler ve açılan dosya içerikleri o API'ye gider);
   önizlemede ajanın yazdığı sayfanın kendi kendine başka adrese yönlenmesi (iframe sandbox'ı bunu engelleyemez; `connect-src`, `form-action` ve
   `allow-top-navigation` kapalıdır).

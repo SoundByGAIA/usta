@@ -41,6 +41,7 @@ class HarnessConfig:
 
     id: str = "base"
     breaker: bool = False
+    taint: bool = False  # DENEYSEL kaynak izi kapısı (taint.py)
     protocol: str = "native"
     approver: str = "deny"  # ölçümde insan yok: onay isteyen eylemler reddedilir
 
@@ -121,6 +122,7 @@ def run_one(
             on_event=env.on_event,
             cancel=cancel,
             breaker=CircuitBreaker(env.root) if harness.breaker else None,
+            taint=harness.taint,
         )
         timer.start()
         try:

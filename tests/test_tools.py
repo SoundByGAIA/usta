@@ -189,3 +189,12 @@ def test_snapshot_and_diff_skip_fifo(tmp_path):
     os.mkfifo(tmp_path / "boru")
     snap = snapshot(tmp_path)  # takılmadan döner
     assert list(snap.files) == ["a.txt"] and diff(snap, tmp_path) == ""
+
+
+def test_truncated_arguments_become_a_recoverable_tool_error(tmp_path):
+    from usta.models import BAD_ARGS_KEY
+    from usta.tools import ToolContext, ToolError, build_registry
+
+    reg = build_registry(ToolContext(root=tmp_path))
+    with pytest.raises(ToolError, match="bozuk ya da kesik"):
+        reg.call("write_file", {BAD_ARGS_KEY: 4096})

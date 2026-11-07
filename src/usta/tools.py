@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from usta import fetch, memory, outline, symbols
+from usta.models import BAD_ARGS_KEY
 from usta.policy import PathEscapeError, resolve_path
 from usta.sandbox import SandboxConfig, SandboxError, run_command
 
@@ -64,6 +65,11 @@ class Registry:
         tool = self._tools.get(name)
         if tool is None:
             raise ToolError(f"bilinmeyen araç: {name}")
+        if BAD_ARGS_KEY in args:
+            raise ToolError(
+                f"{name} çağrısının argümanları bozuk ya da kesik geldi (çıktı sınırı olabilir). "
+                "Daha küçük parçalarla yeniden dene: büyük içeriği write_file ile kısa başlat, sonra edit_file ile ekle."
+            )
         try:
             return tool.fn(args)
         except PathEscapeError as e:

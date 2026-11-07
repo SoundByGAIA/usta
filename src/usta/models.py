@@ -34,6 +34,9 @@ class Usage:
     rescued: int = 0  # içerikten kurtarılan araç çağrısı sayısı (model tool_calls kullanmıyor)
 
 
+BAD_ARGS_KEY = "__bozuk_argumanlar__"  # modelin argüman JSON'u çözümlenemedi (çoğu kez çıktı sınırında kesildi)
+
+
 @dataclass(frozen=True)
 class ToolCall:
     id: str
@@ -152,10 +155,19 @@ class OpenAICompatClient:
         calls = []
         for c in msg.get("tool_calls") or []:
             try:
-                args = json.loads(c["function"]["arguments"] or "{}")
-                calls.append(ToolCall(c["id"], c["function"]["name"], args))
-            except (KeyError, ValueError) as e:
+                raw = c["function"]["arguments"] or "{}"
+                name = c["function"]["name"]
+                cid = c["id"]
+            except (KeyError, TypeError) as e:
                 raise ModelError("araç çağrısı çözümlenemedi") from e
+            try:
+                args = json.loads(raw)
+            except ValueError:
+                args = None
+            if not isinstance(args, dict):
+                # Çıktı sınırında kesilen/bozuk argüman görevi öldürmez: model durumu araç hatası olarak görür
+                args = {BAD_ARGS_KEY: len(raw) if isinstance(raw, str) else 0}
+            calls.append(ToolCall(cid, name, args))
         if not calls and tools and self.rescue:
             from usta.rescue import extract_calls  # döngüsel içe aktarmayı önler
 

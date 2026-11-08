@@ -1,4 +1,3 @@
-import transports
 from transports import URGENT_PREFIX, deliver
 
 

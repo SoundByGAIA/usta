@@ -33,6 +33,7 @@ from usta import (
 from usta.agent import Agent
 from usta.api import create_app, load_or_create_token
 from usta.audit import AuditLog
+from usta.cascade import CascadeModel
 from usta.jsonproto import JsonProtocolClient
 from usta.mcp import McpClient, McpError
 from usta.mcp_tools import McpSession
@@ -346,6 +347,23 @@ def _parser() -> argparse.ArgumentParser:
         type=int,
         metavar="N",
         help="deney: son N dosya yazması tam kalır, eskilerin içeriği bağlamdan atılır",
+    )
+    br.add_argument(
+        "--strong-model",
+        help="X-CASCADE kolu: takılınca devredilecek güçlü model (--model ucuz model olur)",
+    )
+    br.add_argument(
+        "--strong-endpoint", help="güçlü modelin uç noktası (verilmezse --endpoint ile aynı)"
+    )
+    br.add_argument(
+        "--strong-protocol",
+        choices=PROTOCOLS,
+        help="güçlü modelin araç protokolü (verilmezse --protocol ile aynı)",
+    )
+    br.add_argument(
+        "--strong-api-key-env",
+        metavar="ORTAM_DEĞİŞKENİ",
+        help="güçlü model için anahtarın okunacağı ortam değişkeni (verilmezse USTA_API_KEY)",
     )
     _add_model_args(br)
     mcp = sub.add_parser("mcp", help="MCP sunucularını yönet (arama, takvim vb. ek araçlar)")
@@ -848,6 +866,24 @@ def _bench_cmd(args: argparse.Namespace) -> int:
     model = _make_model(args)
     if model is None:
         return 2
+    if bench.ARMS[args.arm].cascade:
+        if not args.strong_model:
+            print("hata: X-CASCADE kolu için --strong-model gerekir", file=sys.stderr)
+            return 2
+        strong_key = (
+            os.environ.get(args.strong_api_key_env) if args.strong_api_key_env else _ENV_KEY
+        )
+        strong = _build_model(
+            args.strong_endpoint
+            or args.endpoint
+            or os.environ.get("USTA_ENDPOINT")
+            or DEFAULT_ENDPOINT,
+            args.strong_model,
+            args.strong_protocol or args.protocol or os.environ.get("USTA_PROTOCOL") or "native",
+            args.model_timeout,
+            api_key=strong_key,
+        )
+        model = CascadeModel(model, strong)
     name = args.model or os.environ.get("USTA_MODEL") or "?"
     protocol = args.protocol or os.environ.get("USTA_PROTOCOL") or "native"
     print(
@@ -864,7 +900,8 @@ def _bench_cmd(args: argparse.Namespace) -> int:
         )
         print(
             f"{mark} {r.task}: {r.steps} adım, {r.tool_calls} çağrı ({r.tool_errors} hata), "
-            f"{r.prompt_tokens + r.completion_tokens} token, {r.seconds:g} sn{extra}{flags}",
+            f"{r.prompt_tokens + r.completion_tokens} token, {r.seconds:g} sn{extra}{flags}"
+            + (f"  ↑güçlü({r.strong_tokens} token)" if r.escalated else ""),
             flush=True,
         )
 

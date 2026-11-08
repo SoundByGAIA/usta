@@ -21,3 +21,19 @@ Flash B'de başarısızlıkların çoğu "kanıtsız bitti" (11/18 koşuda düze
 ## Sınırlar
 Küçük örneklem (6 görev); görevleri bir model yazdı ve başka bir model denetledi; Flash/Pro tek koşu kümesi; DeepSeek ve 12B+ yerel model bu ölçümde yok (DeepSeek bakiyesi yok).
 Ölçüm hatası notu: çalışan betiği düzenlediğimde bash dosyayı kaymış okudu; gflash logları bozuldu, JSON raporları sağlam.
+
+## Kademeli yönlendirme (X-CASCADE, deneysel): sonuç = fayda kanıtlanmadı
+Ucuz model başlar; bitirme kapısı başarısız sayarsa ya da devre kesici açılırsa konuşma güçlü modele devredilir (`src/usta/cascade.py`). Aynı 6 dev görevi × 3 tekrar:
+
+| Yapılandırma | Geçen | Güçlüye devredilen | Güçlü modelin token'ı | Toplam token |
+|---|---|---|---|---|
+| Flash C (tek model) | 14/18 | - | 536 bin (hepsi) | 536 bin |
+| Pro C (tek model) | 16/18 | - | 452 bin (hepsi) | 452 bin |
+| Flash → Pro | 12/18 | 3 | 58 bin | 601 bin |
+| 7B → Flash (yalnız kapı/kesici işareti) | 2/18 | 5 | 134 bin | 468 bin |
+| 7B → Flash (+ "düzenlemeden bitirdi" işareti) | 14/18 | 17 | 496 bin | 733 bin |
+
+- **Flash → Pro:** kapı yalnız 3 koşuda tetiklendi; kalan hatalar yanlış çözümle "bitti" idi (deponun testleri yakalamıyor). Fayda yok; 12/18 ile 14/18 arası gürültü.
+- **7B → Flash:** yalnız kapı işaretiyle 2/18. İkinci işaret (7B hiç düzenleme yapmadan "bitti" derse yanıtı at, güçlüye sor) eklenince 14/18, ama 17 koşunun 17'si Flash'a devredildi: bu, Flash'ın işi yapması + 7B'nin boşa token yakması demek. Flash'ın harcadığı token (496 bin) tek başına Flash C'den (536 bin) yalnız ~%7 az: bulut token tasarrufu gürültü düzeyinde; toplam token ve süre daha yüksek.
+- İkinci işaret dev sonuçlarına bakılarak eklendi (ayarlama); bu yüzden 14/18 kanıt sayılmaz, final görevlerinde doğrulanmadı.
+- **Karar:** deneysel kalır, varsayılan değil. Gerçek token tasarrufu için ucuz modelin işin büyük kısmını kendisinin bitirebilmesi gerekir; 7B bu görevlerde bunu yapamıyor.

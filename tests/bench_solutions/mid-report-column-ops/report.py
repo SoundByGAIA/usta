@@ -64,9 +64,7 @@ class Report:
 
     def aggregate(self, name):
         values = self.column(name)
-        if values and all(
-            isinstance(v, (int, float)) and not isinstance(v, bool) for v in values
-        ):
+        if values and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
             return sum(values)
         if not values:
             return 0
@@ -78,9 +76,7 @@ class Report:
         self._check_column(name)
         out = Report(self.title)
         out._columns = list(self._columns)
-        out._rows = sorted(
-            (dict(r) for r in self._rows), key=lambda r: r[name], reverse=reverse
-        )
+        out._rows = sorted((dict(r) for r in self._rows), key=lambda r: r[name], reverse=reverse)
         return out
 
     def to_csv(self):

@@ -1,8 +1,10 @@
-# PyPI'ye yayın (elle tetiklenir: Actions → publish → Run workflow). Parola/jeton yok: PyPI "Trusted Publisher"
-# (OIDC) olarak bu depo + workflow + `pypi` ortamı tanımlanmadıkça yayın başarısız olur (bilinçli güvenlik).
-# Trusted Publisher kurulana kadar sürümler yerelden `twine` ile yüklenir; kurulunca `on: release` tetikleyicisi eklenebilir.
+# PyPI'ye yayın: GitHub release yayımlanınca ya da elle (Actions → publish → Run workflow). Parola/jeton yok: PyPI
+# "Trusted Publisher" (OIDC) olarak bu depo + workflow + `pypi` ortamı tanımlı olmalı, yoksa yayın başarısız olur.
+# Aynı sürüm PyPI'de zaten varsa yükleme reddedilir (yerelden twine ile yüklenmiş sürümler için beklenen durum).
 name: publish
 on:
+  release:
+    types: [published]
   workflow_dispatch:
 permissions:
   contents: read

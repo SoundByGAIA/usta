@@ -1,0 +1,10 @@
+{
+  "prompt": "inventory.py içindeki `parse(text)`, `report(rows)` ve `parse_and_report(text)` bir CLI'da kullanılıyor; bu üç fonksiyonun ESKİ çağrı biçimleri (tek argüman) aynı sonucu vermeye devam etmeli.\n\nGirdi biçimi: her satır `sku,items,qty`. Boş satırlar ve `#` ile başlayan satırlar atlanır. Bozuk satır şu durumlardan birinde: alan sayısı 3 değil, sku boş, items ya da qty tamsayı değil. Bozuk satırlar hiçbir zaman sonuca girmez.\n\nEklenecek opsiyonel `strict` parametresi:\n1) `parse(text, strict=False)`: strict=False iken eskisi gibi satır listesi döner. strict=True iken `(satirlar, hatalar)` demeti döner; `hatalar` bozuk atlanan satırların 1 tabanlı satır numaralarının artan listesidir (boş satırlar ve '#' satırları numaralanır ama hata sayılmaz).\n2) `report(rows, strict=False)`: strict=False iken eskisi gibi sözlük (`items`, `qty`, `sku`). strict=True iken `(sozluk, uyarilar)` demeti döner; `uyarilar` metin listesidir ve rapor içeriğini değiştirmez. Uyarılar: qty <= 0 olan her kalem için `negatif adet: <sku>`; sku'su boş metin olan her kalem için `sku yok: <items>` (items'in metin hali). Uyarı sırası: önce tüm `negatif adet` uyarıları kalem sırasıyla, sonra tüm `sku yok` uyarıları kalem sırasıyla.\n3) `parse_and_report(text, strict=False)`: strict=False iken eskisi gibi yalnız rapor sözlüğü. strict=True iken `(sozluk, hatalar)` demeti; `hatalar` birleşik listedir: önce satır hataları `\"satir <N>\"` biçiminde artan numarayla, sonra `report` uyarıları (yukarıdaki sırayla).\n\nÖrnek:\ntext = '# baslik\\na,2,3\\nbozuk\\nb,x,1\\n,5,1\\nc,1,0\\n'\n- parse(text) → [{'sku': 'a', 'items': 2, 'qty': 3}, {'sku': 'c', 'items': 1, 'qty': 0}]\n- parse(text, strict=True) → (aynı liste, [3, 4, 5])\n- report(rows) → {'items': 3, 'qty': 3, 'sku': 'a,c'}\n- parse_and_report(text, strict=True) → ({'items': 3, 'qty': 3, 'sku': 'a,c'}, ['satir 3', 'satir 4', 'satir 5', 'negatif adet: c'])\n\nStandart kütüphane dışında modül kullanma; test dosyalarını değiştirme.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "final"
+}

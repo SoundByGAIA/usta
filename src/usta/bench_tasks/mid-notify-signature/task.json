@@ -1,0 +1,10 @@
+{
+  "prompt": "Küçük bir bildirim kitaplığında imza değişikliği yap. `delivery.send(channel, recipient, message)` şu an üç konumsal argüman alıyor; tüm kod tabanını yeni imzaya geçir: `send(channel, text, *, to, urgent=False, retries=1)`.\n\nKurallar:\n1) Yeni `send` yalnız iki konumsal argüman kabul eder (channel, text); `to`, `urgent`, `retries` anahtar sözcüğüyle verilir. Eksik `to` ya da fazladan konumsal argüman TypeError vermeli.\n2) `retries` 1'den küçükse ValueError. `retries` deneme sayısıdır: gönderim `retries` kez denenir ve `transports.deliver` bir `ConnectionError` fırlatırsa yeniden denenir; tüm denemeler ConnectionError ile biterse ConnectionError yükselir. Diğer hatalar yeniden denenmez.\n3) `urgent=True` ise metin teslimden önce transports.URGENT_PREFIX + ' ' ile başlar (ör. \"ACIL: ...\"); aksi halde metin olduğu gibi gider.\n4) `send` teslimden sonra `(kanal, to, deneme_sayisi)` demeti döndürür (retries, kaç denemede başarıldığını gösterir).\n5) `alerts.notify(user, msg)` yeni imzayla çalışır: `user[\"id\"]` alıcıdır, `user.get(\"urgent\", False)` urgent değeridir, kanal her zaman \"push\". Dönüş değeri `send`'in demetidir.\n6) `router.route(kind, user, msg)` yeni imzayla çalışır: kind \"sms\" ise channel \"sms\", değilse \"email\"; to `user[\"phone\"]` (sms) ya da `user[\"id\"]`; msg olduğu gibi gider; urgent ve retries varsayılan değerlerinde kalır. Dönüş değeri `send`'in demetidir.\n\nÖrnek: send(\"sms\", \"Merhaba\", to=\"+90\") → (\"sms\", \"+90\", 1) ve transports'ta teslim edilen metin \"Merhaba\". send(\"sms\", \"x\", to=\"y\", urgent=True) → teslim edilen metin \"ACIL: x\".\n\nStandart kütüphane dışında modül kullanma; test dosyalarını değiştirme.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "dev"
+}

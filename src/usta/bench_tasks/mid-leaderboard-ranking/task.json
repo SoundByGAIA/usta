@@ -1,0 +1,10 @@
+{
+  "prompt": "rank.py içindeki `ranking(players, key=\"score\", n=None)` ve `top_names(players, n)` fonksiyonlarını yaz (NotImplementedError'ları kaldır; yalnız standart kütüphane).\n\nGirdi: players, {\"name\": str, \"score\": int, \"time\": int} sözlüklerinden oluşan liste. time, skorun alındığı an (saniye).\n\nSıralama kuralları:\n1) key=\"score\" → önce score BÜYÜK olan önde; eşit skorda time KÜÇÜK olan önde.\n2) key=\"time\" → önce time KÜÇÜK olan önde; eşitlikte score BÜYÜK olan önde.\n3) İki kuralda da hâlâ eşitlik varsa name'e göre artan alfabetik sıra (Python'un normal metin karşılaştırması).\n4) Sıralama DETERMİNİSTİK olmalı: girdi sırasına bağlı kalınmaz.\n\nÇıktı: `ranking(...)`, her elemanı {\"rank\": int, \"name\": str, \"score\": int, \"time\": int} olan YENİ bir liste döndürür (girdi listesi ve içindeki sözlükler değişmez).\n- rank 1'den başlar. Aynı score VE aynı time'a sahip oyuncular aynı rankı paylaşır (yarışma sıralaması: 1, 2, 2, 4).\n- n verilirse yalnız ilk n eleman döner; n negatifse ValueError.\n- Bilinmeyen key için ValueError.\n\n`top_names(players, n)`: `ranking(players, n=n)` sonucundaki adları sırayla döndürür; n negatifse ValueError.\n\nÖrnek:\nplayers = [{\"name\": \"b\", \"score\": 10, \"time\": 5}, {\"name\": \"a\", \"score\": 10, \"time\": 5}, {\"name\": \"c\", \"score\": 10, \"time\": 3}, {\"name\": \"d\", \"score\": 9, \"time\": 1}]\nranking(players) → sıra c, a, b, d; ranklar 1, 2, 2, 4.\nranking(players, key=\"time\") → sıra d, c, a, b; ranklar 1, 2, 3, 3.\ntop_names(players, 2) → [\"c\", \"a\"]\n\nDepodaki test dosyalarına dokunma (onlar eskisi gibi geçmeli).",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "final"
+}

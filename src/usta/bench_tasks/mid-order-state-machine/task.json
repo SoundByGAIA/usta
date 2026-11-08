@@ -1,0 +1,10 @@
+{
+  "prompt": "orders.py içindeki `Order` sınıfını yaz (NotImplementedError'ları kaldır). Sipariş durum makinesi:\n\nDurumlar (tam metin): \"new\", \"paid\", \"shipped\", \"delivered\", \"cancelled\".\nGeçişler:\n- new → paid (pay), new → cancelled (cancel)\n- paid → shipped (ship), paid → cancelled (cancel)\n- shipped → delivered (deliver)\n- delivered ve cancelled son durumlardır; bunlardan hiçbir geçiş yoktur.\n\nArayüz:\n- `Order(items)` → items bir sözlük: ürün adı → adet (adet pozitif int). Başlangıç durumu \"new\". items sözlüğü KOPYALANIR (dışarıdaki sözlüğü değiştirmek siparişi etkilemez).\n- `pay(amount)` → geçerliyse durum \"paid\" olur ve ödenen toplam artar; dönüş değeri yeni durum. amount > 0 olmalı, değilse ValueError. Geçersiz durumdaysa (geçiş yoksa) InvalidTransition.\n- `ship()`, `deliver()`, `cancel()` → aynı kural: geçerliyse yeni durum metnini döndürür, geçiş yoksa InvalidTransition.\n- Zaten \"paid\" iken ikinci kez `pay` çağrısı InvalidTransition.\n- `paid_total` özelliği ödenen toplamı döndürür (başlangıçta 0, int/float).\n- `items()` metodu ürün adı → adet sözlüğünün KOPYASINI döndürür.\n- `history()` metin listesi: başlangıçta [\"new\"]; her başarılı geçişte yeni durum metni listenin sonuna eklenir.\n- `InvalidTransition(Exception)` aynı modüldeki istisna sınıfıdır ve reddedilen geçişte fırlatılır; hata mesajı serbest.\n\nÖrnek:\norder = Order({\"kalem\": 2})\norder.pay(10) → \"paid\", order.paid_total == 10\norder.ship() → \"shipped\", order.history() == [\"new\", \"paid\", \"shipped\"]\norder.cancel() → InvalidTransition, durum hâlâ \"shipped\"\norder.deliver() → \"delivered\"; sonrası her geçiş InvalidTransition.\n\nNot: ledger.py bu sınıfı `o.history()` ile kullanır; mevcut davranışı bozma.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "dev"
+}

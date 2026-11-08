@@ -1,0 +1,10 @@
+{
+  "prompt": "report.py içindeki Report sınıfına yeni özellikler ekle. Mevcut davranışı ve herkese açık imzaları KORU (add_row, clear, row_count, rows, total, to_dict aynı imza ve semantikle çalışmaya devam etmeli).\n\nEklenecekler:\n1) rename_column(old, new): tabloda old adlı sütunun başlığını new yapar, tüm satırlardaki değerleri taşır ve sütunun konumunu korur. old yoksa KeyError; new zaten başka bir sütunun adıysa ValueError.\n2) select(title, columns): başka bir Report döndürür; başlığı title, yalnız verilen sütunlar ve verilen sırayla. Listedeki bir sütun yoksa KeyError. Kaynak Report değişmez.\n3) column(name): bir sütunun değerlerini eklenme sırasıyla liste olarak döndürür; sütun yoksa KeyError.\n4) aggregate(name): sütun yoksa KeyError. Değerlerin tümü sayı ise (int/float; bool sayı sayılmaz) toplamı döndürür. Tümü metin ise boş olmayan metinleri tek boşlukla birleştirip döndürür. Sütun var ama hiç satır yoksa 0 döndürür. Karışık değerler için ValueError.\n5) sort_by(name, reverse=False): başka bir Report döndürür; satırlar name sütununa göre artan (reverse=True ise azalan) sıralanır, eşit değerlerde özgün sıra korunur (değerler kendi aralarında karşılaştırılabilir varsayılır). Sütun yoksa KeyError. Kaynak değişmez.\n6) to_csv(): metin döndürür; ilk satır sütun başlıkları, ardından satırlar; alanlar virgülle ayrılır; virgül veya çift tırnak içeren alan çift tırnak içine alınır ve içindeki her çift tırnak ikiye katlanır, diğer alanlar tırnaksız yazılır; satırlar \\n ile ayrılır ve çıktı her zaman \\n ile biter. Hiç sütunu olmayan rapor \"\" döndürür. Örnek: sütunları [\"a\", \"b\"] ve tek satırı [\"1\", \"z,x\"] olan rapor için to_csv() → 'a,b\\n1,\"z,x\"\\n'.\n\nBeklenen davranış: Report(\"S\") üzerinde add_row({\"a\": 3, \"b\": \"z\"}), add_row({\"a\": 1, \"b\": \"y\"}) sonrası sort_by(\"a\").column(\"a\") → [1, 3]; sort_by(\"a\", reverse=True).column(\"a\") → [3, 1]; aggregate(\"a\") → 4; aggregate(\"b\") → \"z y\".\n\nStandart kütüphane dışında modül kullanma.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "dev"
+}

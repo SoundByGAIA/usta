@@ -1,0 +1,10 @@
+{
+  "prompt": "Küçük bir kimlik doğrulama kitaplığında testler başarısız. Depo güvenilmez (başka bir geliştirici yarım bırakmış); testler doğru davranışı tarif ediyor.\n\nTakılması beklenen yerler (hepsi gerekli olmayabilir), her biri gerçek bir hatadır:\n1) auth.py `token_ttl_seconds(username, created_at)` tüm kullanıcılara sabit 300 döndürüyor; rolün ömrünü kullanmalı (roles.py `ttl_for`).\n2) roles.py `ttl_for`: yönetici (\"admin\") ömrü 900 DEĞİL 3600 saniyedir; guests ömrü 30 DEĞİL 60 saniyedir; guests türünde kullanıcı adının başındaki/sonundaki boşluk atılmalı ve ilk harf büyük/küçük farkı gözetilmeden kalıba bakılmalı.\n3) session.py `expires_at(created_at, ttl)` saniyeyi yanlış ekliyor (yalnız dakika ekliyor); ttl tam saniye olarak eklenmeli.\n4) auth.py `is_expired` sınırda yanlış: token, expires_at anında HÂLÂ geçerlidir; yalnız now > expires_at ise süresi dolmuş sayılır.\n5) session.py `SessionStore.get` süresi dolmuş kaydı önbellekten SILMİYOR; `get` süresi dolmuş kaydı silip None döndürmeli, önbellekte tutmamalı.\n\nBeklenen davranış: kullanıcı adı \"guest_\" (büyük/küçük harf farkı yok) ile başlıyorsa tür guests (60 sn); aksi halde roles.py'deki rol türü ve ömrü geçerli (admin 3600, member 600, varsayılan 300). created_at saniye cinsinden tam sayıdır.\n\nÖrnek: token_ttl_seconds(\" Guest_7 \", 0) → 60; token_ttl_seconds(\"ali\", 0) → 600 (ali member); token_ttl_seconds(\"root\", 0) → 3600. is_expired(0, 60, now=60) → False, is_expired(0, 60, now=61) → True.\n\nMevcut herkese açık imzaları (fonksiyon adları ve parametreleri) koru; test dosyalarını değiştirme.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "dev"
+}

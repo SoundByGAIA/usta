@@ -1,0 +1,10 @@
+{
+  "prompt": "Küçük bir yapılandırma/şablon kitaplığında testler başarısız.\n\nTakılması beklenen gerçek hatalar:\n1) config.py: modül düzeyindeki DEFAULT_CONFIG sözlüğü `load_config` çağrılarınca PAYLAŞILIYOR ve değiştiriliyor; bir çağrının yaptığı değişiklik sonraki çağrılarda görünüyor. `load_config(overrides)` her çağrıda temiz bir varsayılan kopya kurmalı ve DEFAULT_CONFIG asla değişmemeli.\n2) template.py: `render(template, data)` yer tutucuları `{name}` sözdizimiyle değiştiriyor ve `{{` kaçışını destekliyor; ancak verilmeyen bir ad için KeyError fırlatıyor. Beklenen: eksik anahtar boş metinle değiştirilir. Ayrıca `{{` ve `}}` çıktıda tek `{` ve `}` olmalı.\n3) template.py: bilinmeyen tek süslü parantez dizisi (ör. \"a {x\" veya \"x} b\") için ValueError fırlatılmalı; yalnız `{name}` / `{{` / `}}` geçerli. Ad, bir veya daha fazla harf/rakam/alt çizgi karakteri olabilir.\n4) template.py: `render_all(templates, data)` de aynı hatayı taşıyor; her şablonu `render` ile üretmelidir.\n\nBeklenen davranış örnekleri:\n- render(\"Merhaba {name}!\", {\"name\": \"Ali\"}) → \"Merhaba Ali!\"\n- render(\"Deg({x})\", {}) → \"Deg()\"\n- render(\"{{ok}}\", {}) → \"{ok}\"\n- render(\"{a}{b}\", {\"a\": \"1\", \"b\": \"2\"}) → \"12\"\n- render_all([\"{a}\", \"{a}-\"], {\"a\": 5}) → [\"5\", \"5-\"]\n\nload_config: DEFAULT_CONFIG = {\"debug\": False, \"retries\": 2, \"tags\": [\"base\"]}; load_config({\"debug\": True}) sonucu debug True, retries 2, tags [\"base\"] olmalı. Sonuç tag listesi DEFAULT_CONFIG'in listesiyle aynı nesne OLMAMALI (sonucu değiştirmek varsayılanı etkilememeli). overrides içindeki anahtarlar varsayılanları günceller (tags dahil, liste olduğu gibi alınır).\n\nMevcut herkese açık imzaları koru; test dosyalarını değiştirme.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "final"
+}

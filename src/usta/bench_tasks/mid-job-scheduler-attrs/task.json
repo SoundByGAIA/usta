@@ -1,0 +1,10 @@
+{
+  "prompt": "scheduler.py, report.py ve summary.py kullanım diye hata veriyor; testler başarısız.\n\nNeden: scheduler.Job üyeleri `job_id` / `attempt` olarak yeniden adlandırıldı ama diğer dosyalar hâlâ eski `id` / `tries` adlarını kullanıyor. Ayrıca ardışık yeniden denemeler arasında bekleme uygulanmalı.\n\nİstenen:\n1) `Job` üyeleri yalnız `job_id` ve `attempt` olacak; eski `id` / `tries` adları hiçbir yerde kalmayacak (scheduler.Scheduler da yeni adları kullanacak).\n2) report.py `failures(jobs)` değil `failures(jobs, attempt)` olacak: en az bu kadar deneme yapılmış işlerin kimliklerini, geliş sırasıyla liste olarak döndürür.\n3) summary.py `summary(jobs, min_attempt)` şeklinde olacak ve `{\"total\": <iş sayısı>, \"ready\": <yeniden denenmeye hazır iş sayısı>}` döndürecek. Hazır iş: `FAILED` durumunda ve `attempt < min_attempt`.\n4) execute.py `retry_delay(attempt)` deneme numarasının karesini (saniye) döndürecek: 1 → 1, 2 → 4, 3 → 9.\n\nDosya adları, fonksiyonların/sınıfların adları ve Job üyeleri dışındaki her şey aynı kalacak; model.py değişmeyecek, depodaki test dosyalarının içeriği değiştirilmeyecek. Testlerin kendisini düzenleyerek düzeltme yapma.\n\nÖrnek: `failures([Job(1, 2, \"FAILED\"), Job(2, 1, \"FAILED\"), Job(3, 3, \"OK\")], 2)` → `[1, 3]`; `summary([Job(1, 1, \"FAILED\"), Job(2, 5, \"FAILED\"), Job(3, 0, \"OK\")], 3)` → `{\"total\": 3, \"ready\": 1}`.",
+  "check_cmd": [
+    "python",
+    "-m",
+    "unittest",
+    "-q"
+  ],
+  "split": "dev"
+}

@@ -1,5 +1,15 @@
 # Değişiklik günlüğü
 
+## 0.2.2 — orta zorlukta bench ve kademeli yönlendirme (deneysel)
+
+Ölçümler ve sınırlar: [docs/bench-orta-olcum.md](docs/bench-orta-olcum.md). Varsayılan davranış DEĞİŞMEDİ.
+
+- **9 yeni orta zorlukta bench görevi** (`mid-*`, 6 dev + 3 final; 2-4 dosyalı hata ayıklama, imza değişikliği, durum makinesi, önbellek, ayrıştırıcı). Her görevin referans çözümü bağımsız doğrulandı (başlangıçta başarısız, çözümle geçer); istem-test tutarlılığı ayrı bir model tarafından denetlendi ve uyuşmayan 2 görev elendi. Eski bench doygundu (güçlü modelde hepsi geçiyor, 7B'de hepsi kalıyor); yenisi modelleri ayırt ediyor: 7B 0/18, Gemini 2.5 Flash 7→14/18 (B→C), Pro 15→16/18. C kolunun faydası orta güçteki modelde yönlü ama aralıklar örtüşüyor: **kanıtlanmadı**.
+- **Kademeli yönlendirme (`cascade.py`), DENEYSEL, varsayılan değil:** ucuz modelle başla, bitirme kapısı/devre kesici takılınca ya da ucuz model düzenlemeden "bitti" derse güçlü modele devret. Bench'te `X-CASCADE` kolu; `usta bench run --arm X-CASCADE --strong-model … [--strong-endpoint … --strong-protocol … --strong-api-key-env …]`. Ölçüm: Flash→Pro 12/18 (tek model 14/18), 7B→Flash 14/18 ama bulut token tasarrufu ~%7 (gürültü): **fayda kanıtlanmadı**.
+- Bench sonuçlarına `escalated` ve `strong_tokens` alanları eklendi.
+- CI: `publish` iş akışı release yayımlanınca PyPI Trusted Publisher ile çalışır.
+- Referans çözümler `tests/bench_solutions/` altında (pakete girmez).
+
 ## 0.2.1 — Ofis ve kaynak izi kapısı
 
 Ölçümler ve sınırlar: [docs/v0.2.1-raporu.md](docs/v0.2.1-raporu.md). Rakiplerle dürüst karşılaştırma: [docs/comparison.md](docs/comparison.md).

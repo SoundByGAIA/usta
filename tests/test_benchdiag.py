@@ -153,7 +153,7 @@ def test_arms_a_to_d_unchanged_and_new_arms_are_labelled_experimental():
     assert bench.ARMS["C"].verify and not bench.ARMS["C"].breaker
     assert bench.ARMS["D"].verify and bench.ARMS["D"].breaker
     exp = {k for k, a in bench.ARMS.items() if a.experimental}
-    assert exp == {"X-BRK", "X-CTX", "X-ALL", "X-FULL", "X-SYM", "X-TAINT"}
+    assert exp == {"X-BRK", "X-CTX", "X-ALL", "X-FULL", "X-SYM", "X-TAINT", "X-CASCADE"}
     assert bench.ARMS["X-TAINT"].taint and bench.ARMS["X-TAINT"].verify  # C + kaynak izi kapısı
     assert not any(bench.ARMS[k].taint for k in "ABCD")  # A-D anlamı değişmez
     assert bench.ARMS["X-BRK"].breaker and not bench.ARMS["X-BRK"].verify

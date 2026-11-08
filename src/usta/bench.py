@@ -53,6 +53,9 @@ class Arm:
     context_window: int | None = None  # verilirse bağlam bütçesi/sıkıştırma etkin (token)
     symbol_tools: bool = False  # find_symbol / symbol_context / related_files (usta[symbols])
     taint: bool = False  # kaynak izi kapısı: okunan içerikten türeyen yazma/komut hedefleri onay ister (taint.py)
+    cascade: bool = (
+        False  # ucuz→güçlü model yükseltmesi (cascade.py; modeli çağıran taraf CascadeModel verir)
+    )
     max_read: int | None = (
         None  # verilirse read_file çıktısı bu karakterle sınırlı (kod okuma bütçesi)
     )
@@ -103,6 +106,13 @@ ARMS["X-TAINT"] = replace(
     taint=True,
     experimental=True,
 )
+ARMS["X-CASCADE"] = replace(
+    ARMS["C"],
+    name="X-CASCADE",
+    description="C + kademeli yönlendirme: ucuz model, takılırsa güçlü model (cascade.py; --strong-model gerekir)",
+    cascade=True,
+    experimental=True,
+)
 
 
 @dataclass(frozen=True)
@@ -149,6 +159,8 @@ class TaskResult:
     repair_attempts: int = 0  # ilk testten sonra yapılan düzenleme (onarım) sayısı
     context_peak: int = 0  # en büyük bağlam (girdi token, uç nokta bildirirse)
     compactions: int = 0  # bağlam sıkıştırma sayısı
+    escalated: bool = False  # kademeli yönlendirme: görev güçlü modele devredildi
+    strong_tokens: int = 0  # güçlü modelin harcadığı token (girdi+çıktı)
     trace: str = ""  # adım izi dosyası (--trace-dir verilirse)
 
     def __post_init__(self) -> None:
@@ -274,11 +286,18 @@ def _attempt(
     active: ModelClient = ReplayModel(replay) if replay is not None else (recorder or model)
     usage = getattr(model, "usage", None)
     before = (usage.prompt, usage.completion, usage.requests) if usage else (0, 0, 0)
+    cascade = model if arm.cascade and hasattr(model, "observe") else None
+    if cascade is not None:
+        cascade.reset()
+    strong_use = getattr(getattr(cascade, "strong", None), "usage", None)
+    strong_before = strong_use.prompt + strong_use.completion if strong_use else 0
 
     def stamp(kind: str, **data) -> None:
         events.append({"t_ms": round((time.monotonic() - t0) * 1000), "kind": kind, **data})
 
     def on_event(kind: str, data: dict) -> None:
+        if cascade is not None:
+            cascade.observe(kind, data)
         if kind == "tool_call":
             counts["tool_calls"] += 1
             order.append(str(data.get("tool")))
@@ -439,6 +458,10 @@ def _attempt(
         repair_attempts=repairs,
         context_peak=stats["context_peak"],
         compactions=stats["compactions"],
+        escalated=bool(cascade and cascade.escalated),
+        strong_tokens=(strong_use.prompt + strong_use.completion - strong_before)
+        if strong_use
+        else 0,
         **counts,
     )
     if trace_dir is not None and replay is None:

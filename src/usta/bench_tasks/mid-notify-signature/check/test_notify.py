@@ -1,8 +1,8 @@
 import unittest
 
 import alerts
-import router
 import delivery
+import router
 import transports
 from delivery import send
 
@@ -28,9 +28,7 @@ class SendSignature(Base):
     def test_urgent_prefix(self):
         send("sms", "x", to="y", urgent=True)
         send("sms", "z", to="y")
-        self.assertEqual(
-            transports.sent(), [("sms", "y", "ACIL: x"), ("sms", "y", "z")]
-        )
+        self.assertEqual(transports.sent(), [("sms", "y", "ACIL: x"), ("sms", "y", "z")])
 
     def test_invalid_retries(self):
         for bad in (0, -1):

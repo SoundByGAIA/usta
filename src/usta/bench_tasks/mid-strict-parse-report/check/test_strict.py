@@ -52,7 +52,9 @@ class StrictReport(unittest.TestCase):
         ]
         rep, warnings = report(rows, strict=True)
         self.assertEqual(rep, {"items": 13, "qty": 3, "sku": "z,,y,"})
-        self.assertEqual(warnings, ["negatif adet: z", "negatif adet: y", "sku yok: 7", "sku yok: 3"])
+        self.assertEqual(
+            warnings, ["negatif adet: z", "negatif adet: y", "sku yok: 7", "sku yok: 3"]
+        )
 
     def test_no_warnings_for_clean_rows(self):
         clean = [{"sku": "a", "items": 2, "qty": 3}, {"sku": "b", "items": 1, "qty": 1}]

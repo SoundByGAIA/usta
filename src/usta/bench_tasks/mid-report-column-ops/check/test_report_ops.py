@@ -50,7 +50,9 @@ class Select(unittest.TestCase):
         s = r.select("only-b", ["b"])
         self.assertIsInstance(s, Report)
         self.assertEqual(s.title, "only-b")
-        self.assertEqual(s.to_dict(), {"title": "only-b", "columns": ["b"], "rows": [["z"], ["y"], ["x"]]})
+        self.assertEqual(
+            s.to_dict(), {"title": "only-b", "columns": ["b"], "rows": [["z"], ["y"], ["x"]]}
+        )
         s.add_row({"b": "w"})
         self.assertEqual(r.row_count(), 3)
         self.assertEqual(r.to_dict()["columns"], ["a", "b"])

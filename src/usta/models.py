@@ -136,6 +136,10 @@ class OpenAICompatClient:
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         try:
             r = self._post(body, headers)
+            if r.status_code == 400 and "reasoning_effort" in self.extra_body:
+                self.extra_body.pop("reasoning_effort", None)  # uç nokta düşünme alanını tanımıyor
+                body.pop("reasoning_effort", None)
+                r = self._post(body, headers)
             r.raise_for_status()
             data = r.json()
             msg = data["choices"][0]["message"]

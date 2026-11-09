@@ -50,6 +50,14 @@
     state.defaultWs = s.workspace || null;
     state.zoom = s.zoom || "auto";
     applyZoom();
+    $("think").value = s.think || "auto";
+    const ctx = String(s.context_window || 0);
+    if (![...$("ctx").options].some((o) => o.value === ctx)) {  // terminalden gelen özel değer
+      const o = document.createElement("option");
+      o.value = ctx; o.textContent = ctx + " token";
+      $("ctx").appendChild(o);
+    }
+    $("ctx").value = ctx;
   }
   async function saveSetting(change) {
     try { await api("/settings", { method: "PUT", body: JSON.stringify(change) }); } catch (_) { /* yoksay */ }
@@ -1088,6 +1096,8 @@
     saveSetting({ zoom: state.zoom });
     applyZoom();
   });
+  $("think").addEventListener("change", () => saveSetting({ think: $("think").value }));
+  $("ctx").addEventListener("change", () => saveSetting({ context_window: Number($("ctx").value) }));
   applyZoom();
   if (window.Office && typeof window.Office.init === "function") window.Office.init();
   // Ofis onay şeridi → mevcut karar akışı (tek yol: decideApproval)

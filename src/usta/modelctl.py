@@ -86,6 +86,12 @@ class ModelControl:
             "models": next((g["models"] for g in groups if g["api"] == self.api), []),
         }
 
+    def rebuild(self) -> None:
+        """Ayar değişince (ör. düşünme) mevcut model için istemciyi yeniden kurar."""
+        with self._lock:
+            src = self._source(self.api) or self.default
+            self._client = self.build(src.endpoint, self.name, self.protocol, src.key)
+
     def switch(self, name: str, api: str | None = None) -> dict:
         with self._lock:
             api = api or self.api

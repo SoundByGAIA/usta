@@ -326,6 +326,8 @@ def test_settings_requires_auth_and_has_defaults(tmp_path):
         "mode": "manual",
         "guard": False,
         "zoom": "auto",
+        "think": "auto",
+        "context_window": 0,
         "workspace": None,
     }
 
@@ -340,6 +342,8 @@ def test_settings_put_validates_persists_and_shares_with_terminal(tmp_path):
         "mode": "plan",
         "guard": False,
         "zoom": "auto",
+        "think": "auto",
+        "context_window": 0,
     }
     got = st.load(tmp_path / "home")
     assert (got.theme, got.mode) == ("gri", "plan")
@@ -381,6 +385,25 @@ def test_settings_zoom_roundtrip_and_validation(tmp_path):
     assert c.put("/settings", json={"zoom": "1.5"}, headers=AUTH).json()["zoom"] == "1.5"
     assert c.get("/settings", headers=AUTH).json()["zoom"] == "1.5"
     assert c.put("/settings", json={"zoom": "9"}, headers=AUTH).status_code == 422
+
+
+def test_settings_think_and_context_roundtrip_and_validation(tmp_path):
+    from usta import settings as st
+
+    c, _ = make_client(tmp_path, Scripted())
+    assert c.put("/settings", json={"think": "off"}, headers=AUTH).json()["think"] == "off"
+    assert (
+        c.put("/settings", json={"context_window": 16384}, headers=AUTH).json()["context_window"]
+        == 16384
+    )
+    got = st.load(tmp_path / "home")
+    assert (got.think, got.context_window) == ("off", 16384)
+    assert (
+        c.put("/settings", json={"context_window": 0}, headers=AUTH).json()["context_window"] == 0
+    )
+    assert st.load(tmp_path / "home").context_window is None
+    assert c.put("/settings", json={"think": "cok"}, headers=AUTH).status_code == 422
+    assert c.put("/settings", json={"context_window": 100}, headers=AUTH).status_code == 422
 
 
 def test_oversized_bodies_are_rejected_before_auth_and_parsing(tmp_path):

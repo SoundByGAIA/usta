@@ -16,6 +16,7 @@ maliyete dayanır. Mobil kullanımın (hareket halindeki kullanıcı) önerisi a
 | 6 | Yerel modeli port veya klasörle tanıtma | **Port yapıldı** (yalnız 127.0.0.1; "Bul" ve elle port) | Klasör (GGUF) Ollama'ya eklemeyi gerektirir, ayrı ve büyük; sonraya. |
 | 7 | Ofis ortamı çok beğenildi, geliştirilmeli | Bekliyor | Çok ajan ve paralel görev görünümü. Sahte kalabalık yok: her şey gerçek olaya bağlı kalır. |
 | 8 | Hiç kod bilmeyen biri kullanabilmeli | **Kısmen yapıldı**: kurulum sihirbazı (model yoksa kendiliğinden açılır; bilgisayarımda / internet servisiyle; deneme; örnek görevler) | Yerel akış gerçek Ollama ile, hatalı anahtar yolu gerçek tarayıcıda denendi. Bulut akışı gerçek Gemini ile denendi: anahtar, model listesi, seçim, "merhaba" ve kurulum sonrası gerçek bir görev (index.html üretildi). Bu deneme listeden ses/görsel/gömme modellerini süzme gerekliliğini ortaya çıkardı (61 → 34 model, yapıldı). Kodsuz kullanıcıyla gerçek deneme yapılmadı. Kalan: kurulum komutu, üst çubuğu ayarlara toplama, ilk görev önerileri. |
+| 9 | Tema, arka plan, görsel tasarım özelleştirilebilmeli | Bekliyor (şu an 3 hazır tema: siyah/gri/beyaz) | Önce renk vurgusu ve yazı boyutu, sonra arka plan görseli. Görsel yalnız yerel dosyadan alınır ve ev dizininde durur; dışarıdan görsel/yazı tipi yüklenmez (gizlilik testi bunu zorlar). v0.3.1 adayı; Ceren denemesinden sonra. |
 | – | Telefon / tablet | Bekliyor | Bulut/API yolu. Önce dar ekran düzeltmesi ve PWA; barındırma kararı ayrı. |
 
 ## Kişiselleştirme ilkesi (madde 4, Can ile kararlaştırıldı)

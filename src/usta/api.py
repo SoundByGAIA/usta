@@ -10,6 +10,7 @@ import mimetypes
 import os
 import re
 import secrets
+import sys
 import time
 from collections import deque
 from pathlib import Path
@@ -179,6 +180,11 @@ def friendly_model_error(text: str) -> str:
 
 class LocalScanIn(BaseModel):
     port: int | None = Field(default=None, ge=1, le=65535)
+
+
+class LocalPullIn(BaseModel):
+    port: int = Field(default=11434, ge=1, le=65535)
+    model: str = Field(min_length=1, max_length=120)
 
 
 class LocalCtxIn(BaseModel):
@@ -800,6 +806,31 @@ def create_app(
             return localmodels.scan(body.port)
         except localmodels.LocalError as e:
             raise HTTPException(400, str(e)) from None
+
+    @api.get("/system/info")
+    def system_info() -> dict:
+        """Yerel model sihirbazı için: bellek, Ollama durumu, kurulu modeller ve öneri."""
+        ram = localmodels.memory_gb()
+        ollama = localmodels.probe(11434, timeout=1.0)
+        return {
+            "os": sys.platform,
+            "ram_gb": None if ram is None else round(ram, 1),
+            "ollama_running": ollama is not None,
+            "installed": ollama["models"] if ollama else [],
+            "recommend": localmodels.recommend(ram),
+        }
+
+    @api.post("/local/pull", status_code=202)
+    def local_pull(body: LocalPullIn) -> dict:
+        try:
+            localmodels.PULL.start(body.port, body.model)
+        except localmodels.LocalError as e:
+            raise HTTPException(409 if "sürüyor" in str(e) else 400, str(e)) from None
+        return {"started": True}
+
+    @api.get("/local/pull")
+    def local_pull_progress() -> dict:
+        return localmodels.PULL.snapshot()
 
     @api.post("/local/context")
     def local_context(body: LocalCtxIn) -> dict:

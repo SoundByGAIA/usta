@@ -28,10 +28,44 @@
   <section id="wizard" aria-label="Kurulum" hidden>
     <div id="wiz-start" class="wiz-step">
       <h2>Hoş geldin. Yapay zekâ nerede çalışsın?</h2>
-      <p class="note">Sonra istediğin zaman değiştirebilirsin.</p>
-      <div class="wiz-choices">
-        <button id="wiz-local" type="button" class="card wiz-choice"><strong>Bilgisayarımda</strong><span>Ücretsiz. Yazdıkların bilgisayarından çıkmaz. Biraz kurulum gerekir. Küçük modeller basit işlerde iyidir, zor işlerde zayıf kalabilir.</span></button>
-        <button id="wiz-cloud" type="button" class="card wiz-choice"><strong>İnternet servisiyle</strong><span>Hızlı ve güçlü. Servisten bir anahtar almak gerekir. Yazdıkların o servisin sunucusuna gider ve kullandıkça ücret çıkabilir.</span></button>
+      <p class="note">İkisinin de artıları ve eksileri var. Aşağıdaki öneriye göre seç; sonra istediğin zaman değiştirebilirsin.</p>
+      <div class="wiz-choices wiz-compare">
+        <button id="wiz-cloud" type="button" class="card wiz-choice">
+          <strong>İnternet servisiyle</strong>
+          <span class="wiz-sub">Yapay zekâ internetteki bir şirketin bilgisayarında çalışır.</span>
+          <span class="wiz-label good">Artıları</span>
+          <ul class="wiz-list pro">
+            <li>Çok daha güçlü: zor işleri de yapar</li>
+            <li>Kurulum kısa, indirme yok</li>
+            <li>Ücretsiz seçenekler var (Google Gemini, OpenRouter)</li>
+          </ul>
+          <span class="wiz-label bad">Eksileri</span>
+          <ul class="wiz-list con">
+            <li>Hesap açıp bir "anahtar" almak gerekir (yaklaşık 5-10 dakika)</li>
+            <li>Yazdıkların o şirketin sunucusuna gider</li>
+            <li>Ücretsiz kotalar sınırlıdır; ücretli kullanımda para çıkar</li>
+          </ul>
+        </button>
+        <button id="wiz-local" type="button" class="card wiz-choice">
+          <strong>Bilgisayarımda</strong>
+          <span class="wiz-sub">Yapay zekâ senin bilgisayarında çalışır, internet gerekmez.</span>
+          <span class="wiz-label good">Artıları</span>
+          <ul class="wiz-list pro">
+            <li>Tamamen ücretsiz</li>
+            <li>Yazdıkların bilgisayarından hiç çıkmaz</li>
+            <li>Kurulumdan sonra internet gerekmez</li>
+          </ul>
+          <span class="wiz-label bad">Eksileri</span>
+          <ul class="wiz-list con">
+            <li>Bir program (Ollama) ve bir model (2-5 GB) indirmen gerekir</li>
+            <li>Küçük modeller basit işlerde iyidir, zor işlerde başarısız olur</li>
+            <li>Ekran kartı yoksa yavaş çalışır; bilgisayar belleğine bağlıdır</li>
+          </ul>
+        </button>
+      </div>
+      <div class="card wiz-reco">
+        <strong>Bizim önerimiz</strong>
+        <p id="wiz-reco-text">Bilgisayarına bakıyorum…</p>
       </div>
     </div>
     <div id="wiz-local-step" class="wiz-step" hidden>
@@ -41,8 +75,9 @@
     </div>
     <div id="wiz-cloud-step" class="wiz-step" hidden>
       <h2>İnternet servisi</h2>
-      <p class="note">Servisi seç, sonra servisin sitesinde hesabından aldığın anahtarı yapıştır. Anahtar yalnız bu bilgisayarda saklanır.</p>
-      <div id="wiz-services" class="wiz-choices"></div>
+      <p class="note">Bir servis seç. Servisin sitesinde hesabından bir <strong>anahtar</strong> alacaksın: uzun bir şifre gibi bir yazı. Bu yazıyı aşağıdaki kutuya yapıştıracaksın; yalnız bu bilgisayarda saklanır.</p>
+      <div id="wiz-services"></div>
+      <div id="wiz-service-help" class="card" hidden></div>
       <form id="wiz-cloud-form" autocomplete="off" hidden>
         <div class="key-row"><input id="wiz-key" type="password" placeholder="Anahtarı buraya yapıştır" autocomplete="off" spellcheck="false" aria-label="Anahtar" required></div>
         <div class="row"><button class="primary" type="submit">Dene</button></div>

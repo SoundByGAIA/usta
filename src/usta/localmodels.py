@@ -6,7 +6,11 @@ istek atılamaz. Bulunan sunucu yine kullanıcı onayıyla `apis.json`'a eklenir
 
 from __future__ import annotations
 
+import json
 import re
+import subprocess
+import sys
+import threading
 
 import httpx
 
@@ -79,3 +83,165 @@ def context_variant(port: int, base: str, num_ctx: int, timeout: float = 120.0) 
             "model varyantı oluşturulamadı (bu bir Ollama sunucusu mu, model yüklü mü?)"
         ) from None
     return new
+
+
+# --- bellek, model önerisi ve model indirme (Ollama) ----------------------------------------------
+
+
+def memory_gb() -> float | None:
+    """Bu bilgisayarın toplam fiziksel belleği (GB); öğrenilemezse None."""
+    try:
+        if sys.platform == "win32":
+            import ctypes
+
+            class _MemStatus(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            st = _MemStatus()
+            st.dwLength = ctypes.sizeof(_MemStatus)
+            if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):  # type: ignore[attr-defined]
+                return None
+            return st.ullTotalPhys / 2**30
+        if sys.platform == "darwin":
+            out = subprocess.run(
+                ["sysctl", "-n", "hw.memsize"],
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=5,
+                check=False,
+            )
+            return int(out.stdout.strip()) / 2**30
+        with open("/proc/meminfo", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) / 2**20  # kB -> GB
+    except (OSError, ValueError, subprocess.SubprocessError, AttributeError, IndexError):
+        pass
+    return None
+
+
+# Önerilen modeller: bu depoda gerçekten çalıştırdığımız, Ollama kütüphanesinde bulunan etiketler.
+# Büyük modeller denenmediği için önerilmez (bkz. docs/bench-orta-olcum.md).
+MODEL_SMALL = {"name": "qwen3:4b-instruct-2507-q4_K_M", "size_gb": 2.5}
+MODEL_MEDIUM = {"name": "qwen2.5-coder:7b", "size_gb": 4.7}
+MIN_RAM_LOCAL = 6.0  # bunun altında yerel model önerilmez
+MIN_RAM_MEDIUM = 12.0
+
+
+def recommend(ram_gb: float | None) -> dict:
+    """Belleğe göre yerel model önerisi. `model` None ise yerel model önerilmez (internet servisi)."""
+    if ram_gb is not None and ram_gb < MIN_RAM_LOCAL:
+        return {
+            "model": None,
+            "reason": f"Bu bilgisayarın belleği az ({ram_gb:.0f} GB). Yerel model yavaş ve zayıf kalır; internet servisini öneririz.",
+        }
+    if ram_gb is None:
+        return {
+            **MODEL_SMALL,
+            "model": MODEL_SMALL["name"],
+            "reason": "Belleğini öğrenemedik; en küçük öneriyle başlamak güvenli.",
+        }
+    pick = MODEL_MEDIUM if ram_gb >= MIN_RAM_MEDIUM else MODEL_SMALL
+    return {
+        **pick,
+        "model": pick["name"],
+        "reason": (
+            f"Belleğin {ram_gb:.0f} GB. Bu model yaklaşık {pick['size_gb']} GB indirir ve rahat çalışır."
+            + (
+                ""
+                if ram_gb >= MIN_RAM_MEDIUM
+                else " Daha büyük modeller bu bellekte yavaşlar ya da hiç çalışmaz."
+            )
+        ),
+    }
+
+
+def _friendly_pull_error(text: str) -> str:
+    low = text.lower()
+    if "does not exist" in low or "not found" in low:
+        return "Bu isimde bir model bulunamadı. Adı doğru yazdığından emin ol."
+    if "no space" in low or "disk" in low:
+        return "Diskte yeterli boş yer yok. Yer açıp tekrar dene."
+    if "connection" in low or "timeout" in low or "dial" in low:
+        return "İndirme sırasında internet bağlantısı koptu. Tekrar dene."
+    return f"Model indirilemedi: {text[:160]}"
+
+
+class PullJob:
+    """Ollama'ya model indirir (`/api/pull`); tek seferde bir indirme, ilerleme sorgulanabilir."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.state: dict = {"active": False}
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            return dict(self.state)
+
+    def start(self, port: int, model: str) -> None:
+        check_port(port)
+        if not isinstance(model, str) or not _MODEL_NAME.match(model):
+            raise LocalError("model adı geçersiz")
+        with self._lock:
+            if self.state.get("active"):
+                raise LocalError("zaten bir indirme sürüyor")
+            self.state = {
+                "active": True,
+                "model": model,
+                "status": "başlıyor",
+                "completed": 0,
+                "total": 0,
+                "done": False,
+                "error": None,
+            }
+        threading.Thread(target=self._run, args=(port, model), daemon=True).start()
+
+    def _set(self, **kw) -> None:
+        with self._lock:
+            self.state.update(kw)
+
+    def _run(self, port: int, model: str) -> None:
+        try:
+            with httpx.stream(
+                "POST",
+                f"http://{HOST}:{port}/api/pull",
+                json={"model": model, "stream": True},
+                timeout=httpx.Timeout(30.0, read=None),
+            ) as r:
+                if r.status_code != 200:
+                    self._set(active=False, error="Ollama modeli indiremedi (model adı doğru mu?)")
+                    return
+                for line in r.iter_lines():
+                    if not line:
+                        continue
+                    try:
+                        ev = json.loads(line)
+                    except ValueError:
+                        continue
+                    if ev.get("error"):
+                        self._set(active=False, error=_friendly_pull_error(str(ev["error"])))
+                        return
+                    upd: dict = {"status": str(ev.get("status", ""))[:60]}
+                    if ev.get("total"):
+                        upd.update(total=int(ev["total"]), completed=int(ev.get("completed") or 0))
+                    self._set(**upd)
+                    if ev.get("status") == "success":
+                        self._set(active=False, done=True)
+                        return
+            self._set(active=False, error="indirme beklenmedik şekilde bitti")
+        except httpx.HTTPError:
+            self._set(active=False, error="Ollama'ya ulaşılamadı (program açık mı?)")
+
+
+PULL = PullJob()

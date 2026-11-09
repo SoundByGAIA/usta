@@ -221,3 +221,69 @@ def test_prompt_has_no_readline_markers_without_readline(monkeypatch, tmp_path):
     monkeypatch.setattr(compat, "has_readline", lambda: False)
     p = repl._prompt_str()
     assert "\001" not in p and "\002" not in p and "usta [" in p  # Windows: ☺☻ çöpü yok
+
+
+def test_make_dir_link_falls_back_to_junction_when_symlink_needs_privilege(monkeypatch, tmp_path):
+    """Gerçek Windows denemesi: normal kullanıcıda os.symlink WinError 1314 verip Usta'yı çökertiyordu."""
+    import sys
+    import types
+
+    real_symlink = os.symlink
+    made = []
+
+    def no_privilege(*a, **k):
+        raise OSError(1314, "Gereken ayrıcalık istemci tarafından sağlanmıyor")
+
+    def fake_junction(src, dst):  # Windows'ta _winapi.CreateJunction; testte gerçek bağla taklit
+        made.append((src, dst))
+        real_symlink(src, dst, target_is_directory=True)
+
+    monkeypatch.setattr(os, "symlink", no_privilege)
+    monkeypatch.setitem(sys.modules, "_winapi", types.SimpleNamespace(CreateJunction=fake_junction))
+    target = tmp_path / "proje"
+    target.mkdir()
+    compat.make_dir_link(target, tmp_path / "bag", windows=True)
+    assert made == [(str(target), str(tmp_path / "bag"))]
+    assert (tmp_path / "bag").resolve() == target.resolve()
+
+
+def test_make_dir_link_reraises_off_windows_and_when_link_exists(monkeypatch, tmp_path):
+    target = tmp_path / "proje"
+    target.mkdir()
+
+    monkeypatch.setattr(
+        os, "symlink", lambda *a, **k: (_ for _ in ()).throw(OSError(1, "izin yok"))
+    )
+    with pytest.raises(OSError):
+        compat.make_dir_link(target, tmp_path / "bag", windows=False)  # Linux: hata saklanmaz
+    monkeypatch.undo()
+    compat.make_dir_link(target, tmp_path / "bag2", windows=False)
+    with pytest.raises(FileExistsError):
+        compat.make_dir_link(
+            target, tmp_path / "bag2", windows=True
+        )  # var olan bağ: birleşime düşme
+
+
+def test_register_creates_workspace_link_without_symlink_privilege(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    from usta import projects
+
+    real_symlink = os.symlink
+    monkeypatch.setattr(
+        os, "symlink", lambda *a, **k: (_ for _ in ()).throw(OSError(1314, "yetki yok"))
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "_winapi",
+        types.SimpleNamespace(
+            CreateJunction=lambda s, d: real_symlink(s, d, target_is_directory=True)
+        ),
+    )
+    monkeypatch.setattr(sys, "platform", "win32")
+    home, proj = tmp_path / "home", tmp_path / "proje"
+    proj.mkdir()
+    wid = projects.register(home, proj)
+    assert (home / "workspaces" / wid).resolve() == proj.resolve()
+    assert projects.register(home, proj) == wid  # ikinci kayıt aynı kimliği döndürür

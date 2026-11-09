@@ -110,3 +110,52 @@ def has_readline() -> bool:
     import importlib.util
 
     return importlib.util.find_spec("readline") is not None
+
+
+_REPARSE_POINT = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT
+
+
+def is_dir_link(path) -> bool:
+    """Sembolik bağ ya da Windows dizin birleşimi (junction) mi? (Python 3.11'de `is_junction` yok.)"""
+    if path.is_symlink():
+        return True
+    try:
+        return bool(getattr(path.lstat(), "st_file_attributes", 0) & _REPARSE_POINT)
+    except OSError:
+        return False
+
+
+def remove_dir_link(path) -> None:
+    """Klasör bağını (hedefine dokunmadan) kaldırır; birleşimlerde `unlink` yetmez, `rmdir` gerekir."""
+    try:
+        os.unlink(path)
+    except OSError:
+        os.rmdir(path)
+
+
+def make_dir_link(target, link, windows: bool | None = None) -> None:
+    """`link` adıyla `target` klasörüne bağ kurar.
+
+    Windows'ta sembolik bağ yönetici yetkisi ya da Geliştirici Modu ister (WinError 1314); normal kullanıcıda
+    bu yüzden çöküyordu. Ayrıcalık yoksa aynı işi gören dizin birleşimine (junction) düşülür.
+    """
+    try:
+        os.symlink(target, link, target_is_directory=True)
+        return
+    except FileExistsError:
+        raise
+    except OSError:
+        if windows is None:
+            windows = sys.platform == "win32"
+        if not windows:
+            raise
+    try:
+        import _winapi
+
+        _winapi.CreateJunction(str(target), str(link))
+    except (ImportError, AttributeError, OSError):
+        r = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True, check=False
+        )
+        if r.returncode != 0:
+            raise OSError(f"klasör bağı oluşturulamadı: {link}") from None

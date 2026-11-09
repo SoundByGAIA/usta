@@ -7,9 +7,10 @@ asla yazılmaz; çakışmada başka kimlik seçilir.
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 from pathlib import Path
+
+from usta import compat
 
 _TR = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
 MAX_BASE = 24  # + "-" + 4 hane = en çok 29 karakter (kimlik sınırı 40)
@@ -54,14 +55,14 @@ def register(home: Path, path: Path) -> str:
         digest = hashlib.sha1(f"{path}\0{attempt}".encode(), usedforsecurity=False).hexdigest()[:4]
         wid = f"{slug(path.name)}-{digest}"
         link = base / wid
-        if link.is_symlink():
+        if compat.is_dir_link(link):
             if link.resolve() == path:
                 return wid
             if link.exists():
                 continue  # başka bir projeye işaret ediyor: başka kimlik dene
-            link.unlink()  # kırık bağ
+            compat.remove_dir_link(link)  # kırık bağ
         elif link.exists():
             continue  # gerçek dizin: dokunma
-        os.symlink(path, link, target_is_directory=True)
+        compat.make_dir_link(path, link)  # Windows'ta yetki yoksa dizin birleşimi
         return wid
     raise OSError("proje kimliği üretilemedi")

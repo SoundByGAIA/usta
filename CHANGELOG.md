@@ -1,5 +1,12 @@
 # Değişiklik günlüğü
 
+## 0.3.1 — Windows'ta yönetici olmayan kullanıcı için açılış düzeltmeleri
+
+İlk gerçek kodsuz kullanıcı testinin (Windows 10, normal hesap) bulduğu iki engel. Notlar: [docs/kullanici-testi-2026-11-09.md](docs/kullanici-testi-2026-11-09.md).
+
+- **Windows'ta yönetici olmayan kullanıcıda Usta hiç açılmıyordu:** her çalışma alanı için sembolik bağ kuruluyordu, bu da Windows'ta yönetici yetkisi ister (`WinError 1314`). Ayrıcalık yoksa aynı işi gören dizin birleşimine (junction) düşülür. v0.3.0'ın Windows denemesi yönetici yetkili SSH oturumundan yapıldığı için bu görülmemişti; bu sürüm yetkisiz token ile sınandı.
+- **Ev klasöründen başlatınca hata veriyordu:** `cmd` kullanıcı klasöründe (`C:\Users\Ad`) açılır; Usta orayı çalışma alanı sayıp "çalışma alanı olamaz" diye çıkıyordu. Klasör verilmediyse ve bulunduğun yer uygun değilse artık `~/Usta` klasörünü kendisi kurar, bunu açıkça söyler. `-w` ile açıkça verilen uygunsuz klasör yine hata verir.
+
 ## 0.3.0 — herkes için: kurulum sihirbazı, Windows, tablet/telefon
 
 ~20 kişilik kullanıcı geri bildiriminden doğdu: [docs/geri-bildirim-v0.3.md](docs/geri-bildirim-v0.3.md). Model

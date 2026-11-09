@@ -276,3 +276,45 @@ def test_lan_flag_reaches_portal_and_prints_pairing_info(tmp_path, monkeypatch, 
     assert "192.168.1.5" in out and "123456" in out
     cli.main([])
     assert p.portal_lan is False  # varsayılan: yerel ağa kapalı
+
+
+def test_start_from_home_folder_creates_usta_folder_instead_of_failing(
+    tmp_path, monkeypatch, capsys
+):
+    """Gerçek Windows denemesi: cmd ev klasöründe açılır; 'çalışma alanı olamaz' hatasıyla çıkıyordu."""
+    p = Probe(monkeypatch)
+    userhome = tmp_path / "kullanici"
+    userhome.mkdir()
+    monkeypatch.setenv("HOME", str(userhome))
+    monkeypatch.setenv("USTA_HOME", str(userhome / ".usta"))  # varsayılan: ev klasörünün içinde
+    st.save(userhome / ".usta", st.Settings(model="m", endpoint="http://e/v1"))
+    monkeypatch.chdir(userhome)
+    assert cli.main([]) == 0
+    assert p.repl_kwargs["root"] == (userhome / "Usta").resolve()
+    assert (userhome / "Usta").is_dir()
+    assert "Senin için bir klasör kurdum" in capsys.readouterr().out
+
+
+def test_explicit_workspace_that_is_the_home_folder_still_errors(tmp_path, monkeypatch, capsys):
+    Probe(monkeypatch)
+    userhome = tmp_path / "kullanici"
+    userhome.mkdir()
+    monkeypatch.setenv("HOME", str(userhome))
+    monkeypatch.setenv("USTA_HOME", str(userhome / ".usta"))
+    st.save(userhome / ".usta", st.Settings(model="m", endpoint="http://e/v1"))
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["-w", str(userhome)]) == 2  # kullanıcı açıkça verdiyse sessizce değiştirme
+    assert "çalışma alanı olamaz" in capsys.readouterr().err
+
+
+def test_start_from_a_project_folder_keeps_that_folder(tmp_path, monkeypatch):
+    p = Probe(monkeypatch)
+    userhome = tmp_path / "kullanici"
+    proj = userhome / "Masaüstü" / "Yeni klasör"
+    proj.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(userhome))
+    monkeypatch.setenv("USTA_HOME", str(userhome / ".usta"))
+    st.save(userhome / ".usta", st.Settings(model="m", endpoint="http://e/v1"))
+    monkeypatch.chdir(proj)
+    assert cli.main([]) == 0
+    assert p.repl_kwargs["root"] == proj.resolve() and not (userhome / "Usta").exists()

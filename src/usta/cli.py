@@ -238,7 +238,7 @@ def _parser() -> argparse.ArgumentParser:
         description="Argümansız `usta`: etkileşimli terminal + web portalı. Alt komutlar aşağıda.",
     )
     p.add_argument(
-        "-w", "--workspace", default=".", help="proje dizini (varsayılan: bulunduğun dizin)"
+        "-w", "--workspace", default=None, help="proje dizini (varsayılan: bulunduğun dizin)"
     )
     p.add_argument("--no-portal", action="store_true", help="web portalını başlatma")
     p.add_argument(
@@ -1276,7 +1276,7 @@ def _chat_cmd(args: argparse.Namespace) -> int:
         print(f"Protokol: {protocol} — {prof.note}")
     hosts = _allowed_hosts(args)
     servers = _mcp_servers(home)
-    root = Path(args.workspace).resolve()
+    root = Path(args.workspace or ".").resolve()
     if hosts is None or servers is None or not root.is_dir():
         if not root.is_dir():
             print(f"hata: çalışma alanı yok: {root}", file=sys.stderr)
@@ -1284,8 +1284,24 @@ def _chat_cmd(args: argparse.Namespace) -> int:
     try:
         projects.check_root(home, root)
     except ValueError as e:
-        print(f"hata: {e}", file=sys.stderr)
-        return 2
+        if args.workspace is not None:  # klasörü kullanıcı açıkça verdi: sessizce değiştirme
+            print(f"hata: {e}", file=sys.stderr)
+            return 2
+        # Klasör verilmedi ve bulunduğun yer uygun değil (ör. Windows'ta cmd'nin açıldığı ev klasörü):
+        # hata vermek yerine kendi klasörünü kur. Kodsuz kullanıcı "proje klasörü"nü bilmez.
+        fallback = Path.home() / "Usta"
+        try:
+            fallback.mkdir(exist_ok=True)
+            projects.check_root(home, fallback)
+        except (OSError, ValueError) as e2:
+            print(f"hata: {e}\n(otomatik klasör de kurulamadı: {e2})", file=sys.stderr)
+            return 2
+        print(
+            f"Bulunduğun yer ({root}) çalışma klasörü olamaz. Senin için bir klasör kurdum:\n"
+            f"  {fallback.resolve()}\nUsta'ya yaptırdığın dosyalar buraya yazılacak.",
+            flush=True,
+        )
+        root = fallback.resolve()
     extra = _extra_body(args)
     if extra is None:
         return 2

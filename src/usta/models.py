@@ -144,7 +144,12 @@ class OpenAICompatClient:
             data = r.json()
             msg = data["choices"][0]["message"]
         except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
-            raise ModelError(f"model isteği başarısız: {type(e).__name__}", infra=True) from e
+            detail = (
+                f"HTTP {e.response.status_code}"
+                if isinstance(e, httpx.HTTPStatusError)
+                else type(e).__name__
+            )
+            raise ModelError(f"model isteği başarısız: {detail}", infra=True) from e
         self.usage.requests += 1
         used = data.get("usage") if isinstance(data, dict) else None
         if isinstance(used, dict):

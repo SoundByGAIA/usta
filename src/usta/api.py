@@ -10,6 +10,7 @@ import mimetypes
 import os
 import re
 import secrets
+import time
 from collections import deque
 from pathlib import Path
 from typing import Annotated, Literal
@@ -37,6 +38,7 @@ from usta.audit import AuditLog
 from usta.auth import LoginCodes
 from usta.mcp import McpClient, McpError
 from usta.modelctl import ModelSwitchError
+from usta.models import Message, ModelError
 from usta.policy import PathEscapeError, resolve_path
 from usta.tasks import PlanNotFound, RevertRefused, TaskFinished, TaskManager, WorkspaceBusy
 
@@ -152,6 +154,27 @@ class SettingsIn(BaseModel):
     zoom: Literal["auto", "0.9", "1", "1.1", "1.25", "1.5", "1.75"] | None = None
     think: Literal["auto", "off", "low", "medium", "high"] | None = None
     context_window: int | None = Field(default=None, ge=0, le=2_000_000)  # 0: otomatik (sınır yok)
+
+
+def friendly_model_error(text: str) -> str:
+    """Model hatasını kodsuz bir kullanıcıya anlaşılır cümleye çevirir."""
+    if "HTTP 401" in text or "HTTP 403" in text:
+        return (
+            "Anahtar kabul edilmedi. Doğru kopyaladığından ve hesabında bakiye olduğundan emin ol."
+        )
+    if "HTTP 402" in text:
+        return "Hesabında bakiye yok görünüyor. Servisin sayfasından bakiye yükle."
+    if "HTTP 404" in text:
+        return "Bu model bulunamadı. Listeden başka bir model seç."
+    if "HTTP 429" in text:
+        return "Çok fazla istek gönderildi ya da kota doldu. Biraz bekleyip tekrar dene."
+    if "ConnectError" in text or "ConnectTimeout" in text:
+        return "Servise ulaşılamıyor. İnternet bağlantını ya da programın açık olduğunu kontrol et."
+    if "Timeout" in text:
+        return (
+            "Model zamanında cevap vermedi. Büyük modeller ilk istekte yavaş olabilir; tekrar dene."
+        )
+    return "Model cevap vermedi. Ayrıntı: " + text
 
 
 class LocalScanIn(BaseModel):
@@ -732,6 +755,23 @@ def create_app(
         except apis.ApiError as e:
             raise HTTPException(409 if "zaten" in str(e) else 400, str(e)) from None
         return {"name": a.name}
+
+    @api.post("/setup/ping")
+    def setup_ping() -> dict:
+        """Sihirbazın son denemesi: seçili modele tek kısa istek atar, anlaşılır bir sonuç döner."""
+        ctl = manager.model_control
+        if ctl is None or not ctl.ready:
+            raise HTTPException(409, "önce bir model seç")
+        t0 = time.monotonic()
+        try:
+            r = ctl.current().chat([Message(role="user", content="Merhaba de, tek kelime yaz.")])
+        except ModelError as e:
+            return {"ok": False, "error": friendly_model_error(str(e))}
+        return {
+            "ok": True,
+            "seconds": round(time.monotonic() - t0, 1),
+            "reply": (r.content or "")[:200],
+        }
 
     @api.get("/privacy")
     def get_privacy() -> dict:

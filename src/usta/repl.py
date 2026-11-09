@@ -149,7 +149,7 @@ class Repl:
 
     def _banner(self) -> None:
         self.say(
-            f"Usta · {self.model_name} · {self.root.name} · mod: {MODE_LABELS[self.mode]} · tema: {self.settings.theme}",
+            f"Usta · {self.model_name or 'model seçilmedi'} · {self.root.name} · mod: {MODE_LABELS[self.mode]} · tema: {self.settings.theme}",
             "title",
         )
         self.say(f"Çalışma klasörü: {self.root}  (dosyalar buraya yazılır)", "dim")

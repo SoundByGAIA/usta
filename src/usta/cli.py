@@ -240,6 +240,11 @@ def _parser() -> argparse.ArgumentParser:
         "-w", "--workspace", default=".", help="proje dizini (varsayılan: bulunduğun dizin)"
     )
     p.add_argument("--no-portal", action="store_true", help="web portalını başlatma")
+    p.add_argument(
+        "--setup",
+        action="store_true",
+        help="model seçilmemişse terminalde sormadan tarayıcıdaki kurulum sihirbazıyla başla (terminalde model bulunamazsa kendiliğinden de açılır)",
+    )
     p.add_argument("--no-browser", action="store_true", help="portalı başlat ama tarayıcıyı açma")
     p.add_argument("--port", type=int, help="portal portu (varsayılan 8765, doluysa boş bir port)")
     p.add_argument("--mode", help="başlangıç modu: manuel | oto | plan")
@@ -1234,12 +1239,21 @@ def _chat_cmd(args: argparse.Namespace) -> int:
     if explicit and explicit not in PROTOCOLS:
         print(f"hata: protokol native|json|text olmalı: {explicit}", file=sys.stderr)
         return 2
+    setup = False
     if not name:
-        name = _pick_model(endpoint, home, cur)
-        if name is None:
-            return 2
+        # Terminalde seçilebilecek model varsa eski seçici; yoksa ve portal açıksa kurulum modu (sihirbaz).
+        can_pick = sys.stdin.isatty() and bool(_discover_models(endpoint))
+        in_terminal = sys.stdin.isatty() and not can_pick
+        if cur.portal and not args.no_portal and (args.setup or in_terminal):
+            setup = True
+            name = ""
+            print("Model seçilmedi: tarayıcıdaki kurulum sihirbazını tamamla.", flush=True)
+        else:
+            name = _pick_model(endpoint, home, cur)
+            if name is None:
+                return 2
     protocol = explicit or "native"
-    if not explicit:  # yetenek sondası: önbellekte yoksa birkaç küçük istekle ölç
+    if not explicit and not setup:  # yetenek sondası: önbellekte yoksa birkaç küçük istekle ölç
         print(f"{name} tanınıyor (ilk seferde birkaç küçük istek)…", flush=True)
         try:
             prof = profile.resolve_protocol(

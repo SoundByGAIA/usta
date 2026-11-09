@@ -81,3 +81,98 @@ def test_local_endpoints_require_auth_and_validate(tmp_path, monkeypatch):
         ).status_code
         == 422
     )
+
+
+# --- bellek, öneri, indirme -------------------------------------------------------------------
+def test_recommend_by_memory_tiers():
+    assert localmodels.recommend(4)["model"] is None  # çok az bellek: yerel önerilmez
+    assert "internet servisi" in localmodels.recommend(4)["reason"]
+    assert localmodels.recommend(8)["model"] == localmodels.MODEL_SMALL["name"]
+    assert localmodels.recommend(16)["model"] == localmodels.MODEL_MEDIUM["name"]
+    assert (
+        localmodels.recommend(None)["model"] == localmodels.MODEL_SMALL["name"]
+    )  # bilinmiyor: güvenli taraf
+
+
+def test_memory_gb_reads_meminfo(monkeypatch):
+    import builtins
+    import io
+
+    monkeypatch.setattr(localmodels.sys, "platform", "linux")
+    real_open = builtins.open
+    monkeypatch.setattr(
+        builtins,
+        "open",
+        lambda p, *a, **k: (
+            io.StringIO("MemTotal:       16777216 kB\nMemFree: 1 kB\n")
+            if p == "/proc/meminfo"
+            else real_open(p, *a, **k)
+        ),
+    )
+    assert localmodels.memory_gb() == 16.0
+
+
+class _FakeStream:
+    def __init__(self, lines, status=200):
+        self.lines, self.status_code = lines, status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def iter_lines(self):
+        return iter(self.lines)
+
+
+def _wait(job):
+    import time
+
+    for _ in range(100):
+        if not job.snapshot()["active"]:
+            return job.snapshot()
+        time.sleep(0.02)
+    raise AssertionError("indirme bitmedi")
+
+
+def test_pull_reports_progress_and_success(monkeypatch):
+    lines = [
+        '{"status":"pulling manifest"}',
+        '{"status":"pulling abc","total":1000,"completed":250}',
+        '{"status":"pulling abc","total":1000,"completed":1000}',
+        '{"status":"success"}',
+    ]
+    monkeypatch.setattr(httpx, "stream", lambda *a, **k: _FakeStream(lines))
+    job = localmodels.PullJob()
+    job.start(11434, "qwen2.5-coder:7b")
+    s = _wait(job)
+    assert s["done"] is True and s["error"] is None and (s["completed"], s["total"]) == (1000, 1000)
+
+
+def test_pull_translates_errors_and_rejects_bad_names_and_parallel_runs(monkeypatch):
+    monkeypatch.setattr(
+        httpx,
+        "stream",
+        lambda *a, **k: _FakeStream(['{"error":"pull model manifest: file does not exist"}']),
+    )
+    job = localmodels.PullJob()
+    job.start(11434, "yok:1b")
+    assert "bulunamadı" in _wait(job)["error"]
+    with pytest.raises(localmodels.LocalError):
+        job.start(11434, "../kotu")
+    job.state = {"active": True}
+    with pytest.raises(localmodels.LocalError, match="sürüyor"):
+        job.start(11434, "m:1b")
+
+
+def test_system_info_and_pull_endpoints(tmp_path, monkeypatch):
+    monkeypatch.setattr(localmodels, "memory_gb", lambda: 8.0)
+    monkeypatch.setattr(httpx, "get", _fake_get({}))  # Ollama kapalı
+    c, _ = make_client(tmp_path, Scripted())
+    assert c.get("/system/info").status_code == 401
+    d = c.get("/system/info", headers=AUTH).json()
+    assert d["ram_gb"] == 8.0 and d["ollama_running"] is False
+    assert d["recommend"]["model"] == localmodels.MODEL_SMALL["name"]
+    assert c.get("/local/pull", headers=AUTH).status_code == 200
+    assert c.post("/local/pull", json={"model": "../x"}, headers=AUTH).status_code == 400

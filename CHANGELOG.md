@@ -1,5 +1,15 @@
 # Değişiklik günlüğü
 
+## 0.3.2 — kodsuz kullanıcı testinin 1. turundan sihirbaz iyileştirmeleri
+
+Notlar: [docs/kullanici-testi-2026-11-09.md](docs/kullanici-testi-2026-11-09.md). Model davranışı DEĞİŞMEDİ.
+
+- **Karşılama ekranı:** "Yapay zekâ nerede çalışsın?" artık iki seçeneği artı/eksileriyle yan yana gösterir ve bilgisayarının belleğine bakarak bir öneri yazar.
+- **Yerel model rehberi:** bilgisayarın belleği bulunur ve ona göre model önerilir (6 GB altı: yerel önerilmez; 6-12 GB: `qwen3:4b-instruct-2507-q4_K_M`, 2,5 GB; 12 GB ve üstü: `qwen2.5-coder:7b`, 4,7 GB; yalnız bizim çalıştırıp denediğimiz modeller). Ollama kurulu/açık değilse adım adım kurulum kartı; model yoksa **tek tıkla indirme** ve ilerleme çubuğu (Ollama `/api/pull`). Öneriler denenmiş modellerle sınırlıdır; büyük modeller önerilmez (ölçülmedi).
+- **Servis başına anahtar anlatımı:** her servis için adım adım yönerge, resmî anahtar sayfasına tıklanabilir bağlantı ve açık bir not. "Ücretsiz seçenekler" ayrı gruplanır: Google Gemini (ücretsiz kota; ücretsiz katmanda verinin ürün geliştirmede kullanılabileceği uyarısıyla) ve OpenRouter (`openrouter/free`; `openrouter/auto` ücretlidir, uyarı yazar). DeepSeek ve OpenAI "ücretli" etiketli.
+- **Bekleme geri bildirimi:** model seçilince yetenek ölçümü yarım dakika sürebiliyordu ve ekran sessizdi; artık "Modeli tanıyorum, bu yarım dakika sürebilir" yazar ve düğmeler kilitlenir.
+- Not (eklenmeyenler): OpenCode'un ücretsiz modelleri resmî sayfasına göre yalnız OpenCode uygulamasında çalışır ("Free-tier chat models require OpenCode"), Usta gibi başka istemcilerden kullanılamaz; Claude'un OpenAI-uyumlu ucu "deneme amaçlı" etiketli ve `/models` desteği doğrulanamadığından eklenmedi.
+
 ## 0.3.1 — Windows'ta yönetici olmayan kullanıcı için açılış düzeltmeleri
 
 İlk gerçek kodsuz kullanıcı testinin (Windows 10, normal hesap) bulduğu iki engel. Notlar: [docs/kullanici-testi-2026-11-09.md](docs/kullanici-testi-2026-11-09.md).

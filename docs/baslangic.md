@@ -23,9 +23,10 @@ Usta, ne istediğini yazdığında bunu senin için yapan bir yapay zekâ yardı
 - Tarayıcın kendiliğinden açılır. Açılmazsa siyah pencereye `/portal link` yaz ve çıkan bağlantıyı tarayıcıya yapıştır.
 
 **5. Kurulum ekranı**
-- Tarayıcıda "Hoş geldin" ekranı çıkar. İki seçenek vardır:
-  - **İnternet servisiyle:** Hızlı ve güçlüdür. Bir servisten (ör. Google Gemini, DeepSeek) **anahtar** almalısın. Anahtar, uzun bir şifre gibi bir yazıdır; servisin sitesinde hesap açınca "API keys" yazan yerden alırsın. Ekrandaki kutuya yapıştır, "Dene"ye bas. Yazdıkların o servisin sunucusuna gider, kullandıkça ücret çıkabilir.
-  - **Bilgisayarımda:** Ücretsizdir, yazdıkların bilgisayarından çıkmaz. Önce `ollama.com`dan Ollama programını kurup bir model indirmen gerekir. Küçük modeller basit işleri yapar, zor işlerde zayıf kalabilir.
+- Tarayıcıda "Yapay zekâ nerede çalışsın?" ekranı çıkar. İki seçeneğin artıları ve eksileri yazılıdır, altında da senin bilgisayarına göre bir öneri vardır.
+  - **İnternet servisiyle** (çoğu kişi için önerilir): Daha güçlü ve hızlıdır. Bir servisten **anahtar** almalısın (uzun bir şifre gibi bir yazı). Ekran, her servis için adımları ve anahtar sayfasının bağlantısını gösterir; yaklaşık 5-10 dakika sürer. **Ücretsiz seçenekler:** Google Gemini ve OpenRouter (ücretsiz katmanlarında günlük istek sınırı düşüktür ve yazdıkların servis tarafından ürün geliştirmede kullanılabilir). DeepSeek ve OpenAI ücretlidir.
+  - **Bilgisayarımda**: Ücretsizdir ve yazdıkların bilgisayarından çıkmaz. Ekran bilgisayarının belleğine bakıp sana bir model önerir ve adım adım yürütür: önce Ollama programını kurarsın, sonra "İndir" düğmesiyle modeli indirirsin (2-5 GB, ilerleme çubuğu görünür). Küçük modeller basit işlerde iyidir, zor işlerde başarısız olabilir.
+- Model seçince Usta modeli tanımak için yarım dakikaya kadar bekler ("Modeli tanıyorum" yazar), bu sırada başka bir şeye basma.
 - Sonunda "Hazır!" yazar. Altındaki örneklerden birine bas ve dene.
 
 ## Tabletten ya da telefondan kullanmak

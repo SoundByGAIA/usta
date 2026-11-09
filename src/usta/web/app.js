@@ -888,92 +888,226 @@
 
 
   // --- kurulum sihirbazı (kodsuz kullanıcı için: "API/endpoint/token" yok) ---
+  // Servis bilgileri resmî sayfalardan doğrulandı (2026-11-09). Ücretsiz katman iddiası yalnız doğrulananlar için.
   const WIZ_SERVICES = [
-    { id: "deepseek", label: "DeepSeek", endpoint: "https://api.deepseek.com/v1", hint: "deepseek.com sitesinde hesap aç, \"API keys\" bölümünden bir anahtar oluştur.", prefer: "deepseek-chat" },
-    { id: "gemini", label: "Google Gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai", hint: "aistudio.google.com sitesinde Google hesabınla giriş yap ve bir anahtar oluştur.", prefer: "gemini-2.5-flash" },
-    { id: "openrouter", label: "OpenRouter", endpoint: "https://openrouter.ai/api/v1", hint: "openrouter.ai sitesinde hesap aç; tek anahtarla birçok modele erişirsin.", prefer: "" },
-    { id: "openai", label: "OpenAI", endpoint: "https://api.openai.com/v1", hint: "platform.openai.com sitesinde hesap aç ve \"API keys\" bölümünden anahtar oluştur.", prefer: "" },
+    { id: "gemini", label: "Google Gemini", free: true, endpoint: "https://generativelanguage.googleapis.com/v1beta/openai",
+      url: "https://aistudio.google.com/apikey", linkText: "Google AI Studio anahtar sayfasını aç",
+      steps: ["Sayfa açılınca Google hesabınla giriş yap.", "\"Create API key\" (anahtar oluştur) düğmesine bas.", "Çıkan uzun yazıyı kopyala ve aşağıdaki kutuya yapıştır."],
+      note: "Ücretsiz kotası var, ama günlük istek sınırı düşüktür ve Google bunu değiştirebilir. Ücretsiz katmanda yazdıkların Google'ın ürünlerini geliştirmek için kullanılabilir (Google'ın koşullarına bak).",
+      prefer: "gemini-2.5-flash" },
+    { id: "openrouter", label: "OpenRouter", free: true, endpoint: "https://openrouter.ai/api/v1",
+      url: "https://openrouter.ai/keys", linkText: "OpenRouter anahtar sayfasını aç",
+      steps: ["Sayfa açılınca hesap aç (e-posta ya da Google ile) ve giriş yap.", "Anahtar oluştur düğmesine bas ve bir ad ver.", "Çıkan uzun yazıyı kopyala ve aşağıdaki kutuya yapıştır."],
+      note: "Ücretsiz kalmak için \"openrouter/free\" modelini seç (sihirbaz onu önerir). \"openrouter/auto\" ücretli modellere yönlendirir. Ücretsiz modellerin günlük istek sınırı düşüktür; bazı ücretsiz modellerde sağlayıcı yazdıklarını kaydedebilir.",
+      prefer: "openrouter/free" },
+    { id: "deepseek", label: "DeepSeek", free: false, endpoint: "https://api.deepseek.com/v1",
+      url: "https://platform.deepseek.com/api_keys", linkText: "DeepSeek anahtar sayfasını aç",
+      steps: ["Sayfa açılınca hesap aç ve giriş yap.", "Hesabına bakiye yükle (bakiye yoksa anahtar çalışmaz).", "\"API keys\" sayfasında anahtar oluştur ve kopyala."],
+      note: "Ücretlidir: kullandıkça bakiyeden düşer.", prefer: "deepseek-chat" },
+    { id: "openai", label: "OpenAI (GPT)", free: false, endpoint: "https://api.openai.com/v1",
+      url: "https://platform.openai.com/api-keys", linkText: "OpenAI anahtar sayfasını aç",
+      steps: ["Sayfa açılınca hesap aç ve giriş yap.", "Kullanmak için ödeme bilgisi ekle ya da kredi yükle.", "\"API keys\" sayfasında anahtar oluştur ve kopyala."],
+      note: "Ücretlidir.", prefer: "" },
   ];
   const WIZ_STEPS = ["wiz-start", "wiz-local-step", "wiz-cloud-step", "wiz-test-step"];
   const WIZ_EXAMPLES = ["Bir hesap makinesi web sayfası yap.", "Bu klasördeki dosyaları incele ve ne işe yaradıklarını kısaca anlat.", "Bugünün tarihini büyük yazıyla gösteren basit bir sayfa yap."];
   const wizMsg = (t, c) => { const m = $("wiz-msg"); m.textContent = t || ""; m.className = c || "empty"; };
-  function wizShow(id) { for (const s of WIZ_STEPS) $(s).hidden = s !== id; wizMsg(""); }
+  function wizBusy(on, text) { $("wizard").classList.toggle("wiz-busy", !!on); wizMsg(on ? text : "", on ? "ok" : "empty"); }
+  function wizShow(id) {
+    for (const s of WIZ_STEPS) $(s).hidden = s !== id;
+    wizMsg("");
+    if (id === "wiz-start") wizReco();
+  }
   function openWizard() { if ($("wizard").hidden) togglePanel("wizard"); else wizShow("wiz-start"); }
   const trimSlash = (u) => String(u || "").replace(/\/+$/, "");
+  function wizLink(url, text) {
+    const a = h("a", "wiz-link", text);
+    a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
+    return a;
+  }
+
+  async function wizReco() {
+    const el = $("wiz-reco-text");
+    el.textContent = "Bilgisayarına bakıyorum…";
+    let d = null;
+    try { const r = await api("/system/info"); if (r.ok) d = await r.json(); } catch (_) { /* yoksay */ }
+    const ram = d && d.ram_gb ? `${d.ram_gb} GB` : null;
+    if (d && d.recommend && !d.recommend.model) {
+      el.textContent = `Bilgisayarının belleği az (${ram}). İnternet servisiyle başla; ücretsiz seçenek olarak Google Gemini'yi deneyebilirsin.`;
+    } else {
+      el.textContent = "Yeni başlıyorsan ve anahtar almaktan çekinmiyorsan: İnternet servisiyle başla, ücretsiz seçenek olarak Google Gemini'yi dene. "
+        + `Yazdıklarının bilgisayarından çıkmaması senin için çok önemliyse: Bilgisayarımda${ram ? ` (belleğin ${ram}, bu iş için uygun)` : ""}, ama zor işlerde zayıf kalabileceğini bil.`;
+    }
+  }
 
   async function wizUse(apiName, model) {
-    const r = await api("/model", { method: "PUT", body: JSON.stringify({ model, api: apiName }) });
+    wizBusy(true, "Modeli tanıyorum, bu yarım dakika sürebilir. Lütfen bekle…");
+    let r;
+    try { r = await api("/model", { method: "PUT", body: JSON.stringify({ model, api: apiName }) }); }
+    finally { wizBusy(false); }
     if (!r.ok) { wizMsg(await errorText(r), "error"); return; }
     await loadModels();
     wizTest();
   }
+  async function wizEnsureLocalApi() {
+    const endpoint = "http://127.0.0.1:11434/v1";
+    const rows = await (await api("/apis")).json();
+    const row = rows.find((a) => trimSlash(a.endpoint) === endpoint);
+    if (row) return row.name;
+    const r = await api("/apis", { method: "POST", body: JSON.stringify({ name: "ollama", endpoint }) });
+    if (!r.ok) throw new Error(await errorText(r));
+    return "ollama";
+  }
+  const fmtGb = (n) => `${(n / 1073741824).toFixed(1)} GB`;
+  let wizPullTimer = null;
+  function wizStopPull() { clearTimeout(wizPullTimer); wizPullTimer = null; }
+
   async function wizLocal() {
+    wizStopPull();
     wizShow("wiz-local-step");
     const body = $("wiz-local-body");
-    body.replaceChildren(h("p", null, "Bilgisayarında arıyorum…"));
-    const res = await api("/local/scan", { method: "POST", body: "{}" });
+    body.replaceChildren(h("p", null, "Bilgisayarına bakıyorum…"));
+    const res = await api("/system/info");
     if (!res.ok) { body.replaceChildren(h("p", "error", await errorText(res))); return; }
-    const found = await res.json();
-    const f = found.find((x) => x.models.length);
-    if (!f) {
-      body.replaceChildren(h("p", null, found.length
-        ? "Model programı çalışıyor ama içinde indirilmiş model yok. Önce bir model indir, sonra \"Tekrar ara\"ya bas."
-        : "Bilgisayarında çalışan bir model programı bulamadım. Ollama programını kur (ollama.com), bir model indir, programın açık olduğundan emin ol ve \"Tekrar ara\"ya bas."));
+    const d = await res.json();
+    const rec = d.recommend || {};
+    const out = [h("p", null, d.ram_gb ? `Bilgisayarının belleği: ${d.ram_gb} GB.` : "Bilgisayarının belleğini öğrenemedim.")];
+    if (!rec.model) {
+      out.push(h("p", null, rec.reason || ""));
+      const go = h("button", "primary", "İnternet servisine geç");
+      go.type = "button"; go.addEventListener("click", wizCloud);
+      body.replaceChildren(...out, go);
       return;
     }
-    body.replaceChildren(h("p", null, `${f.name} bulundu. Hangi modeli kullanalım?`));
-    for (const m of f.models) {
-      const b = h("button", "card wiz-choice");
-      b.type = "button";
-      b.append(h("strong", null, m));
-      b.addEventListener("click", async () => {
-        const rows = await (await api("/apis")).json();
-        let row = rows.find((a) => trimSlash(a.endpoint) === trimSlash(f.endpoint));
-        if (!row) {
-          row = { name: `yerel-${f.port}` };
-          const r = await api("/apis", { method: "POST", body: JSON.stringify({ name: row.name, endpoint: f.endpoint }) });
-          if (!r.ok) { wizMsg(await errorText(r), "error"); return; }
-        }
-        wizUse(row.name, m);
-      });
-      body.appendChild(b);
+    out.push(h("p", null, rec.reason));
+    if (!d.ollama_running) {
+      const card = h("div", "card");
+      card.append(h("strong", null, "1. Ollama programını kur"),
+        h("p", null, "Ollama, yapay zekâ modellerini bilgisayarında çalıştıran ücretsiz bir programdır."),
+        wizLink("https://ollama.com/download", "Ollama indirme sayfasını aç"));
+      const ol = h("ol", "wiz-steps");
+      for (const t of ["İndirdiğin dosyayı aç ve kur.", "Kurulum bitince Ollama'yı bir kez aç (Başlat menüsünde \"Ollama\").", "Bu pencereye dön ve aşağıdaki \"Tekrar ara\" düğmesine bas."]) ol.appendChild(h("li", null, t));
+      card.appendChild(ol);
+      body.replaceChildren(...out, card);
+      return;
+    }
+    const have = (d.installed || []).includes(rec.model);
+    const card = h("div", "card");
+    if (!have) {
+      card.append(h("strong", null, `2. Modeli indir: ${rec.model}`),
+        h("p", null, `Yaklaşık ${rec.size_gb} GB indirir. Hızlı internetle birkaç dakika sürer, yavaşta daha uzun. İndirirken bu pencereyi kapatma.`));
+      const dl = h("button", "primary", `İndir (≈ ${rec.size_gb} GB)`);
+      dl.type = "button";
+      dl.addEventListener("click", () => wizPull(rec.model, card));
+      card.appendChild(dl);
+    } else {
+      card.append(h("strong", null, `Önerilen model zaten kurulu: ${rec.model}`));
+      const use = h("button", "primary", "Bunu kullan");
+      use.type = "button";
+      use.addEventListener("click", async () => { try { wizUse(await wizEnsureLocalApi(), rec.model); } catch (e) { wizMsg(String(e.message || e), "error"); } });
+      card.appendChild(use);
+    }
+    body.replaceChildren(...out, card);
+    const others = (d.installed || []).filter((m) => m !== rec.model);
+    if (others.length) {
+      body.appendChild(h("p", "wiz-group", "Bilgisayarında kurulu diğer modeller:"));
+      for (const m of others) {
+        const b = h("button", "card wiz-choice");
+        b.type = "button"; b.append(h("strong", null, m));
+        b.addEventListener("click", async () => { try { wizUse(await wizEnsureLocalApi(), m); } catch (e) { wizMsg(String(e.message || e), "error"); } });
+        body.appendChild(b);
+      }
     }
   }
+  async function wizPull(model, card) {
+    const r = await api("/local/pull", { method: "POST", body: JSON.stringify({ model }) });
+    if (!r.ok && r.status !== 409) { wizMsg(await errorText(r), "error"); return; }
+    const bar = h("progress", "wiz-progress"); bar.max = 100; bar.value = 0;
+    const label = h("p", "note", "İndirme başlıyor…");
+    card.replaceChildren(h("strong", null, `İndiriliyor: ${model}`), bar, label);
+    const poll = async () => {
+      if ($("wiz-local-step").hidden) return;  // kullanıcı başka adıma geçti
+      let s = null;
+      try { const p = await api("/local/pull"); if (p.ok) s = await p.json(); } catch (_) { /* tekrar dene */ }
+      if (s && s.error) {
+        card.replaceChildren(h("p", "error", s.error));
+        const again = h("button", null, "Tekrar dene"); again.type = "button"; again.addEventListener("click", wizLocal);
+        card.appendChild(again);
+        return;
+      }
+      if (s && s.done) { wizLocal(); return; }
+      if (s && s.total) {
+        const pct = Math.min(100, Math.round((s.completed / s.total) * 100));
+        bar.value = pct;
+        label.textContent = `%${pct} (${fmtGb(s.completed)} / ${fmtGb(s.total)})`;
+      }
+      wizPullTimer = setTimeout(poll, 1000);
+    };
+    poll();
+  }
+
   let wizService = null;
   function wizCloud() {
+    wizStopPull();
     wizShow("wiz-cloud-step");
     wizService = null;
+    $("wiz-service-help").hidden = true;
     $("wiz-cloud-form").hidden = true;
     $("wiz-models").hidden = true;
     const box = $("wiz-services");
     box.replaceChildren();
-    for (const svc of WIZ_SERVICES) {
-      const b = h("button", "card wiz-choice");
-      b.type = "button";
-      b.append(h("strong", null, svc.label), h("span", null, svc.hint));
-      b.addEventListener("click", () => { wizService = svc; $("wiz-cloud-form").hidden = false; $("wiz-models").hidden = true; $("wiz-key").focus(); wizMsg(`${svc.label} seçildi. Anahtarı yapıştırıp "Dene"ye bas.`); });
-      box.appendChild(b);
+    const groups = [["Ücretsiz seçenekler", true], ["Ücretli servisler (bakiye ya da kredi gerekir)", false]];
+    for (const [title, free] of groups) {
+      box.appendChild(h("p", "wiz-group", title));
+      const row = h("div", "wiz-choices");
+      for (const svc of WIZ_SERVICES.filter((x) => x.free === free)) {
+        const b = h("button", "card wiz-choice");
+        b.type = "button";
+        const name = h("strong", null, svc.label);
+        name.appendChild(h("span", free ? "wiz-tag" : "wiz-tag paid", free ? "ücretsiz katmanı var" : "ücretli"));
+        b.append(name);
+        b.addEventListener("click", () => wizPickService(svc));
+        row.appendChild(b);
+      }
+      box.appendChild(row);
     }
+  }
+  function wizPickService(svc) {
+    wizService = svc;
+    const help = $("wiz-service-help");
+    const ol = h("ol", "wiz-steps");
+    for (const t of svc.steps) ol.appendChild(h("li", null, t));
+    help.replaceChildren(h("strong", null, `${svc.label}: anahtarı nasıl alırım?`), wizLink(svc.url, svc.linkText), ol, h("p", "wiz-note", svc.note));
+    help.hidden = false;
+    $("wiz-cloud-form").hidden = false;
+    $("wiz-models").hidden = true;
+    wizMsg("");
+    help.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
   async function wizTryKey(ev) {
     ev.preventDefault();
     const svc = wizService;
     const key = $("wiz-key").value.trim();
     if (!svc || !key) return;
-    wizMsg("Deniyorum…");
-    let r = await api("/apis", { method: "POST", body: JSON.stringify({ name: svc.id, endpoint: svc.endpoint, key }) });
-    if (r.status === 409) r = await api(`/apis/${svc.id}/key`, { method: "PUT", body: JSON.stringify({ key }) });
-    if (!r.ok) { wizMsg(await errorText(r), "error"); return; }
-    $("wiz-key").value = "";
-    const info = await (await api("/model")).json();
-    const g = (info.apis || []).find((x) => x.api === svc.id);
-    if (!g || !g.models.length) { wizMsg("Anahtar kabul edilmedi ya da servise ulaşılamadı. Doğru kopyaladığından emin ol ve tekrar dene.", "error"); return; }
-    const sel = $("wiz-model");
-    const list = L.chatModels(g.models, svc.prefer);
-    sel.replaceChildren(...list.map((m) => { const o = h("option", null, m.replace(/^models\//, "")); o.value = m; return o; }));
-    sel.value = list[0];
-    $("wiz-models").hidden = false;
-    wizMsg("");
+    wizBusy(true, "Anahtarı deniyorum…");
+    try {
+      let r = await api("/apis", { method: "POST", body: JSON.stringify({ name: svc.id, endpoint: svc.endpoint, key }) });
+      if (r.status === 409) r = await api(`/apis/${svc.id}/key`, { method: "PUT", body: JSON.stringify({ key }) });
+      if (!r.ok) { wizBusy(false); wizMsg(await errorText(r), "error"); return; }
+      $("wiz-key").value = "";
+      const info = await (await api("/model")).json();
+      const g = (info.apis || []).find((x) => x.api === svc.id);
+      wizBusy(false);
+      if (!g || !g.models.length) { wizMsg("Anahtar kabul edilmedi ya da servise ulaşılamadı. Doğru kopyaladığından emin ol (başında/sonunda boşluk olmasın) ve tekrar dene.", "error"); return; }
+      const sel = $("wiz-model");
+      const list = L.chatModels(g.models, svc.prefer);
+      sel.replaceChildren(...list.map((m) => { const o = h("option", null, m.replace(/^models\//, "")); o.value = m; return o; }));
+      sel.value = list[0];
+      $("wiz-models").hidden = false;
+    } catch (e) {
+      wizBusy(false);
+      wizMsg("Bir şey ters gitti, tekrar dene.", "error");
+    }
   }
   async function wizTest() {
     wizShow("wiz-test-step");

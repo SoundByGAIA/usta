@@ -11,6 +11,7 @@
     <h1>Usta</h1>
     <button id="tools-btn" type="button" aria-pressed="false">Araçlar</button>
     <button id="apis-btn" type="button" aria-pressed="false">API'ler</button>
+    <button id="privacy-btn" type="button" aria-pressed="false">Gizlilik</button>
     <form id="token-form" autocomplete="off">
       <label for="token" class="sr">Jeton</label>
       <input id="token" type="password" placeholder="Jeton (~/.usta/token)" autocomplete="off" spellcheck="false">
@@ -54,6 +55,18 @@
     </select>
     <span id="conn" role="status"></span>
   </header>
+
+  <section id="privacy" aria-label="Gizlilik" hidden>
+    <p class="note">Verinin nereye gittiğini ve nerede durduğunu burada görürsün. Bu liste o anki gerçek duruma göre hesaplanır.</p>
+    <h2>İstemlerin nereye gidiyor?</h2>
+    <div id="privacy-sends"></div>
+    <h2>Diğer yollar</h2>
+    <ul id="privacy-other"></ul>
+    <h2>Bilgisayarında tuttuklarım</h2>
+    <p id="privacy-home" class="note"></p>
+    <div id="privacy-stored"></div>
+    <p class="note">Hepsini silmek için Usta'yı kapat ve yukarıdaki klasörü sil. Tek tek silmek için ilgili dosyayı sil; Usta çalışırken ihtiyaç duyarsa yeniden oluşturur (ör. jeton yenilenir, bağladığın API'ler gider).</p>
+  </section>
 
   <section id="apis" aria-label="API'ler" hidden>
     <p class="note">Bağladığın API'lerin modelleri üstteki model listesinde görünür. İstemlerin ve açtığın dosyaların içeriği seçtiğin modelin API'sine gider. Anahtarlar yalnız bilgisayarında (<code>~/.usta/apis.json</code>, yalnız sen okuyabilirsin) durur ve ekranda bir daha gösterilmez.</p>

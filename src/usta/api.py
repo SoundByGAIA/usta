@@ -29,6 +29,7 @@ from usta import (
     mcpcatalog,
     mcpconfig,
     memory,
+    privacy,
     skills,
 )
 from usta import settings as usta_settings
@@ -731,6 +732,14 @@ def create_app(
         except apis.ApiError as e:
             raise HTTPException(409 if "zaten" in str(e) else 400, str(e)) from None
         return {"name": a.name}
+
+    @api.get("/privacy")
+    def get_privacy() -> dict:
+        ctl = manager.model_control
+        sources = [{"name": r["name"], "endpoint": r["endpoint"]} for r in api_rows()]
+        return privacy.report(
+            home, sources, ctl.api if ctl else None, getattr(manager, "allowed_hosts", None)
+        )
 
     @api.post("/local/scan")
     def local_scan(body: LocalScanIn) -> list[dict]:

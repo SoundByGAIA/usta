@@ -32,7 +32,14 @@ class Probe:
 
         class FakePortal:
             def __init__(
-                self, manager, home, token, preferred_port=8765, workspace=None, lan=False
+                self,
+                manager,
+                home,
+                token,
+                preferred_port=8765,
+                workspace=None,
+                lan=False,
+                background=False,
             ):
                 probe.portal_workspace = workspace
                 probe.portal_port = preferred_port

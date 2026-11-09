@@ -228,7 +228,7 @@ def _serve(app, host: str, port: int) -> None:
 
 
 def _approver(tool: str, args: dict) -> bool:
-    if not sys.stdin.isatty():
+    if not compat.is_tty():
         return False
     return input(f"onay: {tool} {args} — izin verilsin mi? [e/H] ").strip().lower() in {"e", "y"}
 
@@ -242,6 +242,20 @@ def _parser() -> argparse.ArgumentParser:
         "-w", "--workspace", default=None, help="proje dizini (varsayılan: bulunduğun dizin)"
     )
     p.add_argument("--no-portal", action="store_true", help="web portalını başlatma")
+    p.add_argument(
+        "--arka-plan",
+        "--background",
+        dest="background",
+        action="store_true",
+        help="siyah pencere/terminal olmadan arka planda çalış (masaüstü simgesi bunu kullanır); Ayarlar'dan kapatılır",
+    )
+    p.add_argument(
+        "--kisayol",
+        "--shortcut",
+        dest="shortcut",
+        action="store_true",
+        help="masaüstüne tek tıkla açılan bir Usta simgesi koy ve çık",
+    )
     p.add_argument(
         "--lan",
         action="store_true",
@@ -515,7 +529,7 @@ def _mcp_add(args: argparse.Namespace, command: list[str], home: Path) -> int:
     except mcpconfig.McpConfigError as e:
         print(f"hata: {e}", file=sys.stderr)
         return 2
-    interactive = sys.stdin.isatty()
+    interactive = compat.is_tty()
     where = (
         "bilgisayarında SENİN yetkilerinle çalışacak (UYUMLULUK MODU, yalıtım yok)"
         if host
@@ -1071,7 +1085,7 @@ def _discover_models(endpoint: str, key: str | None = None) -> list[str]:
 
 def _pick_model(endpoint: str, home: Path, cur: settings.Settings) -> str | None:
     """İlk çalıştırma: uç noktadaki modelleri listeler, seçileni ayarlara kaydeder."""
-    if not sys.stdin.isatty():
+    if not compat.is_tty():
         print(
             "hata: model belirtilmedi (--model, USTA_MODEL ya da ~/.usta/config.json)",
             file=sys.stderr,
@@ -1217,8 +1231,47 @@ def _probe_cmd(args: argparse.Namespace) -> int:
     return 0
 
 
+def _running_file(home: Path) -> Path:
+    return home / "running.json"
+
+
+def _reuse_running(home: Path, no_browser: bool) -> bool:
+    """Arka planda zaten çalışan bir Usta varsa yeni oturum kodu alıp tarayıcıyı açar; True döner."""
+    try:
+        info = json.loads(_running_file(home).read_text(encoding="utf-8"))
+        port = int(info["port"])
+        token = (home / "token").read_text(encoding="utf-8").strip()
+        base = f"http://127.0.0.1:{port}"
+        r = httpx.post(f"{base}/auth/code", headers={"Authorization": f"Bearer {token}"}, timeout=3)
+        r.raise_for_status()
+        code = r.json()["code"]
+    except (OSError, ValueError, KeyError, TypeError, httpx.HTTPError):
+        return False  # çalışan örnek yok ya da yanıt vermiyor: yenisini başlat
+    if not no_browser:
+        with contextlib.suppress(Exception):
+            _open_browser(f"{base}/?code={code}")
+    return True
+
+
+def _shortcut_cmd() -> int:
+    try:
+        path = compat.create_desktop_shortcut()
+    except OSError as e:
+        print(f"hata: {e}", file=sys.stderr)
+        return 2
+    print(f'Masaüstüne "Usta" simgesi koydum: {path}\nBundan sonra o simgeye çift tıklaman yeter.')
+    return 0
+
+
 def _chat_cmd(args: argparse.Namespace) -> int:
     home = _home()
+    if args.background:
+        if _reuse_running(home, args.no_browser):
+            return 0  # zaten açıktı; tarayıcı yeniden açıldı
+        # pencere yok: çıktıyı dosyaya yaz ki bir sorun olursa bakılabilsin
+        with contextlib.suppress(OSError):
+            log = open(home / "usta.log", "a", encoding="utf-8", buffering=1)  # noqa: SIM115
+            sys.stdout = sys.stderr = log
     cur = settings.load(home)
     try:
         if args.theme:
@@ -1253,9 +1306,9 @@ def _chat_cmd(args: argparse.Namespace) -> int:
     setup = False
     if not name:
         # Terminalde seçilebilecek model varsa eski seçici; yoksa ve portal açıksa kurulum modu (sihirbaz).
-        can_pick = sys.stdin.isatty() and bool(_discover_models(endpoint))
-        in_terminal = sys.stdin.isatty() and not can_pick
-        if cur.portal and not args.no_portal and (args.setup or in_terminal):
+        can_pick = compat.is_tty() and bool(_discover_models(endpoint))
+        in_terminal = compat.is_tty() and not can_pick
+        if cur.portal and not args.no_portal and (args.setup or args.background or in_terminal):
             setup = True
             name = ""
             print("Model seçilmedi: tarayıcıdaki kurulum sihirbazını tamamla.", flush=True)
@@ -1346,7 +1399,7 @@ def _chat_cmd(args: argparse.Namespace) -> int:
         taint_gate=_taint_gate(args),
         mcp_servers=lambda: _mcp_servers(home) or [],
     )
-    interactive = sys.stdin.isatty()
+    interactive = compat.is_tty()
     portal, url = None, None
     if cur.portal and not args.no_portal:
         try:
@@ -1357,6 +1410,7 @@ def _chat_cmd(args: argparse.Namespace) -> int:
                 preferred_port=args.port or 8765,
                 workspace=wid,
                 lan=args.lan,
+                background=args.background,
             )
             url = portal.start()
             pairing = portal.pairing()
@@ -1370,9 +1424,11 @@ def _chat_cmd(args: argparse.Namespace) -> int:
         except RuntimeError as e:
             print(f"uyarı: portal başlatılamadı: {e}", file=sys.stderr)
             portal = None
-    if portal is not None and interactive and not args.no_browser:
+    if portal is not None and (interactive or args.background) and not args.no_browser:
         with contextlib.suppress(Exception):  # tarayıcı açılamazsa terminal yine çalışır
             _open_browser(portal.login_page())
+    if args.background:
+        return _background_loop(home, portal, url)
     save_history = _setup_readline(home) if interactive else None
     repl = Repl(
         manager,
@@ -1394,6 +1450,29 @@ def _chat_cmd(args: argparse.Namespace) -> int:
             save_history()
         if portal is not None:
             portal.stop()
+
+
+def _background_loop(home: Path, portal, url: str | None) -> int:
+    """Arka plan kipi: REPL yok; portal `/quit` ile kapatılana kadar çalışır."""
+    if portal is None:
+        print("hata: portal başlatılamadı; arka planda çalışılamaz", file=sys.stderr)
+        return 2
+    port = int(url.rstrip("/").rsplit(":", 1)[1]) if url else 0
+    with contextlib.suppress(OSError):
+        _running_file(home).write_text(
+            json.dumps({"pid": os.getpid(), "port": port}), encoding="utf-8"
+        )
+    print(f"Usta arka planda çalışıyor: {url}", flush=True)
+    try:
+        while not portal.quit.wait(timeout=1.0):
+            pass
+    except KeyboardInterrupt:
+        pass
+    finally:
+        with contextlib.suppress(OSError):
+            _running_file(home).unlink()
+        portal.stop()
+    return 0
 
 
 def _crash(exc: BaseException) -> int:
@@ -1466,6 +1545,8 @@ def _main(argv: list[str] | None = None) -> int:
         i = argv.index("--")
         argv, command = argv[:i], argv[i + 1 :]
     args = _parser().parse_args(argv)
+    if args.cmd is None and getattr(args, "shortcut", False):
+        return _shortcut_cmd()
     if args.cmd is None:
         return _chat_cmd(args)
     if args.cmd == "mcp":

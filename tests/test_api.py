@@ -329,6 +329,7 @@ def test_settings_requires_auth_and_has_defaults(tmp_path):
         "think": "auto",
         "view": "simple",
         "context_window": 0,
+        "background": False,
         "workspace": None,
     }
 

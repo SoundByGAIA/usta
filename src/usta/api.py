@@ -11,8 +11,10 @@ import os
 import re
 import secrets
 import sys
+import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -305,6 +307,7 @@ def create_app(
     trusted_hosts: list[str] | None = None,
     pair: LoginCodes | None = None,
     lan_urls: list[str] | None = None,
+    on_quit: Callable[[], None] | None = None,
 ) -> FastAPI:
     home = Path(home)
 
@@ -523,6 +526,7 @@ def create_app(
             "think": cur.think,
             "view": cur.view,
             "context_window": cur.context_window or 0,
+            "background": on_quit is not None,
             "workspace": workspace,
         }
 
@@ -795,6 +799,14 @@ def create_app(
             "reply": (r.content or "")[:200],
         }
 
+    @api.post("/quit")
+    def quit_app() -> dict:
+        """Arka planda çalışan Usta'yı kapatır (siyah pencere olmadığı için kullanıcının başka yolu yok)."""
+        if on_quit is None:
+            raise HTTPException(404, "Usta bu modda buradan kapatılamaz (terminalden çık).")
+        threading.Timer(0.5, on_quit).start()  # yanıt gitsin, sonra kapan
+        return {"quit": True}
+
     @api.post("/pair")
     def make_pair() -> dict:
         """Tablet/telefon için kısa ömürlü eşleştirme PIN'i. Yalnız `usta --lan` ile açık."""
@@ -974,6 +986,11 @@ def create_app(
     app.include_router(api)
 
     if login is not None:  # terminalin açtığı portal: tek kullanımlık kodu jetonla takas eder
+
+        @app.post("/auth/code", dependencies=[Depends(auth)])
+        def new_login_code() -> dict:
+            """Zaten çalışan Usta'ya ikinci kez tıklanınca yeni tarayıcı oturumu için kod verir (jeton gerekir)."""
+            return {"code": login.issue()}
 
         @app.post("/auth/exchange")
         def exchange(body: CodeIn) -> dict:

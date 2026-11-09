@@ -878,7 +878,7 @@
   // --- kurulum sihirbazı (kodsuz kullanıcı için: "API/endpoint/token" yok) ---
   const WIZ_SERVICES = [
     { id: "deepseek", label: "DeepSeek", endpoint: "https://api.deepseek.com/v1", hint: "deepseek.com sitesinde hesap aç, \"API keys\" bölümünden bir anahtar oluştur.", prefer: "deepseek-chat" },
-    { id: "gemini", label: "Google Gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai", hint: "aistudio.google.com sitesinde Google hesabınla giriş yap ve bir anahtar oluştur.", prefer: "" },
+    { id: "gemini", label: "Google Gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai", hint: "aistudio.google.com sitesinde Google hesabınla giriş yap ve bir anahtar oluştur.", prefer: "gemini-2.5-flash" },
     { id: "openrouter", label: "OpenRouter", endpoint: "https://openrouter.ai/api/v1", hint: "openrouter.ai sitesinde hesap aç; tek anahtarla birçok modele erişirsin.", prefer: "" },
     { id: "openai", label: "OpenAI", endpoint: "https://api.openai.com/v1", hint: "platform.openai.com sitesinde hesap aç ve \"API keys\" bölümünden anahtar oluştur.", prefer: "" },
   ];
@@ -957,8 +957,9 @@
     const g = (info.apis || []).find((x) => x.api === svc.id);
     if (!g || !g.models.length) { wizMsg("Anahtar kabul edilmedi ya da servise ulaşılamadı. Doğru kopyaladığından emin ol ve tekrar dene.", "error"); return; }
     const sel = $("wiz-model");
-    sel.replaceChildren(...g.models.map((m) => { const o = h("option", null, m); o.value = m; return o; }));
-    if (svc.prefer && g.models.includes(svc.prefer)) sel.value = svc.prefer;
+    const list = L.chatModels(g.models, svc.prefer);
+    sel.replaceChildren(...list.map((m) => { const o = h("option", null, m.replace(/^models\//, "")); o.value = m; return o; }));
+    sel.value = list[0];
     $("wiz-models").hidden = false;
     wizMsg("");
   }

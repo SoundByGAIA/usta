@@ -154,3 +154,15 @@ test("autoScale: küçük pencere 1, büyük ekran orantılı, üst sınır 2", 
   assert.equal(L.autoScale(0, 0), 1);
   assert.equal(L.autoScale(NaN, 900), 1);
 });
+
+test("chatModels drops audio/image/embedding models and puts the preferred one first", () => {
+  const all = ["models/gemini-2.5-flash-preview-tts", "models/gemini-2.5-pro", "models/gemini-2.5-flash",
+    "models/gemini-2.5-flash-image", "models/text-embedding-004", "models/gemini-2.0-flash-live-001"];
+  assert.deepEqual(L.chatModels(all, "gemini-2.5-flash"), ["models/gemini-2.5-flash", "models/gemini-2.5-pro"]);
+  assert.deepEqual(L.chatModels(all, ""), ["models/gemini-2.5-pro", "models/gemini-2.5-flash"]);
+});
+
+test("chatModels falls back to the full list when filtering removes everything", () => {
+  assert.deepEqual(L.chatModels(["a-embed", "b-tts"], ""), ["a-embed", "b-tts"]);
+  assert.deepEqual(L.chatModels([], "x"), []);
+});

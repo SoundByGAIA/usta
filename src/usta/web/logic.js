@@ -169,7 +169,19 @@
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
-  const api = { autoScale, createSSEParser, parseDiff, summarize, isActive, authHeaders, formatTokens, usageText };
+  // Servisler ses, görsel ve gömme modellerini de listeler; kodsuz biri yanlışını seçmesin.
+  // Süzme tümünü eliyorsa tam liste döner. `prefer` (öneri) varsa başa alınır.
+  const NOT_CHAT = /(embed|tts|image|imagen|veo|audio|whisper|dall-e|moderation|transcribe|realtime|live|aqa|robotics)/i;
+  function chatModels(models, prefer) {
+    const chat = models.filter((m) => !NOT_CHAT.test(m));
+    const list = chat.length ? chat : models.slice();
+    const bare = (m) => m.replace(/^models\//, "");
+    const i = prefer ? list.findIndex((m) => bare(m) === prefer) : -1;
+    if (i > 0) list.unshift(list.splice(i, 1)[0]);
+    return list;
+  }
+
+  const api = { chatModels, autoScale, createSSEParser, parseDiff, summarize, isActive, authHeaders, formatTokens, usageText };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.UstaLogic = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

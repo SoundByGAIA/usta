@@ -696,14 +696,33 @@
   }
   function togglePanel(name) {
     const open = $(name).hidden;
-    for (const p of ["tools", "apis"]) {
+    for (const p of ["tools", "apis", "privacy"]) {
       $(p).hidden = !(open && p === name);
       $(`${p}-btn`).setAttribute("aria-pressed", String(open && p === name));
     }
     document.querySelector("main").hidden = open;
     if (!open) return;
     if (name === "tools") { toolsMsg(""); loadTools(); loadSkills(); }
+    else if (name === "privacy") loadPrivacy();
     else { apisMsg(""); loadApis(); }
+  }
+  const fmtBytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+  async function loadPrivacy() {
+    const res = await api("/privacy");
+    if (!res.ok) { $("privacy-sends").replaceChildren(h("p", "error", await errorText(res))); return; }
+    const d = await res.json();
+    const where = { "bu-bilgisayar": "bu bilgisayar", "yerel-ağ": "yerel ağ", internet: "internet" };
+    $("privacy-sends").replaceChildren(...d.sends.map((t) => h("p", null, t)));
+    const list = h("div", "models");
+    for (const a of d.apis) list.appendChild(h("span", d.model && d.model.name === a.name ? "cur" : null, `${a.name}: ${where[a.where]}`));
+    $("privacy-sends").appendChild(list);
+    $("privacy-other").replaceChildren(...d.other.map((t) => h("li", null, t)));
+    $("privacy-home").textContent = `Klasör: ${d.home}`;
+    $("privacy-stored").replaceChildren(...d.stored.map((f) => {
+      const card = h("div", "card");
+      card.append(h("strong", null, f.name), h("span", "chip", fmtBytes(f.bytes)), h("p", "empty", f.what));
+      return card;
+    }));
   }
   const toggleTools = () => togglePanel("tools");
 
@@ -1128,6 +1147,7 @@
   });
   $("tools-btn").addEventListener("click", () => togglePanel("tools"));
   $("apis-btn").addEventListener("click", () => togglePanel("apis"));
+  $("privacy-btn").addEventListener("click", () => togglePanel("privacy"));
   $("api-form").addEventListener("submit", addApi);
   $("local-scan").addEventListener("click", scanLocal);
   $("skill-upload").addEventListener("click", () => $("skill-input").click());

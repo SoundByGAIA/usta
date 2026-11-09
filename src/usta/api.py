@@ -20,7 +20,17 @@ from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from usta import apis, attachments, filetree, mcp_runtime, mcpcatalog, mcpconfig, memory, skills
+from usta import (
+    apis,
+    attachments,
+    filetree,
+    localmodels,
+    mcp_runtime,
+    mcpcatalog,
+    mcpconfig,
+    memory,
+    skills,
+)
 from usta import settings as usta_settings
 from usta.audit import AuditLog
 from usta.auth import LoginCodes
@@ -141,6 +151,16 @@ class SettingsIn(BaseModel):
     zoom: Literal["auto", "0.9", "1", "1.1", "1.25", "1.5", "1.75"] | None = None
     think: Literal["auto", "off", "low", "medium", "high"] | None = None
     context_window: int | None = Field(default=None, ge=0, le=2_000_000)  # 0: otomatik (sınır yok)
+
+
+class LocalScanIn(BaseModel):
+    port: int | None = Field(default=None, ge=1, le=65535)
+
+
+class LocalCtxIn(BaseModel):
+    port: int = Field(ge=1, le=65535)
+    model: str = Field(min_length=1, max_length=120)
+    num_ctx: int = Field(ge=256, le=2_000_000)
 
 
 class CodeIn(BaseModel):
@@ -711,6 +731,20 @@ def create_app(
         except apis.ApiError as e:
             raise HTTPException(409 if "zaten" in str(e) else 400, str(e)) from None
         return {"name": a.name}
+
+    @api.post("/local/scan")
+    def local_scan(body: LocalScanIn) -> list[dict]:
+        try:
+            return localmodels.scan(body.port)
+        except localmodels.LocalError as e:
+            raise HTTPException(400, str(e)) from None
+
+    @api.post("/local/context")
+    def local_context(body: LocalCtxIn) -> dict:
+        try:
+            return {"model": localmodels.context_variant(body.port, body.model, body.num_ctx)}
+        except localmodels.LocalError as e:
+            raise HTTPException(502 if "oluşturulamadı" in str(e) else 400, str(e)) from None
 
     @api.put("/apis/{name}/key")
     def set_api_key(name: ServerName, body: KeyIn) -> dict:

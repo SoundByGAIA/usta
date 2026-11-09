@@ -37,7 +37,7 @@
       <option value="high">Düşünme: çok</option>
     </select>
     <label for="ctx" class="sr">Bağlam</label>
-    <select id="ctx" title="Bağlam: modelin aynı anda aklında tutacağı metin miktarı. Büyük değer daha çok bellek ister.">
+    <select id="ctx" title="Bağlam: modelin aynı anda aklında tutacağı metin miktarı. Büyük değer daha çok bellek ister. Bilgisayarındaki Ollama modelinde gerçek pencereyi değiştirmek için API bölümündeki &quot;Bilgisayarımdaki model&quot; kartını kullan.">
       <option value="0">Bağlam: otomatik</option>
       <option value="4096">4K</option>
       <option value="8192">8K</option>
@@ -59,6 +59,15 @@
     <p class="note">Bağladığın API'lerin modelleri üstteki model listesinde görünür. İstemlerin ve açtığın dosyaların içeriği seçtiğin modelin API'sine gider. Anahtarlar yalnız bilgisayarında (<code>~/.usta/apis.json</code>, yalnız sen okuyabilirsin) durur ve ekranda bir daha gösterilmez.</p>
     <h2>Bağlı API'ler</h2>
     <div id="apis-list"></div>
+    <h2>Bilgisayarımdaki model</h2>
+    <div class="card" id="local-card">
+      <p class="note">Ollama ya da LM Studio gibi programlar modeli bilgisayarında bir port üzerinden sunar. "Bul" bu portları arar; yalnız kendi bilgisayarına bakar, internete hiçbir şey çıkmaz.</p>
+      <div class="key-row">
+        <input id="local-port" type="number" min="1" max="65535" placeholder="Port (boş bırakırsan yaygın olanları ararım)" aria-label="Port">
+        <button id="local-scan" type="button">Bul</button>
+      </div>
+      <div id="local-found"></div>
+    </div>
     <h2>API ekle</h2>
     <form id="api-form" class="card" autocomplete="off">
       <div class="key-row"><input id="api-name" placeholder="ad (ör. deepseek)" maxlength="30" pattern="[a-z0-9][a-z0-9_\-]{0,29}" required aria-label="API adı"></div>

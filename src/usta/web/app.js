@@ -798,6 +798,62 @@
     loadApis(); loadModels();
   }
 
+  // --- bilgisayarımdaki model ---
+  const LOCAL_SLUG = { 11434: "ollama", 1234: "lm-studio", 8080: "llama-cpp", 8000: "vllm" };
+  const CTX_CHOICES = [4096, 8192, 16384, 32768, 65536, 131072];
+  async function scanLocal() {
+    const box = $("local-found");
+    box.replaceChildren();
+    const raw = $("local-port").value.trim();
+    const body = raw ? { port: Number(raw) } : {};
+    const res = await api("/local/scan", { method: "POST", body: JSON.stringify(body) });
+    if (!res.ok) { apisMsg(await errorText(res), "error"); return; }
+    const found = await res.json();
+    if (!found.length) { box.appendChild(h("p", "empty", "Bu portlarda çalışan bir model sunucusu bulamadım. Program açık mı?")); return; }
+    for (const f of found) {
+      const card = h("div", "card");
+      card.append(h("strong", null, `${f.name} (port ${f.port})`), h("code", "cmd", f.endpoint));
+      const models = h("div", "models");
+      for (const m of f.models) models.appendChild(h("span", null, m));
+      if (!f.models.length) models.appendChild(h("span", null, "model yok"));
+      card.appendChild(models);
+      const add = h("button", "primary", "Ekle");
+      add.type = "button";
+      add.addEventListener("click", async () => {
+        const name = LOCAL_SLUG[f.port] || `yerel-${f.port}`;
+        const r = await api("/apis", { method: "POST", body: JSON.stringify({ name, endpoint: f.endpoint }) });
+        if (r.ok) { apisMsg(`Eklendi (${name}); modeller model listesinde görünür.`, "ok"); loadApis(); loadModels(); }
+        else apisMsg(await errorText(r), "error");
+      });
+      const actions = h("div", "row");
+      actions.appendChild(add);
+      card.appendChild(actions);
+      if (f.port === 11434 && f.models.length) {
+        const row = h("div", "key-row");
+        const msel = h("select");
+        msel.setAttribute("aria-label", "Model");
+        for (const m of f.models) { const o = h("option", null, m); o.value = m; msel.appendChild(o); }
+        const csel = h("select");
+        csel.setAttribute("aria-label", "Bağlam");
+        for (const c of CTX_CHOICES) { const o = h("option", null, `${c / 1024}K`); o.value = String(c); csel.appendChild(o); }
+        csel.value = "16384";
+        const go = h("button", null, "Bağlamı uygula");
+        go.type = "button";
+        go.title = "Ollama'da bu bağlamla yeni bir model kopyası oluşturur (ağırlıklar kopyalanmaz)";
+        go.addEventListener("click", async () => {
+          go.disabled = true;
+          const r = await api("/local/context", { method: "POST", body: JSON.stringify({ port: f.port, model: msel.value, num_ctx: Number(csel.value) }) });
+          go.disabled = false;
+          if (r.ok) { const d = await r.json(); apisMsg(`Oluşturuldu: ${d.model}. Model listesinden seçebilirsin.`, "ok"); scanLocal(); loadApis(); loadModels(); }
+          else apisMsg(await errorText(r), "error");
+        });
+        row.append(msel, csel, go);
+        card.appendChild(row);
+      }
+      box.appendChild(card);
+    }
+  }
+
   // --- dosya gezgini ---
   const filesMsg = (t) => { $("files-msg").textContent = t || ""; };
   const joinPath = (dir, name) => (dir ? `${dir}/${name}` : name);
@@ -1073,6 +1129,7 @@
   $("tools-btn").addEventListener("click", () => togglePanel("tools"));
   $("apis-btn").addEventListener("click", () => togglePanel("apis"));
   $("api-form").addEventListener("submit", addApi);
+  $("local-scan").addEventListener("click", scanLocal);
   $("skill-upload").addEventListener("click", () => $("skill-input").click());
   $("skill-input").addEventListener("change", async () => { await uploadSkills($("skill-input").files); $("skill-input").value = ""; });
   $("f-refresh").addEventListener("click", () => refreshTree());

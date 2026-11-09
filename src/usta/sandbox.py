@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -28,7 +31,8 @@ def local_image_id(image: str) -> str | None:
     p = subprocess.run(
         ["docker", "image", "inspect", "-f", "{{.Id}}", image],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     return p.stdout.strip() if p.returncode == 0 and p.stdout.strip() else None
@@ -37,7 +41,11 @@ def local_image_id(image: str) -> str | None:
 def load_pins(home: Path | None = None) -> dict[str, str]:
     path = (home or _home()) / PIN_FILE
     try:
-        data = json.loads(path.read_text()) if path.is_file() and not path.is_symlink() else {}
+        data = (
+            json.loads(path.read_text(encoding="utf-8"))
+            if path.is_file() and not path.is_symlink()
+            else {}
+        )
     except (OSError, ValueError):
         return {}
     return (
@@ -113,6 +121,18 @@ class SandboxError(Exception):
     pass
 
 
+_DRIVE = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def unsafe_mount_path(path: str, windows: bool | None = None) -> bool:
+    """`-v kaynak:hedef` sözdizimini bozabilecek ':' ya da ',' var mı? Windows'ta yalnız sürücü harfi iki noktası serbesttir."""
+    if windows is None:
+        windows = sys.platform == "win32"
+    if windows and _DRIVE.match(path):
+        path = path[2:]
+    return ":" in path or "," in path
+
+
 def build_docker_args(
     cfg: SandboxConfig,
     command: list[str],
@@ -147,7 +167,7 @@ def build_docker_args(
         if not src.exists() or not dst.startswith("/") or ":" in dst:
             raise ValueError(f"geçersiz salt okunur bağlama: {src} -> {dst}")
         args += ["-v", f"{src}:{dst}:ro"]
-    if ":" in str(workdir) or "," in str(workdir):  # -v sözdizimini bozar / seçenek enjekte eder
+    if unsafe_mount_path(str(workdir)):  # -v sözdizimini bozar / seçenek enjekte eder
         raise ValueError(f"çalışma klasörü adında ':' ya da ',' olamaz: {workdir}")
     args += ["-v", f"{workdir}:/workspace:rw"]
     protected = {".git", ".usta"} | find_protected(
@@ -219,6 +239,11 @@ def run_command(
 ) -> RunResult:
     if cancel is not None and cancel.is_set():
         return RunResult(130, "", "", cancelled=True)
+    if shutil.which("docker") is None:
+        raise SandboxError(
+            "Docker bu bilgisayarda kurulu değil, bu yüzden komut çalıştırılamıyor. "
+            "Dosya okuyup yazarak devam et; yazdığın kodu çalıştırarak deneyemezsin."
+        )
     if not cfg.allowed_hosts:
         return _run_container(cfg, command, cancel)
     if session is not None:
@@ -236,7 +261,9 @@ LABELS = ["--label", "usta.managed=1", "--label", f"usta.pid={os.getpid()}"]
 
 
 def _docker(*args: str, check: bool = True) -> subprocess.CompletedProcess:
-    p = subprocess.run(["docker", *args], check=False, capture_output=True, text=True)
+    p = subprocess.run(
+        ["docker", *args], check=False, capture_output=True, encoding="utf-8", errors="replace"
+    )
     if check and p.returncode != 0:
         raise SandboxError((p.stderr.strip().splitlines() or ["docker hatası"])[-1])
     return p

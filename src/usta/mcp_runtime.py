@@ -71,7 +71,8 @@ def image_id(image: str) -> str | None:
     p = subprocess.run(
         ["docker", "image", "inspect", "-f", "{{.Id}}", image],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     return p.stdout.strip() if p.returncode == 0 and p.stdout.strip() else None

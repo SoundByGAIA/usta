@@ -69,7 +69,11 @@ class Settings:
 def load(home: Path) -> Settings:
     path = Path(home) / "config.json"
     try:
-        data = json.loads(path.read_text()) if path.is_file() and not path.is_symlink() else {}
+        data = (
+            json.loads(path.read_text(encoding="utf-8"))
+            if path.is_file() and not path.is_symlink()
+            else {}
+        )
     except (OSError, ValueError):
         return Settings()
     if not isinstance(data, dict):

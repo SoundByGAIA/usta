@@ -20,10 +20,10 @@ PAIRS = (
 
 def load(out_dir: Path) -> tuple[dict, list[dict]]:
     out_dir = Path(out_dir)
-    meta = json.loads((out_dir / "experiment.json").read_text())
+    meta = json.loads((out_dir / "experiment.json").read_text(encoding="utf-8"))
     recs = [
         json.loads(line)
-        for line in (out_dir / "runs.jsonl").read_text().splitlines()
+        for line in (out_dir / "runs.jsonl").read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
     return meta, recs
@@ -90,9 +90,10 @@ def write(out_dir: Path) -> dict:
     meta, recs = load(out_dir)
     s = summarize(recs)
     (Path(out_dir) / "results.json").write_text(
-        json.dumps({"experiment": meta, "summary": s}, ensure_ascii=False, indent=2)
+        json.dumps({"experiment": meta, "summary": s}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
-    (Path(out_dir) / "report.md").write_text(markdown(meta, recs, s))
+    (Path(out_dir) / "report.md").write_text(markdown(meta, recs, s), encoding="utf-8")
     return s
 
 

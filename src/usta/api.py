@@ -211,11 +211,11 @@ def load_or_create_token(home: Path) -> str:
     """Yönetici jetonu home/token dosyasında (0600) tutulur; repoya girmez."""
     path = Path(home) / "token"
     if path.exists():
-        return path.read_text().strip()
+        return path.read_text(encoding="utf-8").strip()
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     token = secrets.token_urlsafe(32)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "w") as f:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(token + "\n")
     return token
 
@@ -458,7 +458,7 @@ def create_app(
             raise HTTPException(409, "çalışma alanında görev sürüyor")
         try:
             full.parent.mkdir(parents=True, exist_ok=True)
-            full.write_text(body.content)
+            full.write_text(body.content, encoding="utf-8")
         except OSError:
             raise HTTPException(400, "yazılamadı") from None
         return {"path": path, "bytes": len(body.content.encode())}
@@ -898,7 +898,7 @@ def create_app(
         path = home / "audit" / f"{workspace}.jsonl"
         if not path.is_file():
             return []
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             return [json.loads(line) for line in deque(f, maxlen=limit)]
 
     @app.get("/preview/{workspace}/{key}/{path:path}", include_in_schema=False)

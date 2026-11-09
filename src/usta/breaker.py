@@ -93,7 +93,7 @@ class CircuitBreaker:
     def _on_edit(self, tool: str, args: dict) -> Trip | None:
         path = args["path"]
         try:
-            text = (self.root / path).read_text(errors="replace")
+            text = (self.root / path).read_text(errors="replace", encoding="utf-8")
         except OSError:
             text = str(args.get("content") or args.get("new") or "")
         fp = _h(text)

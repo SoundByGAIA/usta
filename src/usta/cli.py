@@ -652,7 +652,7 @@ def _bench_compare(args: argparse.Namespace) -> int:
         return 2
     print(md, end="")
     if args.out:
-        Path(args.out).write_text(md)
+        Path(args.out).write_text(md, encoding="utf-8")
     return 0
 
 
@@ -946,7 +946,8 @@ def _bench_cmd(args: argparse.Namespace) -> int:
         Path(args.out).write_text(
             json.dumps(
                 bench.report(name, protocol, results, args.arm), ensure_ascii=False, indent=2
-            )
+            ),
+            encoding="utf-8",
         )
         print(f"Rapor: {args.out}")
     return 0
@@ -1377,6 +1378,8 @@ def _chat_cmd(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     compat.utf8_console()
+    if not compat.enable_ansi():  # renk kodları çözülemiyorsa düz yazı
+        os.environ.setdefault("NO_COLOR", "1")
     argv = list(sys.argv[1:] if argv is None else argv)
     command: list[str] = []
     if (

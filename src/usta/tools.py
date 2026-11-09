@@ -102,7 +102,7 @@ def build_registry(ctx: ToolContext, extra: list[Tool] | tuple[Tool, ...] = ()) 
         return p
 
     def read_file(a: dict) -> str:
-        text = regular(resolve_path(root, a["path"])).read_text(errors="replace")
+        text = regular(resolve_path(root, a["path"])).read_text(errors="replace", encoding="utf-8")
         start, end = a.get("start"), a.get("end")
         if start is not None or end is not None:
             ok = all(isinstance(v, int) and not isinstance(v, bool) for v in (start, end))
@@ -123,7 +123,10 @@ def build_registry(ctx: ToolContext, extra: list[Tool] | tuple[Tool, ...] = ()) 
     def outline_tool(a: dict) -> str:
         try:
             return outline.outline_text(
-                a["path"], regular(resolve_path(root, a["path"])).read_text(errors="replace")
+                a["path"],
+                regular(resolve_path(root, a["path"])).read_text(
+                    errors="replace", encoding="utf-8"
+                ),
             )
         except ValueError as e:
             raise ToolError(str(e)) from e
@@ -134,7 +137,9 @@ def build_registry(ctx: ToolContext, extra: list[Tool] | tuple[Tool, ...] = ()) 
         try:
             return outline.read_symbol(
                 a["path"],
-                regular(resolve_path(root, a["path"])).read_text(errors="replace"),
+                regular(resolve_path(root, a["path"])).read_text(
+                    errors="replace", encoding="utf-8"
+                ),
                 a["name"],
             )
         except (ValueError, LookupError) as e:
@@ -179,7 +184,11 @@ def build_registry(ctx: ToolContext, extra: list[Tool] | tuple[Tool, ...] = ()) 
             )
         rel, sym = defs[0]
         budget = ctx.context_budget * (3 if expand else 1)
-        src = regular(resolve_path(root, rel)).read_text(errors="replace").splitlines()
+        src = (
+            regular(resolve_path(root, rel))
+            .read_text(errors="replace", encoding="utf-8")
+            .splitlines()
+        )
         body = "\n".join(src[sym.start - 1 : min(sym.end, sym.start + 199)])
         out = [f"{rel}:L{sym.start}-L{sym.end} {sym.kind} {sym.qualname}", body]
         fs = index.symbols_of(rel)
@@ -192,7 +201,9 @@ def build_registry(ctx: ToolContext, extra: list[Tool] | tuple[Tool, ...] = ()) 
                 out.append(f"- {_where(crel, c)}")
                 if expand:
                     csrc = (
-                        regular(resolve_path(root, crel)).read_text(errors="replace").splitlines()
+                        regular(resolve_path(root, crel))
+                        .read_text(errors="replace", encoding="utf-8")
+                        .splitlines()
                     )
                     out.append("\n".join(csrc[c.start - 1 : min(c.end, c.start + 24)]))
         callers = index.callers(sym.name)
@@ -224,16 +235,16 @@ def build_registry(ctx: ToolContext, extra: list[Tool] | tuple[Tool, ...] = ()) 
     def write_file(a: dict) -> str:
         p = regular(resolve_path(root, a["path"]))
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(a["content"])
+        p.write_text(a["content"], encoding="utf-8")
         return f"yazıldı: {a['path']} ({len(a['content'])} karakter)"
 
     def edit_file(a: dict) -> str:
         p = regular(resolve_path(root, a["path"]))
-        text = p.read_text()
+        text = p.read_text(encoding="utf-8")
         n = text.count(a["old"]) if a["old"] else 0
         if n != 1:
             raise ToolError(f"'old' metni tam bir kez geçmeli, {n} kez geçiyor")
-        p.write_text(text.replace(a["old"], a["new"], 1))
+        p.write_text(text.replace(a["old"], a["new"], 1), encoding="utf-8")
         return f"düzenlendi: {a['path']}"
 
     def list_dir(a: dict) -> str:

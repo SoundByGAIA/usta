@@ -54,7 +54,8 @@ def _git_sha() -> str:
         p = subprocess.run(
             ["git", "-C", str(Path(__file__).parent), "rev-parse", "--short", "HEAD"],
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
             timeout=5,
         )
@@ -196,7 +197,9 @@ def run_one(
     if out_dir is not None:
         d = Path(out_dir) / "traces"
         d.mkdir(parents=True, exist_ok=True)
-        (d / f"{run_id}.json").write_text(json.dumps(trace, ensure_ascii=False, indent=1))
+        (d / f"{run_id}.json").write_text(
+            json.dumps(trace, ensure_ascii=False, indent=1), encoding="utf-8"
+        )
     rec["_trace"] = trace
     return rec
 
@@ -218,7 +221,7 @@ def run_experiment(
     if out_dir is not None:
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         (Path(out_dir) / "experiment.json").write_text(
-            json.dumps(meta, ensure_ascii=False, indent=2)
+            json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         runs_file = Path(out_dir) / "runs.jsonl"
     for rep in range(1, repeat + 1):

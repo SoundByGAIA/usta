@@ -43,5 +43,5 @@ class AuditLog:
         record = mask_deep({"ts": time.time(), "event": event, **fields})
         line = mask(json.dumps(record, ensure_ascii=False))
         fd = os.open(self.path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
-        with os.fdopen(fd, "a") as f:
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
             f.write(line + "\n")

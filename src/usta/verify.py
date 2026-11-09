@@ -197,7 +197,9 @@ class Verifier:
         if tool == "write_file" and isinstance(args.get("content"), str):
             return syntax_check(path, args["content"])
         try:
-            return syntax_check(path, (Path(root) / path).read_text(errors="replace"))
+            return syntax_check(
+                path, (Path(root) / path).read_text(errors="replace", encoding="utf-8")
+            )
         except OSError:
             return None
 

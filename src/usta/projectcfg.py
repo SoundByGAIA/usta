@@ -36,7 +36,11 @@ def _key(root: Path) -> str:
 def _read(home: Path) -> dict:
     path = Path(home) / "projects.json"
     try:
-        data = json.loads(path.read_text()) if path.is_file() and not path.is_symlink() else {}
+        data = (
+            json.loads(path.read_text(encoding="utf-8"))
+            if path.is_file() and not path.is_symlink()
+            else {}
+        )
     except (OSError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}

@@ -174,7 +174,7 @@ def load_tasks(root: Path = TASKS_DIR) -> list[BenchTask]:
         spec = d / "task.json"
         if not spec.is_file():
             continue
-        data = json.loads(spec.read_text())
+        data = json.loads(spec.read_text(encoding="utf-8"))
         split = data.get("split", "dev")
         if split not in SPLITS:
             raise ValueError(f"{d.name}: bilinmeyen split {split!r}")
@@ -499,13 +499,13 @@ def _write_trace(
             "replies": recorder.replies if recorder else [],
         }
     )
-    path.write_text(json.dumps(doc, ensure_ascii=False, indent=1))
+    path.write_text(json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")
     return path.name
 
 
 def replay_trace(path: Path, *, tasks: list[BenchTask] | None = None) -> tuple[TaskResult, dict]:
     """Kaydı modelsiz yeniden oynatır; (yeni sonuç, özgün sonuç). Harness/araç tarafı kararlıysa aynı çıkar."""
-    doc = json.loads(Path(path).read_text())
+    doc = json.loads(Path(path).read_text(encoding="utf-8"))
     if doc.get("version") != TRACE_VERSION or not doc.get("replies"):
         raise ValueError(f"{path}: yeniden oynatılabilir iz değil")
     pool = tasks or load_tasks()
@@ -656,7 +656,7 @@ def wilson(passed: int, n: int, z: float = 1.96) -> tuple[float, float]:
 
 
 def load_report(path: Path) -> dict:
-    data = json.loads(Path(path).read_text())
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, dict) or "results" not in data or "model" not in data:
         raise ValueError(f"{path}: bench raporu değil")
     data.setdefault("arm", "B")  # kol alanından önce üretilen raporlar B koluydu

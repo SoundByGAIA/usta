@@ -10,7 +10,7 @@ import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from usta import theme
+from usta import theme, thinking
 
 MODES = ("manual", "auto", "plan")
 ZOOMS = ("auto", "0.9", "1", "1.1", "1.25", "1.5", "1.75")
@@ -26,6 +26,7 @@ class Settings:
     api: str | None = None  # kayıtlı API adı (apis.json); None: varsayılan uç nokta
     protocol: str | None = None
     context_window: int | None = None
+    think: str = "auto"  # auto | off | low | medium | high (bkz. thinking.py)
     portal: bool = True
     zoom: str = "auto"  # portal arayüz boyutu: auto ya da çarpan
     guard: bool = (
@@ -36,6 +37,8 @@ class Settings:
         object.__setattr__(self, "theme", theme.resolve(self.theme))
         if self.zoom not in ZOOMS:
             raise ValueError(f"geçersiz zoom: {self.zoom!r}")
+        if self.think not in thinking.THINK:
+            raise ValueError(f"geçersiz think: {self.think!r}")
         if self.mode not in MODES:
             raise ValueError(f"geçersiz mod: {self.mode!r}")
         if self.endpoint is not None and (

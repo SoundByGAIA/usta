@@ -29,6 +29,7 @@ from usta import (
     settings,
     symbols,
     theme,
+    thinking,
 )
 from usta.agent import Agent
 from usta.api import create_app, load_or_create_token
@@ -1275,7 +1276,14 @@ def _chat_cmd(args: argparse.Namespace) -> int:
         default_ep,
         name,
         protocol,
-        lambda ep, nm, pr, key: _build_model(ep, nm, pr, args.model_timeout, extra, api_key=key),
+        lambda ep, nm, pr, key: _build_model(
+            ep,
+            nm,
+            pr,
+            args.model_timeout,
+            {**thinking.extra_for(settings.load(home).think), **(extra or {})},
+            api_key=key,
+        ),
         _discover_models,
         explicit_protocol=explicit,
         default_key=os.environ.get("USTA_API_KEY"),

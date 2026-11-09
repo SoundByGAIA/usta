@@ -139,6 +139,8 @@ class SettingsIn(BaseModel):
     mode: Literal["manual", "auto", "plan"] | None = None
     guard: bool | None = None
     zoom: Literal["auto", "0.9", "1", "1.1", "1.25", "1.5", "1.75"] | None = None
+    think: Literal["auto", "off", "low", "medium", "high"] | None = None
+    context_window: int | None = Field(default=None, ge=0, le=2_000_000)  # 0: otomatik (sınır yok)
 
 
 class CodeIn(BaseModel):
@@ -454,6 +456,8 @@ def create_app(
             "mode": cur.mode,
             "guard": cur.guard,
             "zoom": cur.zoom,
+            "think": cur.think,
+            "context_window": cur.context_window or 0,
             "workspace": workspace,
         }
 
@@ -463,12 +467,31 @@ def create_app(
 
         cur = usta_settings.load(home)
         changes = {k: v for k, v in body.model_dump().items() if v is not None}
-        new = dataclasses.replace(cur, **changes)
+        if "context_window" in changes:
+            cw = changes["context_window"]
+            if cw == 0:
+                changes["context_window"] = None
+            elif cw < 256:
+                raise HTTPException(422, "bağlam en az 256 token olmalı")
         try:
+            new = dataclasses.replace(cur, **changes)
             usta_settings.save(home, new)
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from None
         except OSError:
             raise HTTPException(500, "ayar kaydedilemedi") from None
-        return {"theme": new.theme, "mode": new.mode, "guard": new.guard, "zoom": new.zoom}
+        if "context_window" in changes:
+            manager.context_window = new.context_window  # bir sonraki görevden itibaren
+        if "think" in changes and manager.model_control is not None:
+            manager.model_control.rebuild()
+        return {
+            "theme": new.theme,
+            "mode": new.mode,
+            "guard": new.guard,
+            "zoom": new.zoom,
+            "think": new.think,
+            "context_window": new.context_window or 0,
+        }
 
     # --- MCP: yalnız katalogdan ekleme; serbest komut yok (bkz. mcpcatalog) -------------------
     def mcp_servers() -> dict[str, mcpconfig.Server]:

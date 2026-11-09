@@ -28,6 +28,24 @@
       <option value="1.5">%150</option>
       <option value="1.75">%175</option>
     </select>
+    <label for="think" class="sr">Düşünme</label>
+    <select id="think" title="Düşünme: model cevap vermeden önce ne kadar düşünsün (desteklemeyen modelde etkisizdir)">
+      <option value="auto">Düşünme: model karar versin</option>
+      <option value="off">Düşünme: kapalı (hızlı)</option>
+      <option value="low">Düşünme: az</option>
+      <option value="medium">Düşünme: orta</option>
+      <option value="high">Düşünme: çok</option>
+    </select>
+    <label for="ctx" class="sr">Bağlam</label>
+    <select id="ctx" title="Bağlam: modelin aynı anda aklında tutacağı metin miktarı. Büyük değer daha çok bellek ister.">
+      <option value="0">Bağlam: otomatik</option>
+      <option value="4096">4K</option>
+      <option value="8192">8K</option>
+      <option value="16384">16K</option>
+      <option value="32768">32K</option>
+      <option value="65536">64K</option>
+      <option value="131072">128K</option>
+    </select>
     <label for="theme" class="sr">Tema</label>
     <select id="theme" title="Tema (terminalle ortak)">
       <option value="siyah">Siyah</option>

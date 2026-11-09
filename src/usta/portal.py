@@ -60,8 +60,10 @@ class Portal:
         preferred_port: int = 8765,
         workspace: str | None = None,
         lan: bool = False,
+        background: bool = False,
     ):
         self.codes = LoginCodes()
+        self.quit = threading.Event()  # arka planda: /quit bunu kurar, ana döngü kapanır
         self.lan = lan
         self.pair = LoginCodes(ttl=300.0, digits=6) if lan else None
         self._lan_urls: list[str] = []  # start() portu bilince doldurulur; API aynı listeyi görür
@@ -80,6 +82,7 @@ class Portal:
             trusted_hosts=trusted,  # DNS rebinding: başka Host başlığı reddedilir
             pair=self.pair,
             lan_urls=self._lan_urls,
+            on_quit=self.quit.set if background else None,
         )
         self._preferred = preferred_port
         self._server: uvicorn.Server | None = None

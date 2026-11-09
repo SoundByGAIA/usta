@@ -1,5 +1,19 @@
 # Değişiklik günlüğü
 
+## 0.4.0 — yeni kullanıcı dostu arayüz ve terminalsiz kullanım
+
+İlk kodsuz kullanıcı testinin (Windows 10, [docs/kullanici-testi-2026-11-09.md](docs/kullanici-testi-2026-11-09.md)) ve geri bildirim turunun sonucu. Model davranışı DEĞİŞMEDİ; bu sürüm kullanılabilirlik işidir. Windows'taki yeni parçalar (masaüstü simgesi, arka plan modu) bu notlar yazılırken gerçek Windows'ta denenmemişti.
+
+- **Basit görünüm (varsayılan) ve Gelişmiş görünüm:** Basit görünümde yalnız yazı kutusu, başlangıç işleri, sonuç ve dosyalar var; araç/API/mod/çalışma alanı gibi gelişmiş öğeler gizli. Ayarlar'dan "Gelişmiş" seçilince hepsi döner. Mevcut kullanıcılar için de varsayılan "Basit"tir; Ayarlar → Görünüm'den değiştirilir.
+- **Terminalsiz kullanım:** `python -m usta --kisayol` masaüstüne "Usta" simgesi koyar (Windows `.lnk`, Linux `.desktop`); simge Usta'yı pencere açmadan arka planda (`--arka-plan`) başlatıp tarayıcıyı açar. Zaten açıksa ikinci tıklama yeni süreç açmaz, tarayıcıyı yeniden bağlar. Ayarlar → "Usta'yı kapat" ile kapatılır. Arka plan modunun günlüğü `~/.usta/usta.log`. `kurulum/Usta-Kur.bat`: Python'u denetler, Usta'yı kurar, simgeyi koyar, açar (Windows).
+- **Başlangıç işleri ve devam önerileri:** boş ekranda tıklanabilir 6 örnek iş; her sonuçtan sonra "Rengini değiştir" gibi öneriler.
+- **Sonuç kartı:** görev bitince "Sonucu aç" (Sonuç sekmesi), "Dosyaları göster" (Dosya Gezgini'nde açar) ve sade "Yaptığı değişikliği geri al".
+- **Düz Türkçe onaylar ve ilerleme:** "Usta `index.html` dosyasını yazmak istiyor" gibi cümleler (teknik ayrıntı katlı); okunan içerikten gelen hedefler için uyarı; akışta "Dosya yazılıyor: index.html" (ham araç adı yerine). Görev hataları (429, 402, 401…) anlaşılır cümlelere çevrilir.
+- **Güven göstergesi:** üst çubukta "Bu bilgisayarda" / "Bulutta (servis)".
+- **Yeni servisler:** Claude (Anthropic; model listesi sabit, çünkü uyumluluk ucunda `/models` doğrulanamadı; Anthropic bu yolu "deneme amaçlı" etiketler) ve OpenCode (ücretli ağ geçidi; `chat/completions` ile çalışan ücretli modeller süzülerek gösterilir; ücretsiz modeller yalnız OpenCode uygulamasında çalışır). Gerçek anahtarla ikisi de henüz denenmedi.
+- **Beklenmeyen hata yakalayıcı:** ham Python hatası yerine kısa açıklama ve gizli bilgi içermeyen rapor dosyası (`~/.usta/rapor-*.txt`); yönetici yetkisiyle oluşmuş `.usta` klasörü için ayrı açıklama.
+- Düzeltme: Ofis sekmesi ilk açılışta görünür kalıyordu (`display:flex`, `hidden` özniteliğini eziyordu).
+
 ## 0.3.2 — kodsuz kullanıcı testinin 1. turundan sihirbaz iyileştirmeleri
 
 Notlar: [docs/kullanici-testi-2026-11-09.md](docs/kullanici-testi-2026-11-09.md). Model davranışı DEĞİŞMEDİ.

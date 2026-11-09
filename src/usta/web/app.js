@@ -69,6 +69,7 @@
     state.zoom = s.zoom || "auto";
     applyZoom();
     applyView(s.view);
+    $("set-quit-row").hidden = !s.background;
     $("think").value = s.think || "auto";
     const ctx = String(s.context_window || 0);
     if (![...$("ctx").options].some((o) => o.value === ctx)) {  // terminalden gelen özel değer
@@ -1545,6 +1546,16 @@
   $("view").addEventListener("change", () => { applyView($("view").value); saveSetting({ view: $("view").value }); });
   $("set-wizard").addEventListener("click", () => { if ($("wizard").hidden) togglePanel("wizard"); else wizShow("wiz-start"); });
   $("set-tablet").addEventListener("click", () => togglePanel("tablet"));
+  let quitArmed = null;
+  $("set-quit").addEventListener("click", async () => {
+    const b = $("set-quit");
+    if (!quitArmed) { b.textContent = "Emin misin? Tekrar bas"; quitArmed = setTimeout(() => { quitArmed = null; b.textContent = "Usta'yı kapat"; }, 4000); return; }
+    clearTimeout(quitArmed); quitArmed = null;
+    const r = await api("/quit", { method: "POST" });
+    if (!r.ok) { b.textContent = "Usta'yı kapat"; wizMsg(await errorText(r), "error"); return; }
+    document.body.replaceChildren(h("p", "wiz-note", "Usta kapandı. Tekrar açmak için masaüstündeki Usta simgesine çift tıkla. Bu sekmeyi kapatabilirsin."));
+    document.body.style.padding = "32px";
+  });
   $("result-open").addEventListener("click", () => showTab("preview"));
   $("result-folder").addEventListener("click", async () => {
     const r = await api(`/workspaces/${encodeURIComponent(state.ws)}/reveal`, { method: "POST" });

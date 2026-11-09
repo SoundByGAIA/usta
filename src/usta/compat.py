@@ -169,3 +169,60 @@ def open_folder(path) -> None:
         subprocess.Popen(["open", str(path)])
     else:
         subprocess.Popen(["xdg-open", str(path)])
+
+
+def is_tty() -> bool:
+    """Girdi gerçek bir terminal mi? Pencere açmayan başlatmada (pythonw) `sys.stdin` None'dır."""
+    return bool(sys.stdin) and bool(getattr(sys.stdin, "isatty", lambda: False)())
+
+
+def _ps_quote(text: str) -> str:
+    return "'" + str(text).replace("'", "''") + "'"
+
+
+def create_desktop_shortcut(name: str = "Usta", workdir=None) -> str:
+    """Masaüstüne, siyah pencere açmadan Usta'yı arka planda başlatan bir simge koyar; yolunu döndürür.
+
+    Windows: `.lnk` (pythonw.exe -m usta --arka-plan). Linux: `.desktop` dosyası. Başka sistemlerde OSError.
+    """
+    from pathlib import Path
+
+    workdir = Path(workdir) if workdir else Path.home() / "Usta"
+    workdir.mkdir(parents=True, exist_ok=True)
+    if sys.platform == "win32":
+        exe = Path(sys.executable)
+        pythonw = exe.with_name("pythonw.exe")
+        target = pythonw if pythonw.exists() else exe
+        script = (
+            "$d=[Environment]::GetFolderPath('Desktop'); "
+            f"$p=Join-Path $d {_ps_quote(name + '.lnk')}; "
+            "$s=(New-Object -ComObject WScript.Shell).CreateShortcut($p); "
+            f"$s.TargetPath={_ps_quote(target)}; $s.Arguments='-m usta --arka-plan'; "
+            f"$s.WorkingDirectory={_ps_quote(workdir)}; $s.Description='Usta yapay zeka yardımcısı'; "
+            "$s.Save(); Write-Output $p"
+        )
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=False,
+        )
+        if r.returncode != 0 or not r.stdout.strip():
+            raise OSError("masaüstü kısayolu oluşturulamadı")
+        return r.stdout.strip().splitlines()[-1]
+    if sys.platform.startswith("linux"):
+        desktop = Path.home() / "Desktop"
+        desktop.mkdir(parents=True, exist_ok=True)
+        path = desktop / f"{name}.desktop"
+        path.write_text(
+            "[Desktop Entry]\nType=Application\nName="
+            + name
+            + "\nComment=Usta yapay zeka yardımcısı\n"
+            f"Exec={sys.executable} -m usta --arka-plan\nPath={workdir}\nTerminal=false\n",
+            encoding="utf-8",
+        )
+        path.chmod(0o755)
+        return str(path)
+    raise OSError("masaüstü kısayolu şu an yalnız Windows ve Linux'ta destekleniyor")

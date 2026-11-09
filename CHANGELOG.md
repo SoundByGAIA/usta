@@ -10,7 +10,7 @@ Notlar: [docs/kullanici-testi-2026-11-09.md](docs/kullanici-testi-2026-11-09.md)
 - **Bekleme geri bildirimi:** model seçilince yetenek ölçümü yarım dakika sürebiliyordu ve ekran sessizdi; artık "Modeli tanıyorum, bu yarım dakika sürebilir" yazar ve düğmeler kilitlenir.
 - Not (eklenmeyenler): OpenCode'un ücretsiz modelleri resmî sayfasına göre yalnız OpenCode uygulamasında çalışır ("Free-tier chat models require OpenCode"), Usta gibi başka istemcilerden kullanılamaz; Claude'un OpenAI-uyumlu ucu "deneme amaçlı" etiketli ve `/models` desteği doğrulanamadığından eklenmedi.
 
-## 0.3.1 — Windows'ta yönetici olmayan kullanıcı için açılış düzeltmeleri
+## 0.3.1 — Windows'ta yönetici olmayan kullanıcı için açılış düzeltmeleri (ayrı yayınlanmadı; 0.3.2 ile birlikte çıktı)
 
 İlk gerçek kodsuz kullanıcı testinin (Windows 10, normal hesap) bulduğu iki engel. Notlar: [docs/kullanici-testi-2026-11-09.md](docs/kullanici-testi-2026-11-09.md).
 

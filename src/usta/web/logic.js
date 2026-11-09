@@ -130,19 +130,19 @@
       case "user_message":
         return { kind: "user", title: "", body: d.text };
       case "tool_call":
-        return { kind: "tool", title: `${d.tool} ${brief(d.args)}`.trim(), body: clip(JSON.stringify(d.args, null, 2)) };
+        return { kind: "tool", title: `${d.tool} ${brief(d.args)}`.trim(), body: clip(JSON.stringify(d.args, null, 2)), tool: d.tool, args: d.args };
       case "tool_result":
         return { kind: "result", title: d.tool || "", body: clip(d.result) };
       case "denied":
-        return { kind: "warn", title: `Reddedildi: ${d.tool}`, body: "" };
+        return { kind: "warn", title: `Reddedildi: ${d.tool}`, body: "", tool: d.tool };
       case "usage":
         return { kind: "usage", title: "", body: "" };
       case "warning":
         return { kind: "warn", title: String(d.message || "Uyarı").slice(0, 300), body: "" };
       case "approval_required":
-        return { kind: "approval", title: `Onay gerekli: ${d.tool}`, body: (d.reason ? `Neden: ${clip(String(d.reason), 300)}\n` : "") + clip(JSON.stringify(d.args, null, 2), 20000), approvalId: d.approval_id };
+        return { kind: "approval", title: `Onay gerekli: ${d.tool}`, body: (d.reason ? `Neden: ${clip(String(d.reason), 300)}\n` : "") + clip(JSON.stringify(d.args, null, 2), 20000), approvalId: d.approval_id, tool: d.tool, args: d.args, reason: d.reason };
       case "done":
-        if (d.status === "failed") return { kind: "error", title: "Görev başarısız", body: d.error || "" };
+        if (d.status === "failed") return { kind: "error", title: "Görev başarısız", body: friendlyModelError(d.error || "") };
         if (d.status === "cancelled") return { kind: "status", title: "Durduruldu", body: "" };
         return { kind: "status", title: "Bitti", body: "" };
       case "started":
@@ -181,7 +181,62 @@
     return list;
   }
 
-  const api = { chatModels, autoScale, createSSEParser, parseDiff, summarize, isActive, authHeaders, formatTokens, usageText };
+  // Onay isteğini kodsuz kullanıcının anlayacağı bir cümleye çevirir (ham araç adı ve JSON ayrıntıda kalır).
+  function plainApproval(tool, args, reason) {
+    const a = args && typeof args === "object" ? args : {};
+    const v = (x, n) => String(x == null ? "" : x).slice(0, n || 120);
+    let title;
+    switch (tool) {
+      case "write_file": title = `Usta "${v(a.path)}" dosyasını yazmak istiyor (varsa üzerine yazar).`; break;
+      case "edit_file": title = `Usta "${v(a.path)}" dosyasında değişiklik yapmak istiyor.`; break;
+      case "run": title = `Usta bilgisayarında şu komutu çalıştırmak istiyor: ${v(a.command, 160)}`; break;
+      case "fetch_url": title = `Usta şu internet sayfasını okumak istiyor: ${v(a.url, 160)}`; break;
+      case "web_search": title = `Usta internette şunu aramak istiyor: ${v(a.query, 160)}`; break;
+      case "remember": title = "Usta ileride hatırlamak için bir not kaydetmek istiyor."; break;
+      default:
+        title = String(tool || "").startsWith("mcp__")
+          ? `Usta bir ek araç kullanmak istiyor (${v(tool, 60)}).`
+          : `Usta "${v(tool, 60)}" işlemini yapmak istiyor.`;
+    }
+    let warn = "";
+    if (reason) {
+      warn = /okunan içerikte geçiyor/.test(reason)
+        ? "Dikkat: bu hedef, Usta'nın okuduğu bir içerikten geliyor, senin isteğinde yoktu. Emin değilsen Reddet."
+        : `Neden soruyor: ${v(reason, 200)}`;
+    }
+    return { title, warn };
+  }
+
+  // Basit görünümde araç çağrısı satırı: ham araç adı yerine ne yapıldığını söyleyen kısa cümle.
+  function plainProgress(tool, args) {
+    const a = args && typeof args === "object" ? args : {};
+    const v = (x, n) => String(x == null ? "" : x).slice(0, n || 80);
+    switch (tool) {
+      case "write_file": return `Dosya yazılıyor: ${v(a.path)}`;
+      case "edit_file": return `Dosya düzenleniyor: ${v(a.path)}`;
+      case "read_file": return `Dosya okunuyor: ${v(a.path)}`;
+      case "list_dir": return "Klasör inceleniyor";
+      case "run": return "Komut çalıştırılıyor";
+      case "fetch_url": return `Sayfa okunuyor: ${v(a.url)}`;
+      case "web_search": return `İnternette aranıyor: ${v(a.query)}`;
+      case "remember": return "Not alınıyor";
+      default: return String(tool || "").startsWith("mcp__") ? "Ek araç kullanılıyor" : `Çalışıyor: ${v(tool, 40)}`;
+    }
+  }
+
+  // Model/servis hatalarını anlaşılır cümleye çevirir (sunucudaki friendly_model_error ile aynı eşleşmeler).
+  function friendlyModelError(text) {
+    const t = String(text || "");
+    if (/HTTP 40[13]/.test(t)) return "Anahtar kabul edilmedi. Doğru kopyaladığından ve hesabında bakiye olduğundan emin ol.";
+    if (/HTTP 402/.test(t)) return "Hesabında bakiye yok görünüyor. Servisin sayfasından bakiye yükle ya da ücretsiz bir model seç.";
+    if (/HTTP 404/.test(t)) return "Bu model bulunamadı. Kurulum ekranından başka bir model seç.";
+    if (/HTTP 429/.test(t)) return "Bugünkü ücretsiz hakkın doldu ya da çok hızlı istek gönderildi. Biraz bekle, yarın tekrar dene ya da başka bir servis ekle.";
+    if (/ConnectError|ConnectTimeout/.test(t)) return "Servise ulaşılamıyor. İnternet bağlantını (ya da bilgisayarındaki modelin açık olduğunu) kontrol et.";
+    if (/Timeout/.test(t)) return "Model zamanında cevap vermedi. Büyük modeller yavaş olabilir; tekrar dene.";
+    return t;
+  }
+
+  const api = { plainProgress, plainApproval, friendlyModelError, chatModels, autoScale, createSSEParser, parseDiff, summarize, isActive, authHeaders, formatTokens, usageText };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.UstaLogic = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

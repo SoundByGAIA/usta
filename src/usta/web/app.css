@@ -161,6 +161,7 @@ select { font: inherit; color: inherit; background: var(--bg); border: 1px solid
 
 /* Ofis sekmesi: piksel sahne kapsayıcıya sığar, tam sayı ölçek office.js'te ayarlanır */
 #office { flex: 1; min-height: 0; overflow: auto; padding: 12px var(--gutter); display: flex; flex-direction: column; gap: 10px; }
+#office[hidden] { display: none; }
 #office .note { margin: 0; color: var(--muted); }
 .office-stage { display: flex; flex: 0 0 auto; justify-content: center; align-items: flex-start; min-height: 0; max-width: 100%; overflow: hidden; background: #1c232e; border-radius: 10px; padding: 2px; transition: background .3s ease; }
 #office-canvas { display: block; max-width: 100%; height: auto; background: #1c232e; border: 1px solid #101722; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.35); image-rendering: pixelated; image-rendering: crisp-edges; }
@@ -244,3 +245,23 @@ select { font: inherit; color: inherit; background: var(--bg); border: 1px solid
 .wiz-group { margin: 14px 0 4px; font-weight: 700; }
 #wiz-service-help { margin: 12px 0; }
 #wiz-service-help > strong { display: block; margin-bottom: 4px; }
+
+/* basit görünüm: gelişmiş öğeler gizlenir */
+body.simple .adv { display: none !important; }
+.where { font-size: 12px; padding: 3px 10px; border-radius: 12px; border: 1px solid currentColor; white-space: nowrap; }
+.where.local { color: #3fb950; } .where.lan { color: #d29922; } .where.cloud { color: #d29922; }
+.starters { padding: 8px 4px 0; }
+.starters h3 { margin: 4px 0 8px; font-size: 16px; text-transform: none; letter-spacing: 0; color: var(--text); }
+.starters .tip { color: var(--muted); font-size: .95em; margin: 0 0 10px; }
+.starter-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.starter-grid button { text-align: left; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); cursor: pointer; line-height: 1.4; }
+.starter-grid button:hover, .starter-grid button:focus-visible { outline: 2px solid currentColor; }
+.starter-grid strong { display: block; margin-bottom: 2px; }
+.result-card { margin: 10px 4px; border-left: 4px solid #3fb950; }
+.result-card .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.followups { display: flex; flex-wrap: wrap; gap: 8px; }
+.followups button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); color: var(--text); cursor: pointer; }
+.followups button:hover, .followups button:focus-visible { outline: 2px solid currentColor; }
+.approval .plain { font-size: 1.05em; margin: 4px 0; }
+.approval .plain-warn { color: #d29922; margin: 4px 0; }
+body.simple .msg.result { display: none; }

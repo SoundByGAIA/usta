@@ -159,3 +159,13 @@ def make_dir_link(target, link, windows: bool | None = None) -> None:
         )
         if r.returncode != 0:
             raise OSError(f"klasör bağı oluşturulamadı: {link}") from None
+
+
+def open_folder(path) -> None:
+    """Klasörü işletim sisteminin dosya yöneticisinde açar (Windows Gezgini, macOS Finder, Linux xdg-open)."""
+    if sys.platform == "win32":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path)])

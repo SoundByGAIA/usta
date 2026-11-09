@@ -166,3 +166,46 @@ test("chatModels falls back to the full list when filtering removes everything",
   assert.deepEqual(L.chatModels(["a-embed", "b-tts"], ""), ["a-embed", "b-tts"]);
   assert.deepEqual(L.chatModels([], "x"), []);
 });
+
+test("plainApproval turns tool calls into plain Turkish sentences", () => {
+  assert.match(L.plainApproval("write_file", { path: "index.html" }).title, /"index.html" dosyasını yazmak istiyor/);
+  assert.match(L.plainApproval("edit_file", { path: "a.css" }).title, /"a.css" dosyasında değişiklik/);
+  assert.match(L.plainApproval("run", { command: "pytest -q" }).title, /komutu çalıştırmak istiyor: pytest -q/);
+  assert.match(L.plainApproval("fetch_url", { url: "https://x.test/" }).title, /internet sayfasını okumak/);
+  assert.match(L.plainApproval("mcp__arac__ara", {}).title, /ek araç/);
+  assert.match(L.plainApproval("bilinmeyen", null).title, /"bilinmeyen" işlemini/);
+  assert.equal(L.plainApproval("write_file", { path: "x" }).warn, "");
+});
+
+test("plainApproval explains the taint-gate reason and never throws on odd input", () => {
+  const w = L.plainApproval("write_file", { path: "leak.txt" }, "hedef 'leak.txt' okunan içerikte geçiyor ama isteğinde geçmiyor").warn;
+  assert.match(w, /Emin değilsen Reddet/);
+  assert.match(L.plainApproval("run", { command: "x" }, "başka bir neden").warn, /Neden soruyor/);
+  assert.doesNotThrow(() => L.plainApproval(undefined, undefined, undefined));
+});
+
+test("friendlyModelError maps common service failures to plain sentences", () => {
+  assert.match(L.friendlyModelError("model isteği başarısız: HTTP 401"), /Anahtar kabul edilmedi/);
+  assert.match(L.friendlyModelError("model isteği başarısız: HTTP 402"), /bakiye yok/);
+  assert.match(L.friendlyModelError("model isteği başarısız: HTTP 429"), /ücretsiz hakkın doldu/);
+  assert.match(L.friendlyModelError("model isteği başarısız: ConnectError"), /ulaşılamıyor/);
+  assert.equal(L.friendlyModelError("başka bir hata"), "başka bir hata");
+});
+
+test("summarize shows friendly text for failed tasks and carries approval details", () => {
+  const f = L.summarize("done", { status: "failed", error: "model isteği başarısız: HTTP 429" });
+  assert.equal(f.kind, "error"); assert.match(f.body, /ücretsiz hakkın doldu/);
+  const ap = L.summarize("approval_required", { approval_id: "z", tool: "run", args: { command: "ls" }, reason: "r" });
+  assert.equal(ap.tool, "run"); assert.deepEqual(ap.args, { command: "ls" }); assert.equal(ap.reason, "r");
+});
+
+test("plainProgress describes tool calls in plain Turkish for the simple view", () => {
+  assert.equal(L.plainProgress("write_file", { path: "index.html" }), "Dosya yazılıyor: index.html");
+  assert.equal(L.plainProgress("edit_file", { path: "a.css" }), "Dosya düzenleniyor: a.css");
+  assert.equal(L.plainProgress("list_dir", {}), "Klasör inceleniyor");
+  assert.equal(L.plainProgress("run", { command: "x" }), "Komut çalıştırılıyor");
+  assert.equal(L.plainProgress("mcp__x__y", {}), "Ek araç kullanılıyor");
+  assert.doesNotThrow(() => L.plainProgress(undefined, undefined));
+  const tc = L.summarize("tool_call", { tool: "write_file", args: { path: "p.txt" } });
+  assert.equal(tc.tool, "write_file"); assert.deepEqual(tc.args, { path: "p.txt" });
+});

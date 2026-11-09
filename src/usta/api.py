@@ -25,6 +25,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from usta import (
     apis,
     attachments,
+    compat,
     filetree,
     localmodels,
     mcp_runtime,
@@ -154,6 +155,7 @@ class SettingsIn(BaseModel):
     guard: bool | None = None
     zoom: Literal["auto", "0.9", "1", "1.1", "1.25", "1.5", "1.75"] | None = None
     think: Literal["auto", "off", "low", "medium", "high"] | None = None
+    view: Literal["simple", "advanced"] | None = None
     context_window: int | None = Field(default=None, ge=0, le=2_000_000)  # 0: otomatik (sınır yok)
 
 
@@ -355,6 +357,16 @@ def create_app(
         ws_root(workspace)
         return {"base": f"/preview/{workspace}/{preview_key(workspace)}/"}
 
+    @api.post("/workspaces/{workspace}/reveal")
+    def reveal_workspace(workspace: WorkspaceId) -> dict:
+        """Çalışma klasörünü bu bilgisayarın dosya yöneticisinde açar (yalnız o klasör; yol dışarıdan alınmaz)."""
+        root = ws_root(workspace).resolve()
+        try:
+            compat.open_folder(root)
+        except OSError:
+            raise HTTPException(500, "klasör açılamadı") from None
+        return {"opened": str(root)}
+
     @api.get("/workspaces/{workspace}/tree")
     def tree(workspace: WorkspaceId, path: str = "") -> dict:
         root = ws_root(workspace)
@@ -509,6 +521,7 @@ def create_app(
             "guard": cur.guard,
             "zoom": cur.zoom,
             "think": cur.think,
+            "view": cur.view,
             "context_window": cur.context_window or 0,
             "workspace": workspace,
         }
@@ -542,6 +555,7 @@ def create_app(
             "guard": new.guard,
             "zoom": new.zoom,
             "think": new.think,
+            "view": new.view,
             "context_window": new.context_window or 0,
         }
 

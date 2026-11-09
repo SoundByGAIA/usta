@@ -13,6 +13,7 @@ from pathlib import Path
 from usta import compat, theme, thinking
 
 MODES = ("manual", "auto", "plan")
+VIEWS = ("simple", "advanced")
 ZOOMS = ("auto", "0.9", "1", "1.1", "1.25", "1.5", "1.75")
 MAX_TEXT = 2048
 
@@ -27,6 +28,7 @@ class Settings:
     protocol: str | None = None
     context_window: int | None = None
     think: str = "auto"  # auto | off | low | medium | high (bkz. thinking.py)
+    view: str = "simple"  # simple: yeni kullanıcı görünümü | advanced: tüm araçlar
     portal: bool = True
     zoom: str = "auto"  # portal arayüz boyutu: auto ya da çarpan
     guard: bool = (
@@ -39,6 +41,8 @@ class Settings:
             raise ValueError(f"geçersiz zoom: {self.zoom!r}")
         if self.think not in thinking.THINK:
             raise ValueError(f"geçersiz think: {self.think!r}")
+        if self.view not in VIEWS:
+            raise ValueError(f"geçersiz view: {self.view!r}")
         if self.mode not in MODES:
             raise ValueError(f"geçersiz mod: {self.mode!r}")
         if self.endpoint is not None and (

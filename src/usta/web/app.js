@@ -40,6 +40,24 @@
     $("mode").value = ["manual", "auto", "plan"].includes(mode) ? mode : "manual";
     $("mode-warn").hidden = $("mode").value !== "auto";
   }
+  function applyView(view) {
+    state.view = view === "advanced" ? "advanced" : "simple";
+    document.body.classList.toggle("simple", state.view === "simple");
+    $("view").value = state.view;
+  }
+  async function updateWhere() {
+    const el = $("where");
+    try {
+      const r = await api("/privacy");
+      if (!r.ok) { el.hidden = true; return; }
+      const m = (await r.json()).model;
+      if (!m) { el.hidden = true; return; }
+      el.hidden = false;
+      el.className = "where " + (m.where === "bu-bilgisayar" ? "local" : m.where === "yerel-ağ" ? "lan" : "cloud");
+      el.textContent = m.where === "bu-bilgisayar" ? "Bu bilgisayarda" : m.where === "yerel-ağ" ? "Yerel ağda" : `Bulutta (${m.name})`;
+      el.title = m.where === "bu-bilgisayar" ? "Yazdıkların bu bilgisayardan çıkmaz." : "Yazdıkların bu servisin sunucusuna gider. Ayrıntı için Gizlilik düğmesine bas.";
+    } catch (_) { el.hidden = true; }
+  }
   async function loadSettings() {
     const res = await api("/settings");
     if (!res.ok) return;
@@ -50,6 +68,7 @@
     state.defaultWs = s.workspace || null;
     state.zoom = s.zoom || "auto";
     applyZoom();
+    applyView(s.view);
     $("think").value = s.think || "auto";
     const ctx = String(s.context_window || 0);
     if (![...$("ctx").options].some((o) => o.value === ctx)) {  // terminalden gelen özel değer
@@ -79,6 +98,7 @@
     return `hata ${res.status}`;
   }
 
+  const USTA_KAPALI = "Usta kapalı görünüyor. Siyah pencereyi kapattıysan Usta'yı yeniden başlat (python -m usta).";
   function setConn(text, cls) {
     const c = $("conn");
     c.textContent = text;
@@ -88,6 +108,52 @@
     const chip = $("status");
     chip.textContent = s ? STATUS[s] || s : "";
     chip.dataset.s = s || "";
+    if (s === "running") { hideResult(); updateStarters(); }
+    else if (s === "done" && !state.replay) showResult();
+  }
+
+  // --- yeni başlayanlar: başlangıç işleri, sonuç kartı, devam önerileri ---
+  const STARTERS = [
+    ["Tanıtım sayfası", "Kendi işim için bir tanıtım web sayfası yap: başlık, kısa açıklama ve iletişim bölümü olsun."],
+    ["Hesap makinesi", "Bir hesap makinesi web sayfası yap."],
+    ["Alışveriş listesi", "Alışveriş listesi tutabileceğim basit bir web sayfası yap; madde ekleyip silebileyim."],
+    ["Bugünün tarihi", "Bugünün tarihini büyük yazıyla gösteren basit bir sayfa yap."],
+    ["Yılan oyunu", "Basit bir yılan oyunu web sayfası yap."],
+    ["Dosyalarımı anlat", "Bu klasördeki dosyaları incele ve ne işe yaradıklarını kısaca anlat."],
+  ];
+  const FOLLOWUPS = ["Daha güzel görünmesini sağla", "Renklerini değiştir", "Yazıları büyüt", "Bir hata var, düzelt", "Türkçe karakterleri kontrol et"];
+  function fillPrompt(text) { const p = $("prompt"); p.value = text; p.focus(); p.setSelectionRange(text.length, text.length); }
+  function updateStarters() {
+    const box = $("starters");
+    const show = !!state.ws && !state.active && !state.replay && $("stream").children.length === 0 && $("result-card").hidden;
+    box.hidden = !show;
+    if (!show || box.dataset.ready) return;
+    box.dataset.ready = "1";
+    const grid = h("div", "starter-grid");
+    for (const [title, text] of STARTERS) {
+      const b = h("button");
+      b.type = "button";
+      b.append(h("strong", null, title), h("span", null, text));
+      b.addEventListener("click", () => fillPrompt(text));
+      grid.appendChild(b);
+    }
+    box.replaceChildren(h("h3", null, "Ne yapmamı istersin?"), h("p", "tip", "Bir örneğe bas ya da aşağıya kendi cümlelerinle yaz. Ne kadar ayrıntı verirsen sonuç o kadar iyi olur."), grid);
+  }
+  function hideResult() { $("result-card").hidden = true; }
+  async function showResult() {
+    if (!state.ws || state.replay) return;
+    const card = $("result-card");
+    card.hidden = false;
+    $("starters").hidden = true;
+    let hasIndex = false;
+    try {
+      const r = await api(`/workspaces/${encodeURIComponent(state.ws)}/tree?path=`);
+      if (r.ok) hasIndex = ((await r.json()).entries || []).some((e) => !e.dir && e.name === "index.html");
+    } catch (_) { /* yoksay */ }
+    $("result-open").hidden = !hasIndex;
+    $("result-title").textContent = hasIndex ? "Usta işi bitirdi. Sonucu görmek için \"Sonucu aç\"a bas." : "Usta işi bitirdi.";
+    const fu = $("followups");
+    fu.replaceChildren(...FOLLOWUPS.map((t) => { const b = h("button", null, t); b.type = "button"; b.addEventListener("click", () => fillPrompt(t)); return b; }));
   }
   function setActive(active) {
     state.active = active;
@@ -148,7 +214,8 @@
     if (type === "message" && !s.body) return;
     if (s.kind === "tool" || s.kind === "result") {
       const d = h("details", "msg " + s.kind);
-      d.appendChild(h("summary", null, (s.kind === "result" ? "↳ " : "") + s.title));
+      const simpleTitle = s.kind === "tool" && state.view !== "advanced" ? L.plainProgress(s.tool, s.args) : null;
+      d.appendChild(h("summary", null, simpleTitle || (s.kind === "result" ? "↳ " : "") + s.title));
       if (s.body) d.appendChild(h("pre", null, s.body));
       return addNode(d);
     }
@@ -180,8 +247,14 @@
   }
   function approvalNode(s) {
     const box = h("div", "msg approval");
-    box.appendChild(h("strong", null, s.title));
-    if (s.body) box.appendChild(h("pre", null, s.body));
+    const plain = L.plainApproval(s.tool, s.args, s.reason);
+    box.appendChild(h("p", "plain", plain.title));
+    if (plain.warn) box.appendChild(h("p", "plain-warn", plain.warn));
+    const det = h("details", null);
+    det.appendChild(h("summary", null, "Ayrıntılar (teknik)"));
+    det.appendChild(h("strong", null, s.title));
+    if (s.body) det.appendChild(h("pre", null, s.body));
+    box.appendChild(det);
     const row = h("div", "row");
     const allow = h("button", "primary", "İzin ver");
     const deny = h("button", null, "Reddet");
@@ -516,6 +589,7 @@
     }
     sel.value = `${info.api}|${info.model}`;
     sel.dataset.cur = sel.value;
+    updateWhere();
     return info;
   }
   async function switchModel() {
@@ -572,11 +646,15 @@
     clearTimeout(revertArmed);
     revertArmed = null;
     btn.textContent = "Değişiklikleri geri al";
+    await doRevert();
+  }
+  async function doRevert() {
     const res = await api(`/tasks/${encodeURIComponent(state.task)}/revert`, { method: "POST" });
-    if (!res.ok) { addNode(h("div", "msg error", await errorText(res))); return; }
+    if (!res.ok) { addNode(h("div", "msg error", await errorText(res))); return false; }
     renderDiff("");
     renderEvent("reverted", {});
     showTab("stream");
+    return true;
   }
 
   // --- ek araçlar (MCP): yalnız katalogdan ekleme, serbest komut yok ---
@@ -904,6 +982,16 @@
       url: "https://platform.deepseek.com/api_keys", linkText: "DeepSeek anahtar sayfasını aç",
       steps: ["Sayfa açılınca hesap aç ve giriş yap.", "Hesabına bakiye yükle (bakiye yoksa anahtar çalışmaz).", "\"API keys\" sayfasında anahtar oluştur ve kopyala."],
       note: "Ücretlidir: kullandıkça bakiyeden düşer.", prefer: "deepseek-chat" },
+    { id: "anthropic", label: "Claude (Anthropic)", free: false, endpoint: "https://api.anthropic.com/v1",
+      url: "https://platform.claude.com/settings/keys", linkText: "Claude anahtar sayfasını aç",
+      steps: ["Sayfa açılınca hesap aç ve giriş yap.", "Kullanmak için kredi yükle (ücretli servis).", "Anahtar oluştur ve çıkan yazıyı kopyala."],
+      note: "Ücretlidir. Anthropic bu bağlantı yolunu \"deneme ve karşılaştırma amaçlı\" diye etiketlemiştir; bir şey çalışmazsa bize haber ver.",
+      prefer: "claude-sonnet-5-5" },
+    { id: "opencode", label: "OpenCode (çok modelli ağ geçidi)", free: false, endpoint: "https://opencode.ai/inference/openai/v1",
+      url: "https://opencode.ai/console", linkText: "OpenCode konsolunu aç",
+      steps: ["Sayfa açılınca giriş yap.", "Faturalandırma bilgilerini ve kredi ekle (anahtardan önce gerekir).", "Anahtarı kopyala ve aşağıdaki kutuya yapıştır."],
+      note: "Ücretlidir, kullandıkça kredi düşer. OpenCode'un ücretsiz modelleri yalnız OpenCode uygulamasında çalışır; burada yalnız ücretli modeller görünür. GPT ve Claude modelleri bu ağ geçidinde farklı bir yolla çalıştığı için listede yoktur; onlar için doğrudan OpenAI ve Claude seçeneklerini kullan.",
+      prefer: "deepseek-v4-pro" },
     { id: "openai", label: "OpenAI (GPT)", free: false, endpoint: "https://api.openai.com/v1",
       url: "https://platform.openai.com/api-keys", linkText: "OpenAI anahtar sayfasını aç",
       steps: ["Sayfa açılınca hesap aç ve giriş yap.", "Kullanmak için ödeme bilgisi ekle ya da kredi yükle.", "\"API keys\" sayfasında anahtar oluştur ve kopyala."],
@@ -1339,6 +1427,8 @@
     await loadWorkspaces();
     const saved = get("usta_task");
     if (saved.startsWith(id + ":")) await resume(saved.slice(id.length + 1));
+    hideResult();
+    updateStarters();
   }
   async function resume(taskId) {
     const res = await api(`/tasks/${encodeURIComponent(taskId)}`);
@@ -1370,7 +1460,7 @@
       const res = await api("/workspaces");
       if (!res.ok) { setConn(await errorText(res), "bad"); return; }
     } catch (e) {
-      if (String(e.message) !== "401") setConn("Sunucuya ulaşılamadı", "bad");
+      if (String(e.message) !== "401") setConn(USTA_KAPALI, "bad");
       return;
     }
     put("usta_token", state.token);
@@ -1452,6 +1542,21 @@
     applyZoom();
   });
   $("think").addEventListener("change", () => saveSetting({ think: $("think").value }));
+  $("view").addEventListener("change", () => { applyView($("view").value); saveSetting({ view: $("view").value }); });
+  $("set-wizard").addEventListener("click", () => { if ($("wizard").hidden) togglePanel("wizard"); else wizShow("wiz-start"); });
+  $("set-tablet").addEventListener("click", () => togglePanel("tablet"));
+  $("result-open").addEventListener("click", () => showTab("preview"));
+  $("result-folder").addEventListener("click", async () => {
+    const r = await api(`/workspaces/${encodeURIComponent(state.ws)}/reveal`, { method: "POST" });
+    if (!r.ok) addNode(h("div", "msg error", "Klasör açılamadı. Dosyalar sol taraftaki \"Dosyalarım\" listesinde de görünür."));
+  });
+  let undoArmed = null;
+  $("result-undo").addEventListener("click", async () => {
+    const b = $("result-undo");
+    if (!undoArmed) { b.textContent = "Emin misin? Tekrar bas"; undoArmed = setTimeout(() => { undoArmed = null; b.textContent = "Yaptığı değişikliği geri al"; }, 4000); return; }
+    clearTimeout(undoArmed); undoArmed = null; b.textContent = "Yaptığı değişikliği geri al";
+    if (await doRevert()) { hideResult(); updateStarters(); }
+  });
   $("ctx").addEventListener("change", () => saveSetting({ context_window: Number($("ctx").value) }));
   applyZoom();
   if (window.Office && typeof window.Office.init === "function") window.Office.init();
@@ -1469,7 +1574,7 @@
       if (!res.ok) { setConn("Kod geçersiz ya da süresi dolmuş. Bilgisayarda \"Tablet\" düğmesinden yeni kod al", "bad"); return; }
       state.token = (await res.json()).token;
       connect();
-    } catch (_) { setConn("Sunucuya ulaşılamadı", "bad"); }
+    } catch (_) { setConn(USTA_KAPALI, "bad"); }
   }
   const loginCode = new URLSearchParams(location.search).get("code");
   if (loginCode) {

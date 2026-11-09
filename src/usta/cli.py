@@ -27,6 +27,7 @@ from usta import (
     profile,
     projectcfg,
     projects,
+    services,
     settings,
     symbols,
     theme,
@@ -1060,9 +1061,12 @@ def _discover_models(endpoint: str, key: str | None = None) -> list[str]:
         headers = {"Authorization": f"Bearer {key}"} if key else {}
         r = httpx.get(endpoint.rstrip("/") + "/models", headers=headers, timeout=4)
         r.raise_for_status()
-        return [m["id"] for m in r.json().get("data", []) if isinstance(m.get("id"), str)]
+        found = services.usable_ids(r.json().get("data", []))
     except (httpx.HTTPError, ValueError, AttributeError, TypeError):
-        return []
+        found = []
+    return found or services.fallback_models(
+        endpoint
+    )  # bilinen servis: /models çalışmıyorsa sabit liste
 
 
 def _pick_model(endpoint: str, home: Path, cur: settings.Settings) -> str | None:
@@ -1392,10 +1396,68 @@ def _chat_cmd(args: argparse.Namespace) -> int:
             portal.stop()
 
 
+def _crash(exc: BaseException) -> int:
+    """Beklenmeyen hata: ham Python çıktısı yerine kısa açıklama + gizli bilgi içermeyen rapor dosyası."""
+    import platform
+    import traceback
+    from datetime import datetime
+    from importlib import metadata
+
+    from usta.audit import mask
+
+    try:
+        ver = metadata.version("usta")
+    except metadata.PackageNotFoundError:
+        ver = "?"
+    tb = mask("".join(traceback.format_exception(exc)))
+    report = (
+        f"Usta hata raporu ({datetime.now():%Y-%m-%d %H:%M:%S})\n"
+        f"sürüm: {ver} | Python {platform.python_version()} | {platform.platform()}\n"
+        "(Bu dosyada anahtar ya da şifre yoktur; yine de göndermeden önce gözden geçirebilirsin.)\n\n"
+        f"{tb}"
+    )
+    where = ""
+    try:
+        d = _home()
+        path = d / f"rapor-{datetime.now():%Y%m%d-%H%M%S}.txt"
+        path.write_text(report, encoding="utf-8")
+        where = str(path)
+    except OSError:
+        pass
+    if isinstance(exc, PermissionError) and ".usta" in str(getattr(exc, "filename", "") or exc):
+        print(
+            'Usta kendi klasörüne (.usta) erişemedi. Usta\'yı daha önce "yönetici olarak" açtıysan bu klasör '
+            "yönetici adına oluşmuş olabilir.\nÇözüm: Dosya Gezgini'nde kullanıcı klasöründeki `.usta` klasörünü "
+            "sil ve Usta'yı normal şekilde yeniden başlat.",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"Beklenmeyen bir sorun oldu: {type(exc).__name__}. Üzgünüm.\n"
+            + (
+                f"Rapor dosyası hazırladım: {where}\nBu dosyayı bana gönder, bakayım."
+                if where
+                else report[-400:]
+            ),
+            file=sys.stderr,
+        )
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     compat.utf8_console()
     if not compat.enable_ansi():  # renk kodları çözülemiyorsa düz yazı
         os.environ.setdefault("NO_COLOR", "1")
+    try:
+        return _main(argv)
+    except KeyboardInterrupt:
+        print("\nÇıkılıyor.", file=sys.stderr)
+        return 130
+    except Exception as e:  # noqa: BLE001 - kullanıcıya ham iz yerine açıklama
+        return _crash(e)
+
+
+def _main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     command: list[str] = []
     if (

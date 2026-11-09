@@ -327,6 +327,7 @@ def test_settings_requires_auth_and_has_defaults(tmp_path):
         "guard": False,
         "zoom": "auto",
         "think": "auto",
+        "view": "simple",
         "context_window": 0,
         "workspace": None,
     }
@@ -343,6 +344,7 @@ def test_settings_put_validates_persists_and_shares_with_terminal(tmp_path):
         "guard": False,
         "zoom": "auto",
         "think": "auto",
+        "view": "simple",
         "context_window": 0,
     }
     got = st.load(tmp_path / "home")
@@ -430,3 +432,26 @@ def test_chunked_oversized_body_without_content_length_is_cut(tmp_path):
 
     r = c.post("/workspaces", content=gen(), headers=AUTH | {"content-type": "application/json"})
     assert r.status_code == 413
+
+
+def test_settings_view_roundtrip_and_validation(tmp_path):
+    c, _ = make_client(tmp_path, Scripted())
+    assert c.put("/settings", json={"view": "advanced"}, headers=AUTH).json()["view"] == "advanced"
+    assert c.get("/settings", headers=AUTH).json()["view"] == "advanced"
+    assert c.put("/settings", json={"view": "uzman"}, headers=AUTH).status_code == 422
+
+
+def test_reveal_opens_only_the_workspace_folder(tmp_path, monkeypatch):
+    from usta import compat
+
+    opened = []
+    monkeypatch.setattr(compat, "open_folder", lambda p: opened.append(p))
+    c, _ = make_client(tmp_path, Scripted())
+    ws = new_ws(c)
+    assert c.post(f"/workspaces/{ws}/reveal").status_code == 401
+    r = c.post(f"/workspaces/{ws}/reveal", headers=AUTH)
+    assert r.status_code == 200 and len(opened) == 1 and opened[0].name == ws
+    assert c.post("/workspaces/yok-boyle/reveal", headers=AUTH).status_code == 404
+    assert len(opened) == 1  # olmayan alan için hiçbir şey açılmaz
+    monkeypatch.setattr(compat, "open_folder", lambda p: (_ for _ in ()).throw(OSError("yok")))
+    assert c.post(f"/workspaces/{ws}/reveal", headers=AUTH).status_code == 500

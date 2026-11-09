@@ -251,6 +251,8 @@ class TaskManager:
     ) -> Task:
         if mode not in MODES:
             raise ValueError(f"geçersiz mod: {mode!r} ({', '.join(MODES)})")
+        if self.model_control is not None and not self.model_control.ready:
+            raise ValueError("model seçilmedi: önce kurulum sihirbazını tamamla")
         use_guard = (self.guard if guard is None else guard) and mode != "plan"
         if phased and plan_task is None:
             raise ValueError("aşamalı uygulama için onaylı bir plan gerekir")

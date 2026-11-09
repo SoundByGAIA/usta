@@ -50,6 +50,11 @@ class ModelControl:
         self.endpoint = src.endpoint
         self._client = build(src.endpoint, name, protocol, src.key)
 
+    @property
+    def ready(self) -> bool:
+        """Model seçili mi? Kurulum modunda (sihirbaz tamamlanana dek) hayır."""
+        return bool(self.name)
+
     def current(self) -> ModelClient:
         return self._client
 
@@ -72,7 +77,7 @@ class ModelControl:
                 err = None if models else "model listesi boş ya da uç noktaya ulaşılamadı"
             except Exception:  # noqa: BLE001 - tek kaynak hata verirse diğerleri görünsün
                 models, err = [], "uç noktaya ulaşılamadı"
-            if s.name == self.api and self.name not in models:
+            if s.name == self.api and self.name and self.name not in models:
                 models = [self.name, *models]
             return {"api": s.name, "endpoint": s.endpoint, "models": models, "error": err}
 

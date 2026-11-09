@@ -12,6 +12,7 @@
     <button id="tools-btn" type="button" aria-pressed="false">Araçlar</button>
     <button id="apis-btn" type="button" aria-pressed="false">API'ler</button>
     <button id="privacy-btn" type="button" aria-pressed="false">Gizlilik</button>
+    <button id="wizard-btn" type="button" aria-pressed="false">Kurulum</button>
     <form id="token-form" autocomplete="off">
       <label for="token" class="sr">Jeton</label>
       <input id="token" type="password" placeholder="Jeton (~/.usta/token)" autocomplete="off" spellcheck="false">
@@ -55,6 +56,44 @@
     </select>
     <span id="conn" role="status"></span>
   </header>
+
+  <section id="wizard" aria-label="Kurulum" hidden>
+    <div id="wiz-start" class="wiz-step">
+      <h2>Hoş geldin. Yapay zekâ nerede çalışsın?</h2>
+      <p class="note">Sonra istediğin zaman değiştirebilirsin.</p>
+      <div class="wiz-choices">
+        <button id="wiz-local" type="button" class="card wiz-choice"><strong>Bilgisayarımda</strong><span>Ücretsiz. Yazdıkların bilgisayarından çıkmaz. Biraz kurulum gerekir. Küçük modeller basit işlerde iyidir, zor işlerde zayıf kalabilir.</span></button>
+        <button id="wiz-cloud" type="button" class="card wiz-choice"><strong>İnternet servisiyle</strong><span>Hızlı ve güçlü. Servisten bir anahtar almak gerekir. Yazdıkların o servisin sunucusuna gider ve kullandıkça ücret çıkabilir.</span></button>
+      </div>
+    </div>
+    <div id="wiz-local-step" class="wiz-step" hidden>
+      <h2>Bilgisayarındaki yapay zekâ</h2>
+      <div id="wiz-local-body"></div>
+      <div class="row"><button id="wiz-local-back" type="button">Geri</button><button id="wiz-local-rescan" type="button">Tekrar ara</button></div>
+    </div>
+    <div id="wiz-cloud-step" class="wiz-step" hidden>
+      <h2>İnternet servisi</h2>
+      <p class="note">Servisi seç, sonra servisin sitesinde hesabından aldığın anahtarı yapıştır. Anahtar yalnız bu bilgisayarda saklanır.</p>
+      <div id="wiz-services" class="wiz-choices"></div>
+      <form id="wiz-cloud-form" autocomplete="off" hidden>
+        <div class="key-row"><input id="wiz-key" type="password" placeholder="Anahtarı buraya yapıştır" autocomplete="off" spellcheck="false" aria-label="Anahtar" required></div>
+        <div class="row"><button class="primary" type="submit">Dene</button></div>
+      </form>
+      <div id="wiz-models" hidden>
+        <p>Anahtar kabul edildi. Hangi modeli kullanalım?</p>
+        <div class="key-row"><select id="wiz-model" aria-label="Model"></select></div>
+        <div class="row"><button id="wiz-model-go" class="primary" type="button">Bunu kullan</button></div>
+      </div>
+      <div class="row"><button id="wiz-cloud-back" type="button">Geri</button></div>
+    </div>
+    <div id="wiz-test-step" class="wiz-step" hidden>
+      <h2 id="wiz-test-title">Deniyorum…</h2>
+      <p id="wiz-test-text" class="note"></p>
+      <div id="wiz-examples" class="wiz-choices" hidden></div>
+      <div class="row"><button id="wiz-test-back" type="button" hidden>Geri dön</button></div>
+    </div>
+    <p id="wiz-msg" class="empty" role="status"></p>
+  </section>
 
   <section id="privacy" aria-label="Gizlilik" hidden>
     <p class="note">Verinin nereye gittiğini ve nerede durduğunu burada görürsün. Bu liste o anki gerçek duruma göre hesaplanır.</p>

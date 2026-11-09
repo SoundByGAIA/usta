@@ -138,9 +138,28 @@ def test_wizard_unreachable_endpoint_explains(tmp_path, monkeypatch, capsys):
     Probe(monkeypatch)
     monkeypatch.setattr(cli, "_discover_models", lambda endpoint: [])
     monkeypatch.chdir(tmp_path)
-    assert cli.main([]) == 2
+    assert cli.main(["--no-portal"]) == 2  # portal kapalıyken sihirbaz yok: terminalde açıklama
     err = capsys.readouterr().err
     assert "ulaşılamadı" in err and "--model" in err
+
+
+def test_no_model_found_in_terminal_starts_setup_mode(tmp_path, monkeypatch, capsys):
+    p = Probe(monkeypatch)
+    monkeypatch.setattr(cli, "_discover_models", lambda endpoint: [])
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.chdir(tmp_path)
+    assert cli.main([]) == 0
+    ctl = p.manager.model_control
+    assert ctl is not None and not ctl.ready and p.repl_kwargs["model_name"] == ""
+    assert "kurulum sihirbazını" in capsys.readouterr().out
+
+
+def test_setup_flag_forces_setup_mode_even_without_terminal(tmp_path, monkeypatch):
+    p = Probe(monkeypatch)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["--setup"]) == 0
+    assert not p.manager.model_control.ready
 
 
 def test_wizard_bad_choice_is_rejected(tmp_path, monkeypatch, env):

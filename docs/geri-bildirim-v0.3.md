@@ -15,7 +15,7 @@ maliyete dayanır. Mobil kullanımın (hareket halindeki kullanıcı) önerisi a
 | 5 | Dışarıya veri sızdırmama | **Yapıldı**: portalda "Gizlilik" ekranı, gerçek duruma göre hesaplanır | Telemetri yok; `tests/test_privacy.py` ağ kullanan modülleri izin listesine bağlar, yeni ağ modülü gerekçesiz eklenemez. İstemler seçilen model API'sine gider (ekranda yazar). |
 | 6 | Yerel modeli port veya klasörle tanıtma | **Port yapıldı** (yalnız 127.0.0.1; "Bul" ve elle port) | Klasör (GGUF) Ollama'ya eklemeyi gerektirir, ayrı ve büyük; sonraya. |
 | 7 | Ofis ortamı çok beğenildi, geliştirilmeli | Bekliyor | Çok ajan ve paralel görev görünümü. Sahte kalabalık yok: her şey gerçek olaya bağlı kalır. |
-| 8 | Hiç kod bilmeyen biri kullanabilmeli | Bekliyor | İlk açılış sihirbazı, sade Türkçe, tek komutla kurulum. En çok tekrar eden ihtiyaç olarak ele alınır. |
+| 8 | Hiç kod bilmeyen biri kullanabilmeli | **Kısmen yapıldı**: kurulum sihirbazı (model yoksa kendiliğinden açılır; bilgisayarımda / internet servisiyle; deneme; örnek görevler) | Yerel akış gerçek Ollama ile, hatalı anahtar yolu gerçek tarayıcıda denendi. Bulut akışının başarılı yolu henüz gerçek anahtarla denenmedi (DeepSeek bakiyesi yok). Kodsuz kullanıcıyla gerçek deneme yapılmadı. Kalan: kurulum komutu, üst çubuğu ayarlara toplama, ilk görev önerileri. |
 | – | Telefon / tablet | Bekliyor | Bulut/API yolu. Önce dar ekran düzeltmesi ve PWA; barındırma kararı ayrı. |
 
 ## Kişiselleştirme ilkesi (madde 4, Can ile kararlaştırıldı)
@@ -29,7 +29,7 @@ Hedef: Hermes gibi zamanla kullanıcıya özel skill, MCP ve otomasyon üretmek,
 
 ## Sıra
 
-1. v0.3 "herkes için": 1, 2, 6 (port) yapıldı; 5 (gizlilik ekranı) yapıldı; sırada 8 (sihirbaz), üst çubuğu ayarlar sayfasına toplama.
+1. v0.3 "herkes için": 1, 2, 6 (port) yapıldı; 5 (gizlilik ekranı) yapıldı; 8 (sihirbaz) ilk sürüm yapıldı; sırada üst çubuğu ayarlar sayfasına toplama, gerçek kullanıcıyla deneme.
 2. Ofis ve profil (7, 4): ayrı sürüm; profil için önce tasarım belgesi, Can onayı.
 3. Telefon: dar ekran, PWA, ardından barındırma kararı.
 

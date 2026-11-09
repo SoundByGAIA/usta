@@ -696,7 +696,7 @@
   }
   function togglePanel(name) {
     const open = $(name).hidden;
-    for (const p of ["tools", "apis", "privacy", "wizard"]) {
+    for (const p of ["tools", "apis", "privacy", "wizard", "tablet", "settings"]) {
       $(p).hidden = !(open && p === name);
       $(`${p}-btn`).setAttribute("aria-pressed", String(open && p === name));
     }
@@ -705,9 +705,21 @@
     if (name === "tools") { toolsMsg(""); loadTools(); loadSkills(); }
     else if (name === "privacy") loadPrivacy();
     else if (name === "wizard") wizShow("wiz-start");
+    else if (name === "tablet") loadTablet();
     else { apisMsg(""); loadApis(); }
   }
   const fmtBytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+  async function loadTablet() {
+    const res = await api("/pair", { method: "POST" });
+    $("tablet-off").hidden = res.ok;
+    $("tablet-on").hidden = !res.ok;
+    $("tablet-msg").textContent = "";
+    if (!res.ok) { if (res.status !== 404) $("tablet-msg").textContent = await errorText(res); return; }
+    const d = await res.json();
+    $("tablet-pin").textContent = d.pin;
+    $("tablet-ttl").textContent = `Bu kod ${Math.round(d.ttl / 60)} dakika geçerli.`;
+    $("tablet-urls").replaceChildren(...(d.urls.length ? d.urls.map((u) => h("code", "cmd", u)) : [h("p", "empty", "Yerel ağ adresi bulunamadı. Bilgisayarın Wi-Fi'a bağlı mı?")]));
+  }
   async function loadPrivacy() {
     const res = await api("/privacy");
     if (!res.ok) { $("privacy-sends").replaceChildren(h("p", "error", await errorText(res))); return; }
@@ -1216,8 +1228,10 @@
 
   async function connect(ev) {
     if (ev) ev.preventDefault();
-    state.token = $("token").value.trim() || state.token;
-    if (!state.token) { setConn("Jeton gerekli", "bad"); return; }
+    const typed = $("token").value.trim();
+    if (/^\d{6}$/.test(typed)) { $("token").value = ""; await exchangeCode(typed); return; }  // tablet eşleştirme kodu
+    state.token = typed || state.token;
+    if (!state.token) { setConn("Jeton ya da 6 haneli kod gerekli", "bad"); return; }
     try {
       const res = await api("/workspaces");
       if (!res.ok) { setConn(await errorText(res), "bad"); return; }
@@ -1269,6 +1283,9 @@
   $("api-form").addEventListener("submit", addApi);
   $("local-scan").addEventListener("click", scanLocal);
   $("wizard-btn").addEventListener("click", () => togglePanel("wizard"));
+  $("tablet-btn").addEventListener("click", () => togglePanel("tablet"));
+  $("settings-btn").addEventListener("click", () => togglePanel("settings"));
+  $("tablet-renew").addEventListener("click", loadTablet);
   $("wiz-local").addEventListener("click", wizLocal);
   $("wiz-cloud").addEventListener("click", wizCloud);
   $("wiz-local-back").addEventListener("click", () => wizShow("wiz-start"));
@@ -1315,7 +1332,7 @@
   async function exchangeCode(code) {
     try {
       const res = await fetch("/auth/exchange", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
-      if (!res.ok) { setConn("Giriş kodu geçersiz veya süresi dolmuş; jetonu elle gir", "bad"); return; }
+      if (!res.ok) { setConn("Kod geçersiz ya da süresi dolmuş. Bilgisayarda \"Tablet\" düğmesinden yeni kod al", "bad"); return; }
       state.token = (await res.json()).token;
       connect();
     } catch (_) { setConn("Sunucuya ulaşılamadı", "bad"); }

@@ -12,6 +12,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Self
 
+from usta import compat
 from usta.workspace import find_protected
 
 MAX_OUTPUT = 1_000_000  # bayt; fazlası kırpılır
@@ -57,7 +58,7 @@ def pin_image(image: str, home: Path | None = None) -> str:
     pins = load_pins(home) | {image: iid}
     home.mkdir(parents=True, exist_ok=True, mode=0o700)
     tmp = home / (PIN_FILE + ".tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | compat.nofollow(), 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(pins, f, indent=2)
     os.replace(tmp, home / PIN_FILE)
@@ -136,7 +137,7 @@ def build_docker_args(
     ]
     args += ["--cap-drop", "ALL", "--security-opt", "no-new-privileges"]
     args += ["--pids-limit", str(cfg.pids), "--memory", cfg.memory, "--cpus", cfg.cpus]
-    args += ["--user", f"{os.getuid()}:{os.getgid()}", "--tmpfs", "/tmp:rw,size=64m"]
+    args += [*compat.user_args(), "--tmpfs", "/tmp:rw,size=64m"]
     if name:
         args += ["--name", name]
     for k, v in (env or {}).items():
@@ -284,7 +285,7 @@ class ProxyNetwork:
         ]
         run += ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges"]
         run += ["--pids-limit", "64", "--memory", "128m", "--cpus", "0.5"]
-        run += ["--user", f"{os.getuid()}:{os.getgid()}"]
+        run += compat.user_args()
         run += ["-e", f"USTA_ALLOW={','.join(cfg.allowed_hosts)}"]
         run += ["-e", f"USTA_PORTS={','.join(map(str, cfg.allowed_ports))}"]
         if cfg.proxy_allow_private:

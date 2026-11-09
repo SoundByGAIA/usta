@@ -20,6 +20,7 @@ from usta import (
     apis,
     bench,
     capability,
+    compat,
     mcp_runtime,
     mcpconfig,
     memory,
@@ -58,7 +59,7 @@ def _home() -> Path:
     home = Path(os.environ.get("USTA_HOME") or Path.home() / ".usta")
     with contextlib.suppress(OSError):  # yalnız sahibi okuyabilsin (jeton, anahtarlar, oturumlar)
         home.mkdir(parents=True, exist_ok=True, mode=0o700)
-        if home.stat().st_uid == os.getuid():
+        if compat.owns(home):
             os.chmod(home, 0o700)
     return home
 
@@ -240,6 +241,11 @@ def _parser() -> argparse.ArgumentParser:
         "-w", "--workspace", default=".", help="proje dizini (varsayılan: bulunduğun dizin)"
     )
     p.add_argument("--no-portal", action="store_true", help="web portalını başlatma")
+    p.add_argument(
+        "--lan",
+        action="store_true",
+        help="portalı aynı ağdaki tablet/telefona da aç (6 haneli kodla giriş; trafik şifrelenmez, yalnız güvendiğin ağda kullan)",
+    )
     p.add_argument(
         "--setup",
         action="store_true",
@@ -1329,8 +1335,17 @@ def _chat_cmd(args: argparse.Namespace) -> int:
                 load_or_create_token(home),
                 preferred_port=args.port or 8765,
                 workspace=wid,
+                lan=args.lan,
             )
             url = portal.start()
+            pairing = portal.pairing()
+            if pairing is not None:
+                urls, pin = pairing
+                print("Tablet/telefon için (aynı Wi-Fi'da):")
+                print(f"  adres: {urls[0] if urls else 'yerel ağ adresi bulunamadı'}")
+                print(
+                    f'  giriş kodu: {pin}  (5 dakika geçerli; yeni kod için portalda "Tablet" düğmesi)'
+                )
         except RuntimeError as e:
             print(f"uyarı: portal başlatılamadı: {e}", file=sys.stderr)
             portal = None
@@ -1361,6 +1376,7 @@ def _chat_cmd(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    compat.utf8_console()
     argv = list(sys.argv[1:] if argv is None else argv)
     command: list[str] = []
     if (

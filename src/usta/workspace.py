@@ -10,6 +10,8 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from usta import compat
+
 IGNORED_DIRS = {".git", ".usta", "__pycache__", "node_modules", ".venv"}
 
 
@@ -212,7 +214,9 @@ def _safe_write(root: Path, rel: str, data: bytes, mode: int | None = None) -> N
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(data)
-            os.fchmod(f.fileno(), (mode if mode is not None else 0o644) & 0o7777)  # izinleri koru
+            compat.fchmod(
+                f.fileno(), (mode if mode is not None else 0o644) & 0o7777
+            )  # izinleri koru
         os.replace(tmp, leaf)
     finally:
         tmp.unlink(missing_ok=True)

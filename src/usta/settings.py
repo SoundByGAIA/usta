@@ -10,7 +10,7 @@ import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from usta import theme, thinking
+from usta import compat, theme, thinking
 
 MODES = ("manual", "auto", "plan")
 ZOOMS = ("auto", "0.9", "1", "1.1", "1.25", "1.5", "1.75")
@@ -90,7 +90,7 @@ def save(home: Path, s: Settings) -> None:
     home.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = home / "config.json"
     tmp = path.with_name("config.json.tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | compat.nofollow(), 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(asdict(s), f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)

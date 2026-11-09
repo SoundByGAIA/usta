@@ -31,7 +31,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from usta import mcpconfig
+from usta import compat, mcpconfig
 from usta.mcp import McpClient, McpError
 from usta.sandbox import ProxyNetwork, SandboxConfig, SandboxError
 from usta.workspace import find_protected
@@ -123,7 +123,7 @@ def build_run_args(
     args += ["--network", network or "none", "--read-only"]
     args += ["--cap-drop", "ALL", "--security-opt", "no-new-privileges"]
     args += ["--pids-limit", str(srv.pids), "--memory", srv.memory, "--memory-swap", srv.memory]
-    args += ["--cpus", srv.cpus, "--user", f"{os.getuid()}:{os.getgid()}"]
+    args += ["--cpus", srv.cpus, *compat.user_args()]
     args += ["--tmpfs", "/tmp:rw,nosuid,size=64m", "-e", f"HOME={CONTAINER_HOME}"]
     for key, value in {**OFFLINE_ENV, **(extra_env or {})}.items():
         args += ["-e", f"{key}={value}"]

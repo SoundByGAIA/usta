@@ -180,3 +180,70 @@ def test_portal_rejects_foreign_host_header_dns_rebinding(tmp_path):
         )
     finally:
         p.stop()
+
+
+# --- yerel ağ modu: tablet/telefon eşleştirme PIN'i ----------------------------------------
+def test_digit_codes_are_numeric_and_single_use():
+    c = LoginCodes(digits=6)
+    pin = c.issue()
+    assert len(pin) == 6 and pin.isdigit()
+    assert c.redeem(pin) is True and c.redeem(pin) is False
+
+
+def _lan_client(tmp_path, pair=None):
+    from test_api import TOKEN
+
+    mgr = TaskManager(lambda: None, home=tmp_path / "home")
+    login = LoginCodes()
+    app = create_app(
+        mgr,
+        tmp_path / "home",
+        TOKEN,
+        login=login,
+        pair=pair,
+        lan_urls=["http://192.168.1.5:8765/"],
+    )
+    return TestClient(app), login, TOKEN
+
+
+def test_pair_endpoint_is_404_when_lan_off_and_needs_auth_when_on(tmp_path):
+    c, _, token = _lan_client(tmp_path, pair=None)
+    assert c.post("/pair").status_code == 401
+    r = c.post("/pair", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 404 and "--lan" in r.json()["detail"]
+    c, _, token = _lan_client(tmp_path, pair=LoginCodes(ttl=300, digits=6))
+    assert c.post("/pair").status_code == 401  # PIN'i yalnız giriş yapmış kullanıcı üretir
+    d = c.post("/pair", headers={"Authorization": f"Bearer {token}"}).json()
+    assert len(d["pin"]) == 6 and d["urls"] == ["http://192.168.1.5:8765/"] and d["ttl"] == 300
+
+
+def test_pin_exchanges_for_token_once_and_wrong_pins_lock_without_touching_login_code(tmp_path):
+    pair = LoginCodes(ttl=300, digits=6, max_failures=3)
+    c, login, token = _lan_client(tmp_path, pair=pair)
+    pin = c.post("/pair", headers={"Authorization": f"Bearer {token}"}).json()["pin"]
+    assert c.post("/auth/exchange", json={"code": pin}).json() == {"token": token}
+    assert c.post("/auth/exchange", json={"code": pin}).status_code == 401  # tek kullanım
+    pin = c.post("/pair", headers={"Authorization": f"Bearer {token}"}).json()["pin"]
+    wrong = "000000" if pin != "000000" else "111111"
+    for _ in range(3):
+        assert c.post("/auth/exchange", json={"code": wrong}).status_code == 401
+    assert c.post("/auth/exchange", json={"code": pin}).status_code == 401  # kilitlendi
+    code = login.issue()  # bilgisayardaki tarayıcının kodu etkilenmedi
+    assert c.post("/auth/exchange", json={"code": code}).json() == {"token": token}
+
+
+def test_privacy_report_mentions_lan_only_when_on(tmp_path):
+    c, _, token = _lan_client(tmp_path, pair=None)
+    h = {"Authorization": f"Bearer {token}"}
+    assert not any("Yerel ağ modu" in t for t in c.get("/privacy", headers=h).json()["other"])
+    c, _, token = _lan_client(tmp_path, pair=LoginCodes(digits=6))
+    h = {"Authorization": f"Bearer {token}"}
+    assert any("Yerel ağ modu AÇIK" in t for t in c.get("/privacy", headers=h).json()["other"])
+
+
+def test_portal_binds_loopback_by_default_and_lan_only_when_asked(tmp_path):
+    mgr = TaskManager(lambda: None, home=tmp_path / "home")
+    local = Portal(mgr, tmp_path / "home", "t", preferred_port=0)
+    assert local._host == "127.0.0.1" and local.pairing() is None
+    lan = Portal(mgr, tmp_path / "home", "t", preferred_port=0, lan=True)
+    assert lan._host == "0.0.0.0" and lan.pair is not None

@@ -16,6 +16,8 @@ import time
 import unicodedata
 from pathlib import Path
 
+from usta import compat
+
 MAX_NOTE_CHARS = 500
 MAX_NOTES_BYTES = 32_768
 MAX_HISTORY = 200
@@ -49,7 +51,9 @@ def _dir(root: Path, create: bool) -> Path | None:
 
 def _read(path: Path) -> str:
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)  # FIFO'da bloklanmaz
+        fd = os.open(
+            path, os.O_RDONLY | compat.nofollow() | compat.nonblock()
+        )  # FIFO'da bloklanmaz
     except OSError:
         return ""
     with os.fdopen(fd, "rb") as f:
@@ -61,7 +65,7 @@ def _read(path: Path) -> str:
 def _write(path: Path, text: str) -> None:
     tmp = path.with_name(path.name + ".tmp")
     tmp.unlink(missing_ok=True)  # önceden FIFO/bağ olarak bırakılmış geçici dosya açılmasın
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | compat.nofollow(), 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(text)
     os.replace(tmp, path)

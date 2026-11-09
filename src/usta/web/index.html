@@ -13,47 +13,15 @@
     <button id="apis-btn" type="button" aria-pressed="false">API'ler</button>
     <button id="privacy-btn" type="button" aria-pressed="false">Gizlilik</button>
     <button id="wizard-btn" type="button" aria-pressed="false">Kurulum</button>
+    <button id="tablet-btn" type="button" aria-pressed="false">Tablet</button>
+    <button id="settings-btn" type="button" aria-pressed="false">Ayarlar</button>
     <form id="token-form" autocomplete="off">
       <label for="token" class="sr">Jeton</label>
-      <input id="token" type="password" placeholder="Jeton (~/.usta/token)" autocomplete="off" spellcheck="false">
+      <input id="token" type="password" placeholder="Jeton ya da 6 haneli kod" autocomplete="off" spellcheck="false">
       <button type="submit">Bağlan</button>
     </form>
     <label for="model-select" class="sr">Model</label>
     <select id="model-select" title="Model (görevler arasında değiştirilir; uç nokta sabit)" hidden></select>
-    <label for="zoom" class="sr">Arayüz boyutu</label>
-    <select id="zoom" title="Arayüz boyutu: Otomatik pencere/ekran boyutuna uyar">
-      <option value="auto">Boyut: otomatik</option>
-      <option value="0.9">%90</option>
-      <option value="1">%100</option>
-      <option value="1.1">%110</option>
-      <option value="1.25">%125</option>
-      <option value="1.5">%150</option>
-      <option value="1.75">%175</option>
-    </select>
-    <label for="think" class="sr">Düşünme</label>
-    <select id="think" title="Düşünme: model cevap vermeden önce ne kadar düşünsün (desteklemeyen modelde etkisizdir)">
-      <option value="auto">Düşünme: model karar versin</option>
-      <option value="off">Düşünme: kapalı (hızlı)</option>
-      <option value="low">Düşünme: az</option>
-      <option value="medium">Düşünme: orta</option>
-      <option value="high">Düşünme: çok</option>
-    </select>
-    <label for="ctx" class="sr">Bağlam</label>
-    <select id="ctx" title="Bağlam: modelin aynı anda aklında tutacağı metin miktarı. Büyük değer daha çok bellek ister. Bilgisayarındaki Ollama modelinde gerçek pencereyi değiştirmek için API bölümündeki &quot;Bilgisayarımdaki model&quot; kartını kullan.">
-      <option value="0">Bağlam: otomatik</option>
-      <option value="4096">4K</option>
-      <option value="8192">8K</option>
-      <option value="16384">16K</option>
-      <option value="32768">32K</option>
-      <option value="65536">64K</option>
-      <option value="131072">128K</option>
-    </select>
-    <label for="theme" class="sr">Tema</label>
-    <select id="theme" title="Tema (terminalle ortak)">
-      <option value="siyah">Siyah</option>
-      <option value="gri">Gri</option>
-      <option value="beyaz">Beyaz</option>
-    </select>
     <span id="conn" role="status"></span>
   </header>
 
@@ -93,6 +61,67 @@
       <div class="row"><button id="wiz-test-back" type="button" hidden>Geri dön</button></div>
     </div>
     <p id="wiz-msg" class="empty" role="status"></p>
+  </section>
+
+  <section id="settings" aria-label="Ayarlar" hidden>
+    <h2>Ayarlar</h2>
+    <div class="set-row"><label for="zoom">Arayüz boyutu</label>
+    <select id="zoom" title="Arayüz boyutu: Otomatik pencere/ekran boyutuna uyar">
+      <option value="auto">Boyut: otomatik</option>
+      <option value="0.9">%90</option>
+      <option value="1">%100</option>
+      <option value="1.1">%110</option>
+      <option value="1.25">%125</option>
+      <option value="1.5">%150</option>
+      <option value="1.75">%175</option>
+    </select>
+    </div>
+    <div class="set-row"><label for="think">Düşünme</label>
+    <select id="think" title="Düşünme: model cevap vermeden önce ne kadar düşünsün (desteklemeyen modelde etkisizdir)">
+      <option value="auto">Düşünme: model karar versin</option>
+      <option value="off">Düşünme: kapalı (hızlı)</option>
+      <option value="low">Düşünme: az</option>
+      <option value="medium">Düşünme: orta</option>
+      <option value="high">Düşünme: çok</option>
+    </select>
+    </div>
+    <div class="set-row"><label for="ctx">Bağlam (modelin aklında tuttuğu metin)</label>
+    <select id="ctx" title="Bağlam: modelin aynı anda aklında tutacağı metin miktarı. Büyük değer daha çok bellek ister. Bilgisayarındaki Ollama modelinde gerçek pencereyi değiştirmek için API bölümündeki &quot;Bilgisayarımdaki model&quot; kartını kullan.">
+      <option value="0">Bağlam: otomatik</option>
+      <option value="4096">4K</option>
+      <option value="8192">8K</option>
+      <option value="16384">16K</option>
+      <option value="32768">32K</option>
+      <option value="65536">64K</option>
+      <option value="131072">128K</option>
+    </select>
+    </div>
+    <div class="set-row"><label for="theme">Renk</label>
+    <select id="theme" title="Tema (terminalle ortak)">
+      <option value="siyah">Siyah</option>
+      <option value="gri">Gri</option>
+      <option value="beyaz">Beyaz</option>
+    </select>
+    </div>
+  </section>
+
+  <section id="tablet" aria-label="Tablet ve telefon" hidden>
+    <h2>Tabletten ya da telefondan kullan</h2>
+    <div id="tablet-off" hidden>
+      <p>Bu özellik şu an kapalı. Açmak için Usta'yı kapat ve şöyle başlat:</p>
+      <p><code class="cmd">usta --lan</code></p>
+      <p class="note">Tablet ve bilgisayar aynı Wi-Fi'a bağlı olmalı. Windows ilk seferde bir güvenlik sorusu sorar: "Özel ağlara izin ver" kutusunu işaretleyip "Erişime izin ver"e bas.</p>
+    </div>
+    <div id="tablet-on" hidden>
+      <p>1. Tabletin tarayıcısını aç ve şu adresi yaz:</p>
+      <div id="tablet-urls"></div>
+      <p>2. Sorarsa şu kodu yaz:</p>
+      <p id="tablet-pin" class="wiz-pin" aria-live="polite"></p>
+      <p id="tablet-ttl" class="note"></p>
+      <div class="row"><button id="tablet-renew" type="button">Yeni kod</button></div>
+      <p class="note">Kod tek kullanımlıktır ve 5 dakika geçerlidir. Bu bağlantı şifrelenmez; yalnız evindeki gibi güvendiğin bir Wi-Fi'da kullan.</p>
+    </div>
+    <p id="tablet-msg" class="empty" role="status"></p>
   </section>
 
   <section id="privacy" aria-label="Gizlilik" hidden>

@@ -14,6 +14,8 @@ A feature becomes the default only if a measurement shows it helps.
 
 ## Quick start
 
+**New to the terminal, on Windows, or want to use it from a tablet?** See [docs/baslangic.md](docs/baslangic.md) (step-by-step, Turkish; `pip install usta` is all you need). Windows support is new in 0.3.0 and has had little end-to-end testing on real Windows.
+
 From PyPI: `uv tool install usta` (or `pip install usta`). From source:
 
 ```bash

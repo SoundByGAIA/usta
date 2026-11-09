@@ -48,7 +48,9 @@ def _size(p: Path) -> int:
         return 0
 
 
-def report(home: Path, sources: list[dict], current_api: str | None, allowed_hosts) -> dict:
+def report(
+    home: Path, sources: list[dict], current_api: str | None, allowed_hosts, lan_urls=None
+) -> dict:
     """`sources`: [{name, endpoint}]; `current_api`: kullanılan API adı (yoksa None)."""
     rows = [
         {"name": s["name"], "endpoint": s["endpoint"], "where": where(s["endpoint"])}
@@ -72,11 +74,22 @@ def report(home: Path, sources: list[dict], current_api: str | None, allowed_hos
             "(o sağlayıcının gizlilik koşulları geçerli)."
         )
     hosts = sorted(allowed_hosts or [])
+    lan = (
+        []
+        if lan_urls is None
+        else [
+            (
+                "Yerel ağ modu AÇIK: aynı ağdaki cihazlar bu sayfaya erişebilir ama eşleştirme PIN'i "
+                "olmadan giremez. Trafik şifrelenmez; yalnız güvendiğin ağda (ev Wi-Fi'ı) kullan."
+            )
+        ]
+    )
     return {
         "model": cur,
         "apis": rows,
         "sends": sends,
         "other": [
+            *lan,
             "Komutlar Docker içinde çalışır; Docker yoksa çalışmaz, bilgisayarında doğrudan çalışmaz. "
             + (
                 f"Ağ yalnız şu adreslere açıktır: {', '.join(hosts)}."

@@ -20,6 +20,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from usta import compat
 from usta.jsonproto import JsonProtocolClient
 from usta.modelinfo import detect_revision  # noqa: F401 - dışa açık ad (geriye dönük)
 from usta.models import Message, ModelClient, ModelError, ToolCall
@@ -603,7 +604,7 @@ def save(home: Path, p: CapabilityProfile) -> None:
     data[p.key] = asdict(p)
     home.mkdir(parents=True, exist_ok=True, mode=0o700)
     tmp = path.with_name("capabilities.json.tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | compat.nofollow(), 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)

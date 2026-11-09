@@ -5,6 +5,7 @@ bu yüzden portal aynı görevi canlı izler; onay, diff, geri alma ve meşgul k
 from __future__ import annotations
 
 import dataclasses
+import os
 import re
 import shlex
 import sys
@@ -12,7 +13,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from usta import mcpconfig, memory, projectcfg, skills, theme
+from usta import compat, mcpconfig, memory, projectcfg, skills, theme
 from usta import settings as st
 from usta.modelctl import ModelSwitchError
 from usta.tasks import RevertRefused, Task, TaskManager, WorkspaceBusy
@@ -105,7 +106,10 @@ class Repl:
         self.settings, self.inp = settings, inp
         self.out = out if out is not None else sys.stdout
         self.color = (
-            color if color is not None else bool(getattr(self.out, "isatty", lambda: False)())
+            color
+            if color is not None
+            else bool(getattr(self.out, "isatty", lambda: False)())
+            and not os.environ.get("NO_COLOR")
         )
         self.paint = theme.Painter(settings.theme, color=self.color)
         self.model_name, self.protocol = model_name, protocol
@@ -121,7 +125,9 @@ class Repl:
 
     def _prompt_str(self) -> str:
         s = self.paint("prompt", f"usta [{MODE_LABELS[self.mode]}] › ")
-        if self.color:  # readline imleç hesabı için görünmez dizileri işaretle
+        if (
+            self.color and compat.has_readline()
+        ):  # imleç hesabı için görünmez dizileri işaretle (Windows'ta yok)
             s = re.sub(r"(\x1b\[[0-9;]*m)", "\001\\1\002", s)
         return s
 

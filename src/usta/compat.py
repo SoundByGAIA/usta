@@ -72,3 +72,41 @@ def utf8_console() -> None:
                 reconfigure(encoding="utf-8", errors="replace")
             except (OSError, ValueError):
                 pass
+
+
+_STD_HANDLES = (-11, -12)  # STD_OUTPUT_HANDLE, STD_ERROR_HANDLE
+_VT_FLAG = 0x0004  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+
+
+def enable_ansi(kernel32=None, windows: bool | None = None) -> bool:
+    """Konsolda renk kodlarını (ANSI) çözmeyi açar. Açılamazsa False döner (renk kapatılmalı).
+
+    Klasik Windows `cmd` penceresi bunu kendiliğinden yapmaz; açılmazsa ekranda `←[1m` gibi çöp karakterler çıkar.
+    Konsol olmayan çıktılar (dosyaya yönlendirme) için yapılacak bir şey yoktur.
+    """
+    if windows is None:
+        windows = sys.platform == "win32"
+    if not windows:
+        return True
+    import ctypes
+
+    try:
+        k32 = kernel32 if kernel32 is not None else ctypes.windll.kernel32  # type: ignore[attr-defined]
+        ok = True
+        for std in _STD_HANDLES:
+            handle = k32.GetStdHandle(std)
+            mode = ctypes.c_ulong()
+            if not k32.GetConsoleMode(handle, ctypes.byref(mode)):
+                continue  # konsol değil
+            if not mode.value & _VT_FLAG and not k32.SetConsoleMode(handle, mode.value | _VT_FLAG):
+                ok = False
+        return ok
+    except (AttributeError, OSError):
+        return False
+
+
+def has_readline() -> bool:
+    """`readline` modülü var mı? Windows'ta yok; yokken istem işaret karakterleri ekranda çöp olarak görünür."""
+    import importlib.util
+
+    return importlib.util.find_spec("readline") is not None

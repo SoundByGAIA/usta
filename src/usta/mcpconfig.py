@@ -121,7 +121,7 @@ def _read_json(path: Path, default: dict) -> dict:
     if not path.exists():
         return default
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         raise McpConfigError(f"{path.name} okunamadı veya bozuk") from None
     if not isinstance(data, dict):

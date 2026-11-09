@@ -114,7 +114,11 @@ def _key(endpoint: str, model: str) -> str:
 def load(home: Path, endpoint: str, model: str) -> Profile | None:
     path = Path(home) / "profiles.json"
     try:
-        data = json.loads(path.read_text()) if path.is_file() and not path.is_symlink() else {}
+        data = (
+            json.loads(path.read_text(encoding="utf-8"))
+            if path.is_file() and not path.is_symlink()
+            else {}
+        )
         raw = data.get(_key(endpoint, model)) if isinstance(data, dict) else None
         if not isinstance(raw, dict) or raw.get("protocol") not in PROTOCOLS:
             return None
@@ -127,7 +131,11 @@ def save(home: Path, endpoint: str, model: str, p: Profile) -> None:
     home = Path(home)
     path = home / "profiles.json"
     try:
-        data = json.loads(path.read_text()) if path.is_file() and not path.is_symlink() else {}
+        data = (
+            json.loads(path.read_text(encoding="utf-8"))
+            if path.is_file() and not path.is_symlink()
+            else {}
+        )
     except (OSError, ValueError):
         data = {}
     if not isinstance(data, dict):

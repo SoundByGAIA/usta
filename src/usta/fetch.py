@@ -236,11 +236,11 @@ def wrap_external(url: str, text: str, origin: str = "web'den") -> str:
 
 
 def _inner_source() -> str:
-    return Path(__file__).with_name("fetch_inner.py").read_text()
+    return Path(__file__).with_name("fetch_inner.py").read_text(encoding="utf-8")
 
 
 def _pdf_inner_source() -> str:
-    return Path(__file__).with_name("pdf_inner.py").read_text()
+    return Path(__file__).with_name("pdf_inner.py").read_text(encoding="utf-8")
 
 
 def _pypdf_dir() -> Path:

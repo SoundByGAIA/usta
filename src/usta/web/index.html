@@ -9,11 +9,11 @@
 <body>
   <header>
     <h1>Usta</h1>
-    <button id="tools-btn" type="button" aria-pressed="false">Araçlar</button>
-    <button id="apis-btn" type="button" aria-pressed="false">API'ler</button>
+    <button id="tools-btn" class="adv" type="button" aria-pressed="false">Araçlar</button>
+    <button id="apis-btn" class="adv" type="button" aria-pressed="false">API'ler</button>
     <button id="privacy-btn" type="button" aria-pressed="false">Gizlilik</button>
-    <button id="wizard-btn" type="button" aria-pressed="false">Kurulum</button>
-    <button id="tablet-btn" type="button" aria-pressed="false">Tablet</button>
+    <button id="wizard-btn" class="adv" type="button" aria-pressed="false">Kurulum</button>
+    <button id="tablet-btn" class="adv" type="button" aria-pressed="false">Tablet</button>
     <button id="settings-btn" type="button" aria-pressed="false">Ayarlar</button>
     <form id="token-form" autocomplete="off">
       <label for="token" class="sr">Jeton</label>
@@ -21,7 +21,8 @@
       <button type="submit">Bağlan</button>
     </form>
     <label for="model-select" class="sr">Model</label>
-    <select id="model-select" title="Model (görevler arasında değiştirilir; uç nokta sabit)" hidden></select>
+    <select id="model-select" class="adv" title="Model (görevler arasında değiştirilir; uç nokta sabit)" hidden></select>
+    <span id="where" class="where" role="status" hidden></span>
     <span id="conn" role="status"></span>
   </header>
 
@@ -100,6 +101,15 @@
 
   <section id="settings" aria-label="Ayarlar" hidden>
     <h2>Ayarlar</h2>
+    <div class="set-row"><label for="view">Görünüm</label>
+      <select id="view">
+        <option value="simple">Basit (yeni başlayanlar için)</option>
+        <option value="advanced">Gelişmiş (tüm araçlar)</option>
+      </select></div>
+    <div class="set-row"><label>Yapay zekâ</label>
+      <button id="set-wizard" type="button">Yapay zekâyı değiştir / kurulumu yeniden yap</button></div>
+    <div class="set-row"><label>Tablet ve telefon</label>
+      <button id="set-tablet" type="button">Tabletten ya da telefondan kullan</button></div>
     <div class="set-row"><label for="zoom">Arayüz boyutu</label>
     <select id="zoom" title="Arayüz boyutu: Otomatik pencere/ekran boyutuna uyar">
       <option value="auto">Boyut: otomatik</option>
@@ -217,20 +227,20 @@
 
   <main>
     <aside aria-label="Çalışma alanları">
-      <h2>Çalışma alanları</h2>
-      <ul id="ws-list"></ul>
-      <form id="ws-form">
+      <h2 class="adv">Çalışma alanları</h2>
+      <ul id="ws-list" class="adv"></ul>
+      <form id="ws-form" class="adv">
         <label for="ws-name" class="sr">Yeni çalışma alanı adı</label>
         <input id="ws-name" placeholder="yeni-alan" maxlength="40" pattern="[a-z0-9][a-z0-9_\-]{0,39}" required>
         <button type="submit">Oluştur</button>
       </form>
-      <h2 class="files-h">Dosyalar</h2>
+      <h2 class="files-h">Dosyalarım</h2>
       <div class="files-bar">
         <button id="f-refresh" type="button" title="Yenile" aria-label="Dosya listesini yenile">↻</button>
-        <button id="f-new-file" type="button" title="Yeni boş dosya" disabled>Yeni dosya</button>
-        <button id="f-new-dir" type="button" title="Yeni klasör" disabled>Yeni klasör</button>
+        <button id="f-new-file" class="adv" type="button" title="Yeni boş dosya" disabled>Yeni dosya</button>
+        <button id="f-new-dir" class="adv" type="button" title="Yeni klasör" disabled>Yeni klasör</button>
         <button id="f-up-files" type="button" title="Çalışma alanına dosya yükle" disabled>Dosya yükle</button>
-        <button id="f-up-dir" type="button" title="Klasörü (alt klasörleriyle) çalışma alanına yükle" disabled>Klasör yükle</button>
+        <button id="f-up-dir" class="adv" type="button" title="Klasörü (alt klasörleriyle) çalışma alanına yükle" disabled>Klasör yükle</button>
       </div>
       <form id="fs-form" class="fs-form" hidden autocomplete="off">
         <label id="fs-label" for="fs-input" class="empty"></label>
@@ -249,12 +259,12 @@
     <section id="work" aria-label="Görev">
       <div class="bar">
         <div role="tablist">
-          <button id="tab-stream" role="tab" aria-selected="true" type="button">Akış</button>
-          <button id="tab-diff" role="tab" aria-selected="false" type="button">Değişiklikler <span id="diff-count"></span></button>
-          <button id="tab-memory" role="tab" aria-selected="false" type="button">Hafıza <span id="memory-count"></span></button>
+          <button id="tab-stream" role="tab" aria-selected="true" type="button">Konuşma</button>
+          <button id="tab-diff" class="adv" role="tab" aria-selected="false" type="button">Değişiklikler <span id="diff-count"></span></button>
+          <button id="tab-memory" class="adv" role="tab" aria-selected="false" type="button">Hafıza <span id="memory-count"></span></button>
           <button id="tab-office" role="tab" aria-selected="false" type="button">Ofis</button>
           <button id="tab-history" role="tab" aria-selected="false" type="button">Geçmiş</button>
-          <button id="tab-preview" role="tab" aria-selected="false" type="button">Önizleme</button>
+          <button id="tab-preview" role="tab" aria-selected="false" type="button">Sonuç</button>
           <button id="tab-file" role="tab" aria-selected="false" type="button" hidden>Dosya</button>
         </div>
         <span id="ws-title"></span>
@@ -266,8 +276,19 @@
         <span id="replay-text"></span>
         <button id="replay-close" type="button">Yeni göreve dön</button>
       </div>
+      <div id="starters" class="starters" hidden></div>
       <div id="stream" aria-live="polite"></div>
-      <p id="mode-warn" class="note warn-note" hidden>Oto onay: onay isteyen eylemler sorulmadan çalışır. Yasaklar ve sandbox sınırları geçerlidir.</p>
+      <div id="result-card" class="card result-card" hidden>
+        <strong id="result-title">Usta işi bitirdi.</strong>
+        <div class="row">
+          <button id="result-open" class="primary" type="button" hidden>Sonucu aç</button>
+          <button id="result-folder" type="button">Dosyaları göster</button>
+          <button id="result-undo" type="button">Yaptığı değişikliği geri al</button>
+        </div>
+        <p class="wiz-note">Devam etmek için aşağıya yaz ya da bir öneriye bas:</p>
+        <div id="followups" class="followups"></div>
+      </div>
+      <p id="mode-warn" class="note warn-note adv" hidden>Oto onay: onay isteyen eylemler sorulmadan çalışır. Yasaklar ve sandbox sınırları geçerlidir.</p>
 
       <div id="diff" hidden>
         <div class="toolbar">
@@ -276,7 +297,7 @@
         <div id="diff-files"></div>
       </div>
 
-      <div id="office">
+      <div id="office" hidden>
         <p class="note">Usta'nın çalışması küçük bir piksel ofis olarak canlanır: Kitaplık, Atölye, Test tezgâhı, Postane, Hafıza dolabı. Bölge ve sayaçlar yalnız gerçek olaylardan gelir.</p>
         <div class="office-stage" id="office-stage">
           <canvas id="office-canvas" role="img" aria-label="Usta ofis animasyonu"></canvas>
@@ -354,12 +375,12 @@
         <textarea id="prompt" rows="3" placeholder="Ne yapmamı istersin? (Ctrl+Enter gönderir)" disabled></textarea>
         <div class="actions">
           <label for="mode" class="sr">Mod</label>
-          <select id="mode" title="Çalışma modu (terminalle ortak)">
+          <select id="mode" class="adv" title="Çalışma modu (terminalle ortak)">
             <option value="manual">Manuel: her onay sorulur</option>
             <option value="auto">Oto onay</option>
             <option value="plan">Plan: yalnız plan sunar</option>
           </select>
-          <label class="guard" title="Koruma: değişiklikten sonra testleri çalıştırır, döngüde son güvenli duruma döner">
+          <label class="guard adv" title="Koruma: değişiklikten sonra testleri çalıştırır, döngüde son güvenli duruma döner">
             <input id="guard" type="checkbox"> Koruma
           </label>
           <input id="file-input" type="file" multiple hidden accept=".md,.markdown,.txt,.json,.yaml,.yml,.toml,.csv,.log,.py,.js,.ts,.tsx,.jsx,.html,.css,.sh,.sql,.go,.rs,.java,.c,.h,.cpp,.rb,.php,.ini,.cfg,.xml,text/*">

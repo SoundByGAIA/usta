@@ -318,3 +318,40 @@ def test_start_from_a_project_folder_keeps_that_folder(tmp_path, monkeypatch):
     monkeypatch.chdir(proj)
     assert cli.main([]) == 0
     assert p.repl_kwargs["root"] == proj.resolve() and not (userhome / "Usta").exists()
+
+
+# --- beklenmeyen hata yakalayıcı ----------------------------------------------------------------
+def test_crash_handler_writes_secret_free_report_and_friendly_message(
+    tmp_path, monkeypatch, capsys, env
+):
+    secret = "sk-" + "a" * 40
+
+    def boom(argv=None):
+        raise RuntimeError(f"bir şey patladı {secret}")
+
+    monkeypatch.setattr(cli, "_main", boom)
+    assert cli.main([]) == 1
+    err = capsys.readouterr().err
+    assert "Beklenmeyen bir sorun oldu: RuntimeError" in err and "Rapor dosyası hazırladım" in err
+    reports = list(env.glob("rapor-*.txt"))
+    assert len(reports) == 1
+    text = reports[0].read_text(encoding="utf-8")
+    assert "RuntimeError" in text and "usta" in text and secret not in text  # anahtar maskelenir
+
+
+def test_crash_handler_explains_admin_created_usta_folder(monkeypatch, capsys, env):
+    def boom(argv=None):
+        raise PermissionError(13, "Permission denied", r"C:\Users\Ceren\.usta\token")
+
+    monkeypatch.setattr(cli, "_main", boom)
+    assert cli.main([]) == 1
+    err = capsys.readouterr().err
+    assert "yönetici olarak" in err and ".usta" in err and "Beklenmeyen" not in err
+
+
+def test_keyboard_interrupt_and_system_exit_are_not_reported_as_crashes(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_main", lambda argv=None: (_ for _ in ()).throw(KeyboardInterrupt()))
+    assert cli.main([]) == 130
+    monkeypatch.setattr(cli, "_main", lambda argv=None: (_ for _ in ()).throw(SystemExit(2)))
+    with pytest.raises(SystemExit):
+        cli.main([])

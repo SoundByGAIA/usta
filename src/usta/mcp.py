@@ -10,7 +10,6 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import signal
 import subprocess
 import tempfile
 import threading
@@ -19,6 +18,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Self
 
+from usta import compat
 from usta.fetch import _clean
 
 PROTOCOL_VERSION = "2025-06-18"
@@ -128,10 +128,7 @@ class McpClient:
             proc.wait(timeout=1.0)
         except subprocess.TimeoutExpired:
             pass
-        try:  # sunucu ve alt süreçleri (ör. npx → node) kendi grubundan
-            os.killpg(proc.pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            pass
+        compat.kill_group(proc.pid)  # sunucu ve alt süreçleri (ör. npx → node) kendi grubundan
         try:
             proc.wait(timeout=2.0)
         except subprocess.TimeoutExpired:
@@ -201,10 +198,7 @@ class McpClient:
     def _kill_group(self) -> None:
         self._run_on_close()
         if self.pid is not None:
-            try:
-                os.killpg(self.pid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                pass
+            compat.kill_group(self.pid)
 
     def _dispatch(self, line: bytes) -> None:
         try:

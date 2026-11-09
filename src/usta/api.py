@@ -295,6 +295,8 @@ def create_app(
     login: LoginCodes | None = None,
     workspace: str | None = None,
     trusted_hosts: list[str] | None = None,
+    pair: LoginCodes | None = None,
+    lan_urls: list[str] | None = None,
 ) -> FastAPI:
     home = Path(home)
 
@@ -773,12 +775,23 @@ def create_app(
             "reply": (r.content or "")[:200],
         }
 
+    @api.post("/pair")
+    def make_pair() -> dict:
+        """Tablet/telefon için kısa ömürlü eşleştirme PIN'i. Yalnız `usta --lan` ile açık."""
+        if pair is None:
+            raise HTTPException(404, "Yerel ağ modu kapalı. Usta'yı `usta --lan` ile başlat.")
+        return {"pin": pair.issue(), "ttl": int(pair.ttl), "urls": list(lan_urls or [])}
+
     @api.get("/privacy")
     def get_privacy() -> dict:
         ctl = manager.model_control
         sources = [{"name": r["name"], "endpoint": r["endpoint"]} for r in api_rows()]
         return privacy.report(
-            home, sources, ctl.api if ctl else None, getattr(manager, "allowed_hosts", None)
+            home,
+            sources,
+            ctl.api if ctl else None,
+            getattr(manager, "allowed_hosts", None),
+            lan_urls=list(lan_urls or []) if pair is not None else None,
         )
 
     @api.post("/local/scan")
@@ -919,7 +932,17 @@ def create_app(
 
         @app.post("/auth/exchange")
         def exchange(body: CodeIn) -> dict:
-            if not login.redeem(body.code):
+            # Tablet/telefon eşleştirme PIN'i (yalnız rakam) ayrı deponun sayacını kullanır; yanlış PIN
+            # bilgisayardaki tarayıcının kodunu kilitlemez.
+            if (
+                pair is not None
+                and pair.digits
+                and re.fullmatch(rf"\d{{{pair.digits}}}", body.code)
+            ):
+                ok = pair.redeem(body.code)
+            else:
+                ok = login.redeem(body.code)
+            if not ok:
                 raise HTTPException(401, "kod geçersiz, süresi dolmuş veya kullanılmış")
             return {"token": token}
 

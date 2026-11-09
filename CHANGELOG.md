@@ -1,5 +1,20 @@
 # Değişiklik günlüğü
 
+## 0.3.0 — herkes için: kurulum sihirbazı, Windows, tablet/telefon
+
+~20 kişilik kullanıcı geri bildiriminden doğdu: [docs/geri-bildirim-v0.3.md](docs/geri-bildirim-v0.3.md). Model
+başarısı iddiası yoktur; bu sürüm kullanılabilirlik ve gizlilik işidir. Varsayılan model davranışı DEĞİŞMEDİ.
+
+- **Kurulum sihirbazı:** model seçilmemişse (ya da `usta --setup`) portal sade bir sihirbazla açılır: "Bilgisayarımda" (Ollama'yı kendisi bulur) ya da "İnternet servisiyle" (DeepSeek, Gemini, OpenRouter, OpenAI; anahtar yapıştır). Sonunda modele bir "merhaba" gönderip çalıştığını gösterir. Hata mesajları kodsuz kullanıcıya göre ("Anahtar kabul edilmedi", "Hesabında bakiye yok görünüyor"). Servislerin model listesinden ses/görsel/gömme modelleri süzülür.
+- **Windows uyumu (`compat.py`):** Windows'ta bulunmayan POSIX çağrıları (`os.O_NOFOLLOW`, `os.getuid`, `os.killpg`, `os.fchmod`) için güvenli karşılıklar; konsol UTF-8'e çevrilir; `python -m usta` eklendi. Windows taklidi testleri var. **Gerçek Windows'ta uçtan uca denenmesi bu sürümde sınırlıdır** (bkz. docs/baslangic.md).
+- **Düşünme ayarı:** kapalı / az / orta / çok (`reasoning_effort`); alanı tanımayan uç noktada kullanıcıya hata göstermeden bırakılır.
+- **Bağlam ayarı:** portaldan; yerel Ollama'da gerçek `num_ctx`'li model varyantı oluşturma ("Bilgisayarımdaki model" kartı).
+- **Yerel model bulma:** Ollama, LM Studio, llama.cpp, vLLM portlarını yalnız `127.0.0.1`'de arar ya da elle port.
+- **Gizlilik ekranı:** istemlerin nereye gittiği (bu bilgisayar / yerel ağ / internet) gerçek duruma göre hesaplanır; ev dizinindeki dosyalar listelenir. "Telemetri yok" iddiası testle korunur: kaynakta ağa çıkabilen modüller bilinen bir listeden fazlaysa test kırılır; arayüz dışarıdan kaynak yüklemediği de test edilir.
+- **Tablet/telefon (`usta --lan`), varsayılan KAPALI:** portal yerel ağa açılır; tablet 6 haneli, tek kullanımlık, 5 dakikalık bir kodla girer (5 yanlışta kilitlenir). Trafik şifrelenmez: yalnız güvenilir ağda kullanılır; sahte `Host` başlıkları reddedilir.
+- **Ayarlar paneli:** boyut, düşünme, bağlam ve renk seçicileri üst çubuktan tek bir panele toplandı.
+- `usta serve` modunda model değiştirme/sihirbaz yoktur (yalnız `usta` portal modunda).
+
 ## 0.2.2 — orta zorlukta bench ve kademeli yönlendirme (deneysel)
 
 Ölçümler ve sınırlar: [docs/bench-orta-olcum.md](docs/bench-orta-olcum.md). Varsayılan davranış DEĞİŞMEDİ.

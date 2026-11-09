@@ -14,6 +14,8 @@ kılan harness** (araç çağrısı, bağlam yönetimi, doğrulama döngüsü, d
 
 ## Hızlı başlangıç
 
+**Hiç kod bilmiyorsan, Windows kullanıyorsan ya da tabletten kullanmak istiyorsan:** [docs/baslangic.md](docs/baslangic.md) (adım adım, sade anlatım; `pip install usta` yeterli).
+
 PyPI'den: `uv tool install usta` (ya da `pip install usta`). Kaynaktan:
 
 ```bash

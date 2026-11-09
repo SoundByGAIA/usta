@@ -22,6 +22,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
+from usta import compat
 from usta.proxy import validate_allowed_host
 from usta.sandbox import ProxyNetwork, RunResult, SandboxConfig, SandboxError, run_command
 
@@ -254,7 +255,7 @@ def _check_pdf_file(workdir: Path, name: object, limit: int) -> None:
     if name != "body.pdf":
         raise FetchError("PDF gövdesi alınamadı")
     try:
-        fd = os.open(workdir / name, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(workdir / name, os.O_RDONLY | compat.nofollow())
     except OSError:
         raise FetchError("PDF gövdesi alınamadı") from None
     with os.fdopen(fd, "rb") as f:

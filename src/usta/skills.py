@@ -9,6 +9,8 @@ import os
 import re
 from pathlib import Path
 
+from usta import compat
+
 NAME = re.compile(r"[a-z0-9çğıöşü][a-z0-9çğıöşü_-]{0,29}")
 MAX_SIZE = 20_000
 
@@ -45,7 +47,7 @@ def put(home: Path, name: str, content: str) -> None:
         raise SkillError(f"içerik boş, ikili ya da {MAX_SIZE // 1000} KB'tan büyük")
     d = _dir(home)
     d.mkdir(parents=True, exist_ok=True, mode=0o700)
-    fd = os.open(d / f"{name}.md", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    fd = os.open(d / f"{name}.md", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | compat.nofollow(), 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(content)
 

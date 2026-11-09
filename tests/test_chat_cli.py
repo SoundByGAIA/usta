@@ -31,14 +31,20 @@ class Probe:
                 return 0
 
         class FakePortal:
-            def __init__(self, manager, home, token, preferred_port=8765, workspace=None):
+            def __init__(
+                self, manager, home, token, preferred_port=8765, workspace=None, lan=False
+            ):
                 probe.portal_workspace = workspace
                 probe.portal_port = preferred_port
+                probe.portal_lan = lan
                 self.url = "http://127.0.0.1:9999/"
 
             def start(self):
                 probe.portal_started += 1
                 return self.url
+
+            def pairing(self):
+                return (["http://192.168.1.5:9999/"], "123456") if probe.portal_lan else None
 
             def login_url(self):
                 return self.url + "?code=abc"
@@ -255,3 +261,18 @@ def test_portal_receives_terminal_workspace_id(tmp_path, monkeypatch, env):
     cli.main(["--model", "m"])
     link = next((env / "workspaces").iterdir())
     assert p.portal_workspace == link.name
+
+
+def test_lan_flag_reaches_portal_and_prints_pairing_info(tmp_path, monkeypatch, capsys):
+    p = Probe(monkeypatch)
+    st.save(
+        tmp_path.parent / f"{tmp_path.name}-ustahome",
+        st.Settings(model="m", endpoint="http://e/v1"),
+    )
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["--lan"]) == 0
+    assert p.portal_lan is True
+    out = capsys.readouterr().out
+    assert "192.168.1.5" in out and "123456" in out
+    cli.main([])
+    assert p.portal_lan is False  # varsayılan: yerel ağa kapalı

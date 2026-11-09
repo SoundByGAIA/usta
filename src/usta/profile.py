@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from usta import compat
 from usta.jsonproto import JsonProtocolClient
 from usta.models import Message, ModelClient, ModelError
 from usta.textproto import TextProtocolClient
@@ -134,7 +135,7 @@ def save(home: Path, endpoint: str, model: str, p: Profile) -> None:
     data[_key(endpoint, model)] = asdict(p)
     home.mkdir(parents=True, exist_ok=True, mode=0o700)
     tmp = path.with_name("profiles.json.tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | compat.nofollow(), 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)

@@ -13,6 +13,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from usta import compat
+
 IMAGE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9._/:@-]{0,199}")
 MAX_ARG = 4096
 
@@ -65,7 +67,7 @@ def _write(home: Path, data: dict) -> None:
     home.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = home / "projects.json"
     tmp = path.with_name("projects.json.tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | compat.nofollow(), 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)

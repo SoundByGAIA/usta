@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from dataclasses import replace as dc_replace
 from pathlib import Path
 
+from usta import compat
+
 NAME = re.compile(r"[a-z0-9][a-z0-9_-]{0,29}")
 ENV_NAME = re.compile(r"[A-Z_][A-Z0-9_]{0,63}")
 BLOCKED_ENV_PREFIXES = ("LD_", "DYLD_")
@@ -130,7 +132,7 @@ def _read_json(path: Path, default: dict) -> dict:
 def _write_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     tmp = path.with_name(path.name + ".tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | compat.nofollow(), 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.chmod(tmp, stat.S_IRUSR | stat.S_IWUSR)

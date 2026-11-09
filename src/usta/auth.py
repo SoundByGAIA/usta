@@ -20,8 +20,9 @@ class LoginCodes:
         ttl: float = 120.0,
         max_failures: int = 5,
         clock: Callable[[], float] = time.monotonic,
+        digits: int | None = None,
     ):
-        self.ttl, self.max_failures, self.clock = ttl, max_failures, clock
+        self.ttl, self.max_failures, self.clock, self.digits = ttl, max_failures, clock, digits
         self._code: str | None = None
         self._expires = 0.0
         self._failures = 0
@@ -33,7 +34,11 @@ class LoginCodes:
 
     def issue(self) -> str:
         with self._lock:
-            self._code = secrets.token_urlsafe(24)
+            self._code = (
+                f"{secrets.randbelow(10**self.digits):0{self.digits}d}"
+                if self.digits
+                else secrets.token_urlsafe(24)
+            )
             self._expires = self.clock() + self.ttl
             self._failures = 0
             return self._code

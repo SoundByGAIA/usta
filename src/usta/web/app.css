@@ -216,3 +216,10 @@ select { font: inherit; color: inherit; background: var(--bg); border: 1px solid
 #wizard { padding: 8px 16px 24px; max-width: 760px; margin: 0 auto; }
 .wiz-step h2 { margin: 8px 0 6px; font-size: 22px; text-transform: none; letter-spacing: 0; color: var(--text); }
 .wiz-step .row { margin-top: 8px; }
+#tablet { padding: 8px 16px 24px; max-width: 760px; margin: 0 auto; }
+.wiz-pin { font-size: 40px; letter-spacing: .25em; font-weight: 700; font-variant-numeric: tabular-nums; margin: 6px 0; }
+#tablet-urls code { display: block; font-size: 18px; padding: 8px 0; word-break: break-all; }
+#settings { padding: 8px 16px 24px; max-width: 760px; margin: 0 auto; }
+.set-row { display: flex; flex-direction: column; gap: 4px; margin: 14px 0; }
+.set-row label { font-weight: 600; }
+.set-row select { max-width: 360px; }

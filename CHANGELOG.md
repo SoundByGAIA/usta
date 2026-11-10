@@ -9,6 +9,7 @@ Model davranışı DEĞİŞMEDİ.
 - **Ayarlar → "Yardım iste":** Usta'nın durumunu kısa bir yazıya döker (sürüm, işletim sistemi, bellek, Docker/Ollama kurulu mu, seçili yapay zekâ, son hataların türü ve saati, arka plan günlüğünün sonu). İçinde yazdıkların, dosyaların ve anahtarın YOKTUR; ev klasörü yolu ve bağlantı kodları da silinir. Hiçbir yere kendiliğinden gönderilmez: kullanıcı dosya olarak indirir ya da kopyalar, kendisi gönderir. Başarısız görevler artık denetim günlüğüne `task_failed` olarak yazılır (yalnız hata türü).
 - **`SECURITY.md`:** "Kırmayı deneyenler için rehber" eklendi (nerede denenir, önce nereye bakılır, hangi araçlar var, nasıl bildirilir). Bağımlılık bölümü güncellendi.
 - **Gizlilik listesi:** `usta.log` ve `running.json` dosyaları da "bilgisayarında saklananlar" listesinde.
+- **Yayından hemen sonra düzeltildi (paket aynı, yalnız kurulum dosyası):** `Usta-Kur.bat` depoda LF satır sonlarıyla duruyordu; GitHub'dan indirilen kopya Windows'ta bozuk çalışıyordu (yayınlanan dosya gerçek Windows'ta indirilip denenince görüldü). Dosya artık depoda da CRLF durur (`.gitattributes`: `*.bat -text`) ve bir test bunu denetler.
 - Windows'ta ayrıca denendi: bozuk kapanıştan kalan `running.json` ile yeniden açılış, simgeye ikinci tıklama (yeni süreç açmaz), "Usta'yı kapat". Docker'lı komut çalıştırma ve tablet bağlantısı Windows'ta hâlâ denenmedi.
 
 ## 0.4.3 — sözlük

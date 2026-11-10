@@ -265,3 +265,6 @@ body.simple .adv { display: none !important; }
 .approval .plain { font-size: 1.05em; margin: 4px 0; }
 .approval .plain-warn { color: #d29922; margin: 4px 0; }
 body.simple .msg.result { display: none; }
+
+button.q { min-width: 24px; height: 24px; padding: 0 6px; margin: 0 2px; border: 1px solid currentColor; border-radius: 50%; background: transparent; color: inherit; font-weight: 700; font-size: 0.85em; line-height: 1; cursor: pointer; vertical-align: middle; }
+button.q:hover, button.q:focus-visible { outline: 2px solid currentColor; }

@@ -185,3 +185,10 @@ def test_js_exchanges_login_code_and_cleans_url():
 def test_html_has_guard_checkbox_and_js_sends_it():
     assert 'id="guard"' in (WEB / "index.html").read_text()
     assert 'guard: $("guard").checked' in (WEB / "app.js").read_text()
+
+
+def test_every_help_button_points_to_a_glossary_term():
+    terms = set(re.findall(r'term: "([^"]+)"', (WEB / "glossary.js").read_text(encoding="utf-8")))
+    used = set(re.findall(r'data-gloss="([^"]+)"', (WEB / "index.html").read_text(encoding="utf-8")))
+    used |= {"Ollama", "Docker"}  # Ayarlar → programlar kartları (app.js, ilk sözcük)
+    assert used and used <= terms, used - terms

@@ -55,7 +55,7 @@ Bu bağlantı şifrelenmez. Yalnız evindeki gibi güvendiğin bir Wi-Fi'da kull
 ## Bilmen gerekenler (dürüst notlar)
 
 - **Docker yoksa komut çalıştırılamaz.** Usta, bilgisayarında bir komut çalıştırması gerektiğinde bunu güvenlik için Docker adlı programın içinde yapar. Docker kurulu değilse Usta dosya yazabilir ve okuyabilir ama komut çalıştıramaz (ör. yazdığı kodu deneyemez). Basit sayfa/metin işleri için gerekmez.
-- **Windows'ta denendi, ama sınırlı.** Usta Linux'ta geliştirildi. 9 Kasım 2026'da gerçek bir Windows 10 bilgisayarda (Python 3.14) kurulum, açılış, ayarlar, dosya yazma ve Türkçe karakterler denendi ve buldukları düzeltildi. Docker'lı komut çalıştırma ve tablet bağlantısı Windows'ta denenmedi. Bir şey bozulursa bize haber ver.
+- **Windows'ta denendi, ama sınırlı.** Usta Linux'ta geliştirildi. 9 Kasım 2026'da gerçek bir Windows 10 bilgisayarda (Python 3.14) kurulum, açılış, ayarlar, dosya yazma ve Türkçe karakterler denendi ve buldukları düzeltildi. 10 Kasım'da masaüstü simgesi ve arka planda çalışma da denendi. Docker'lı komut çalıştırma ve tablet bağlantısı Windows'ta denenmedi. Bir şey bozulursa bize haber ver.
 - **Verin nerede?** Usta'daki "Gizlilik" düğmesi, yazdıklarının nereye gittiğini ve bilgisayarında neleri sakladığını gösterir.
 
 ## Sorun olursa

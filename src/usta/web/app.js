@@ -795,7 +795,9 @@
     box.replaceChildren(...items.map((it) => {
       const card = h("div", "card");
       const state = d.os === undefined ? "" : (it.ok ? " (kurulu ✓)" : " (kurulu değil)");
-      card.append(h("strong", null, `${it.name}${state}`), h("p", null, it.why));
+      const ask = h("button", "q", "?");
+      ask.type = "button"; ask.dataset.gloss = it.name.split(" ")[0]; ask.title = "Bu ne demek?"; ask.setAttribute("aria-label", `Bu ne demek? ${it.name}`);
+      card.append(h("strong", null, `${it.name}${state} `), ask, h("p", null, it.why));
       if (!it.ok) card.appendChild(wizLink(it.url, it.text));
       return card;
     }));
@@ -1539,6 +1541,13 @@
   $("wizard-btn").addEventListener("click", () => togglePanel("wizard"));
   $("tablet-btn").addEventListener("click", () => togglePanel("tablet"));
   $("glossary-btn").addEventListener("click", () => togglePanel("glossary"));
+  document.addEventListener("click", (ev) => {
+    const b = ev.target.closest && ev.target.closest("button.q[data-gloss]");
+    if (!b) return;
+    if ($("glossary").hidden) togglePanel("glossary");
+    $("gloss-q").value = b.dataset.gloss;
+    renderGlossary();
+  });
   $("gloss-q").addEventListener("input", renderGlossary);
   $("settings-btn").addEventListener("click", () => togglePanel("settings"));
   $("tablet-renew").addEventListener("click", loadTablet);

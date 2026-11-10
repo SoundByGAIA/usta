@@ -44,7 +44,7 @@
           </ul>
           <span class="wiz-label bad">Eksileri</span>
           <ul class="wiz-list con">
-            <li>Hesap açıp bir "anahtar" almak gerekir (yaklaşık 5-10 dakika)</li>
+            <li>Hesap açıp bir "anahtar" almak gerekir (yaklaşık 5-10 dakika) <button type="button" class="q" data-gloss="API anahtarı" aria-label="Bu ne demek? API anahtarı" title="Bu ne demek?">?</button></li>
             <li>Yazdıkların o şirketin sunucusuna gider</li>
             <li>Ücretsiz kotalar sınırlıdır; ücretli kullanımda para çıkar</li>
           </ul>
@@ -60,7 +60,7 @@
           </ul>
           <span class="wiz-label bad">Eksileri</span>
           <ul class="wiz-list con">
-            <li>Bir program (Ollama) ve bir model (2-5 GB) indirmen gerekir</li>
+            <li>Bir program (Ollama) <button type="button" class="q" data-gloss="Ollama" aria-label="Bu ne demek? Ollama" title="Bu ne demek?">?</button> ve bir model (2-5 GB) <button type="button" class="q" data-gloss="Model" aria-label="Bu ne demek? Model" title="Bu ne demek?">?</button> indirmen gerekir</li>
             <li>Küçük modeller basit işlerde iyidir, zor işlerde başarısız olur</li>
             <li>Ekran kartı yoksa yavaş çalışır; bilgisayar belleğine bağlıdır</li>
           </ul>
@@ -78,7 +78,7 @@
     </div>
     <div id="wiz-cloud-step" class="wiz-step" hidden>
       <h2>İnternet servisi</h2>
-      <p class="note">Bir servis seç. Servisin sitesinde hesabından bir <strong>anahtar</strong> alacaksın: uzun bir şifre gibi bir yazı. Bu yazıyı aşağıdaki kutuya yapıştıracaksın; yalnız bu bilgisayarda saklanır.</p>
+      <p class="note">Bir servis seç. Servisin sitesinde hesabından bir <strong>anahtar</strong> <button type="button" class="q" data-gloss="API anahtarı" aria-label="Bu ne demek? API anahtarı" title="Bu ne demek?">?</button> alacaksın: uzun bir şifre gibi bir yazı. Bu yazıyı aşağıdaki kutuya yapıştıracaksın; yalnız bu bilgisayarda saklanır.</p>
       <div id="wiz-services"></div>
       <div id="wiz-service-help" class="card" hidden></div>
       <form id="wiz-cloud-form" autocomplete="off" hidden>
@@ -144,7 +144,7 @@
       <option value="high">Düşünme: çok</option>
     </select>
     </div>
-    <div class="set-row"><label for="ctx">Bağlam (modelin aklında tuttuğu metin)</label>
+    <div class="set-row"><label for="ctx">Bağlam (modelin aklında tuttuğu metin)</label><button type="button" class="q" data-gloss="Bağlam penceresi" aria-label="Bu ne demek? Bağlam penceresi" title="Bu ne demek?">?</button>
     <select id="ctx" title="Bağlam: modelin aynı anda aklında tutacağı metin miktarı. Büyük değer daha çok bellek ister. Bilgisayarındaki Ollama modelinde gerçek pencereyi değiştirmek için API bölümündeki &quot;Bilgisayarımdaki model&quot; kartını kullan.">
       <option value="0">Bağlam: otomatik</option>
       <option value="4096">4K</option>
@@ -232,7 +232,7 @@
     <input id="skill-input" type="file" accept=".md,text/markdown" multiple hidden>
     <p id="skills-msg" class="empty" role="status"></p>
     <h2>MCP araçları</h2>
-    <p class="note">Ek araçlar (MCP sunucuları) <strong>yalıtılmış bir Docker konteynerinde</strong> çalışır (ev dizinin ve Docker soketi yok, ağ yalnız gerekli adreslere açık); Docker ve imaj gerekir. Yine de yalnız güvendiklerini ekle. Her çağrıları varsayılan olarak onayına sunulur.</p>
+    <p class="note">Ek araçlar (MCP sunucuları) <strong>yalıtılmış bir Docker konteynerinde</strong> <button type="button" class="q" data-gloss="Docker" aria-label="Bu ne demek? Docker" title="Bu ne demek?">?</button> çalışır (ev dizinin ve Docker soketi yok, ağ yalnız gerekli adreslere açık); Docker ve imaj gerekir. Yine de yalnız güvendiklerini ekle. Her çağrıları varsayılan olarak onayına sunulur.</p>
     <div id="tools-installed"></div>
     <h2>Eklenebilir</h2>
     <div id="tools-catalog"></div>

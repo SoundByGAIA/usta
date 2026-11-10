@@ -3,6 +3,7 @@
 ## 0.4.3 — sözlük
 
 - **Sözlük:** üst çubukta her zaman görünen "Sözlük" düğmesi. 40 kelime (JSON, Docker, Ollama, API anahtarı, token, terminal, bağlam penceresi...) 5 yaşındaki bir çocuğa anlatır gibi, her biri için gündelik bir benzetmeyle açıklanır; arama kutusu aksansız yazımı ve takma adları da bulur. Veri arayüzün içindedir, dışarıdan bir şey yüklenmez.
+- **"?" düğmeleri:** kurulum ekranındaki "anahtar", "Ollama", "model", "bağlam", "Docker" gibi zor kelimelerin yanına küçük "?" düğmesi konuldu; basınca Sözlük o kelimenin kartıyla açılır. Bir testle her "?" düğmesinin sözlükte karşılığı olduğu denetlenir.
 
 ## 0.4.2 — indirmen gerekebilecek programlar
 

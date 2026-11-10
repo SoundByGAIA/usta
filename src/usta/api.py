@@ -10,6 +10,7 @@ import mimetypes
 import os
 import re
 import secrets
+import shutil
 import sys
 import threading
 import time
@@ -842,6 +843,8 @@ def create_app(
             "os": sys.platform,
             "ram_gb": None if ram is None else round(ram, 1),
             "ollama_running": ollama is not None,
+            "ollama_installed": ollama is not None or shutil.which("ollama") is not None,
+            "docker_installed": shutil.which("docker") is not None,
             "installed": ollama["models"] if ollama else [],
             "recommend": localmodels.recommend(ram),
         }

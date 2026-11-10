@@ -776,6 +776,22 @@
     card.appendChild(actions);
     return card;
   }
+  async function loadPrograms() {
+    const box = $("programs");
+    let d = {};
+    try { const res = await api("/system/info"); if (res.ok) d = await res.json(); } catch { /* durum bilinmiyor */ }
+    const items = [
+      { name: "Ollama", ok: d.ollama_installed, why: "Yapay zekâyı kendi bilgisayarında çalıştırır. Gerekli mi? Yalnız \"Bilgisayarımda\" seçeneğini seçersen. İnternet servisi kullanıyorsan gerekmez.", url: "https://ollama.com/download", text: "Ollama'yı indir" },
+      { name: "Docker Desktop", ok: d.docker_installed, why: "Usta'nın bilgisayarında komut çalıştırmasını güvenli bir kutuda yapar. Gerekli mi? Sayfa, yazı, hesap makinesi gibi basit işler için hayır. Yazdığı kodu denemesini istiyorsan evet.", url: "https://www.docker.com/products/docker-desktop/", text: "Docker Desktop'ı indir" },
+    ];
+    box.replaceChildren(...items.map((it) => {
+      const card = h("div", "card");
+      const state = d.os === undefined ? "" : (it.ok ? " (kurulu ✓)" : " (kurulu değil)");
+      card.append(h("strong", null, `${it.name}${state}`), h("p", null, it.why));
+      if (!it.ok) card.appendChild(wizLink(it.url, it.text));
+      return card;
+    }));
+  }
   function togglePanel(name) {
     const open = $(name).hidden;
     for (const p of ["tools", "apis", "privacy", "wizard", "tablet", "settings"]) {
@@ -788,6 +804,7 @@
     else if (name === "privacy") loadPrivacy();
     else if (name === "wizard") wizShow("wiz-start");
     else if (name === "tablet") loadTablet();
+    else if (name === "settings") loadPrograms();
     else { apisMsg(""); loadApis(); }
   }
   const fmtBytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);

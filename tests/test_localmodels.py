@@ -173,6 +173,7 @@ def test_system_info_and_pull_endpoints(tmp_path, monkeypatch):
     assert c.get("/system/info").status_code == 401
     d = c.get("/system/info", headers=AUTH).json()
     assert d["ram_gb"] == 8.0 and d["ollama_running"] is False
+    assert isinstance(d["docker_installed"], bool) and isinstance(d["ollama_installed"], bool)
     assert d["recommend"]["model"] == localmodels.MODEL_SMALL["name"]
     assert c.get("/local/pull", headers=AUTH).status_code == 200
     assert c.post("/local/pull", json={"model": "../x"}, headers=AUTH).status_code == 400

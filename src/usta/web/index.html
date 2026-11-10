@@ -15,6 +15,7 @@
     <button id="wizard-btn" class="adv" type="button" aria-pressed="false">Kurulum</button>
     <button id="tablet-btn" class="adv" type="button" aria-pressed="false">Tablet</button>
     <button id="settings-btn" type="button" aria-pressed="false">Ayarlar</button>
+    <button id="dev-btn" type="button" aria-pressed="false" title="Açınca ileri düzey araçlar görünür (dosya farkları, hafıza, API'ler...)">Geliştirici modu: Kapalı</button>
     <form id="token-form" autocomplete="off">
       <label for="token" class="sr">Jeton</label>
       <input id="token" type="password" placeholder="Jeton ya da 6 haneli kod" autocomplete="off" spellcheck="false">
@@ -101,10 +102,10 @@
 
   <section id="settings" aria-label="Ayarlar" hidden>
     <h2>Ayarlar</h2>
-    <div class="set-row"><label for="view">Görünüm</label>
+    <div class="set-row"><label for="view">Geliştirici modu</label>
       <select id="view">
-        <option value="simple">Basit (yeni başlayanlar için)</option>
-        <option value="advanced">Gelişmiş (tüm araçlar)</option>
+        <option value="simple">Kapalı: sade ekran (yeni başlayanlar için)</option>
+        <option value="advanced">Açık: tüm araçlar görünsün</option>
       </select></div>
     <div class="set-row"><label>Yapay zekâ</label>
       <button id="set-wizard" type="button">Yapay zekâyı değiştir / kurulumu yeniden yap</button></div>

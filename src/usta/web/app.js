@@ -44,6 +44,9 @@
     state.view = view === "advanced" ? "advanced" : "simple";
     document.body.classList.toggle("simple", state.view === "simple");
     $("view").value = state.view;
+    const on = state.view === "advanced";
+    $("dev-btn").textContent = `Geliştirici modu: ${on ? "Açık" : "Kapalı"}`;
+    $("dev-btn").setAttribute("aria-pressed", String(on));
   }
   async function updateWhere() {
     const el = $("where");
@@ -1543,6 +1546,11 @@
     applyZoom();
   });
   $("think").addEventListener("change", () => saveSetting({ think: $("think").value }));
+  $("dev-btn").addEventListener("click", () => {
+    const next = state.view === "advanced" ? "simple" : "advanced";
+    applyView(next);
+    saveSetting({ view: next });
+  });
   $("view").addEventListener("change", () => { applyView($("view").value); saveSetting({ view: $("view").value }); });
   $("set-wizard").addEventListener("click", () => { if ($("wizard").hidden) togglePanel("wizard"); else wizShow("wiz-start"); });
   $("set-tablet").addEventListener("click", () => togglePanel("tablet"));

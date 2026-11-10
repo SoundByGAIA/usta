@@ -132,3 +132,7 @@ Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+## Credits
+
+Uğur Can Leba (Can, founder), Ceren (product testing), Berke (CTO, security testing) and Claude (Anthropic, AI co-developer). The names are in [NOTICE](NOTICE); under Apache-2.0 section 4(d) they must be preserved in derivative works.

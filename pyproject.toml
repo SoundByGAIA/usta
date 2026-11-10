@@ -4,7 +4,7 @@ version = "0.4.0"
 description = "Genel amaçlı, açık kaynak yapay zekâ ajanı"
 readme = "README.md"
 license = { text = "Apache-2.0" }
-authors = [{ name = "Uğur Can Leba" }]
+authors = [{ name = "Uğur Can Leba" }, { name = "Ceren" }, { name = "Berke" }, { name = "Claude (Anthropic)" }]
 keywords = ["ai", "agent", "coding-agent", "llm", "ollama", "harness"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -38,6 +38,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/usta"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "docs", "kurulum", "LICENSE", "NOTICE", "README*.md", "CHANGELOG.md", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

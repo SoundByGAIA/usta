@@ -4,10 +4,10 @@ Telif hakkı 2026 Usta katkıcıları
 Bu ürün şu kişilerin ve ekibin emeğidir:
 
   Ordis
-  Uğur Can Leba        - kurucu, ürün yönü
-  Ceren Yıldız         - ürün denemesi ve ilk kullanıcı testleri
-  Berke Dündar         - CTO, güvenlik ve dayanıklılık sınaması
-  Claude (Anthropic)   - yapay zekâ ortak geliştirici
+  Uğur Can Leba        - Ordis mimarı, kurucu
+  Claude (Anthropic)   - Ordis mimarı, yapay zekâ ortak geliştirici
+  Berke Dündar         - güvenlik ve geliştirme (CTO)
+  Ceren Yıldız         - başöğretmen ve yerelleştirme
 
 Apache Lisansı 2.0'ın 4(d) maddesi uyarınca bu NOTICE dosyası, Usta'nın
 türev çalışmalarında ve dağıtımlarında korunmalıdır; yukarıdaki adlar

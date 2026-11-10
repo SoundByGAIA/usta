@@ -1,5 +1,13 @@
 # Değişiklik günlüğü
 
+## 0.4.1 — geliştirici modu düğmesi ve katkıcı adları
+
+Küçük düzeltme sürümü; model davranışı DEĞİŞMEDİ.
+
+- **Geliştirici modu başlıkta görünür:** "Geliştirici modu: Kapalı/Açık" düğmesi artık her zaman üst çubukta; Ayarlar'daki seçici de aynı adı taşıyor. Önceden geçiş Ayarlar'da küçük bir "Görünüm" seçicisinin arkasındaydı ve bulunamıyordu.
+- **Katkıcı adları:** `NOTICE` dosyası eklendi (Ordis; Uğur Can Leba ve Claude Ordis mimarları; Berke Dündar güvenlik ve geliştirme; Ceren Yıldız başöğretmen ve yerelleştirme); README'lerde ve paket yazarlarında da var. Apache-2.0 4(d) gereği türev çalışmalarda korunmalıdır.
+- **Doğrulandı:** Claude (Anthropic) uyumluluk ucu gerçek anahtarla denendi: sohbet çalışıyor; `/v1/models` listesi `anthropic-version` başlığı ister, sabit model listesi geçerli.
+
 ## 0.4.0 — yeni kullanıcı dostu arayüz ve terminalsiz kullanım
 
 İlk kodsuz kullanıcı testinin (Windows 10, [docs/kullanici-testi-2026-11-09.md](docs/kullanici-testi-2026-11-09.md)) ve geri bildirim turunun sonucu. Model davranışı DEĞİŞMEDİ; bu sürüm kullanılabilirlik işidir. Windows'taki yeni parçalar (masaüstü simgesi, arka plan modu, tek örnek, kapatma, bellek tespiti) 10 Kasım 2026'da gerçek Windows 10 + Python 3.14'te, yetkisiz token ile denendi ve geçti. `Usta-Kur.bat` yayından sonra denenecek.

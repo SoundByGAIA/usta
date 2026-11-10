@@ -37,6 +37,7 @@ from usta import (
     memory,
     privacy,
     skills,
+    support,
 )
 from usta import settings as usta_settings
 from usta.audit import AuditLog
@@ -164,23 +165,50 @@ class SettingsIn(BaseModel):
 
 
 def friendly_model_error(text: str) -> str:
-    """Model hatasını kodsuz bir kullanıcıya anlaşılır cümleye çevirir."""
+    """Model hatasını kodsuz bir kullanıcıya anlaşılır cümleye çevirir (web/logic.js ile aynı cümleler)."""
     if "HTTP 401" in text or "HTTP 403" in text:
         return (
             "Anahtar kabul edilmedi. Doğru kopyaladığından ve hesabında bakiye olduğundan emin ol."
         )
     if "HTTP 402" in text:
-        return "Hesabında bakiye yok görünüyor. Servisin sayfasından bakiye yükle."
+        return "Hesabında bakiye yok görünüyor. Servisin sayfasından bakiye yükle ya da ücretsiz bir model seç."
     if "HTTP 404" in text:
-        return "Bu model bulunamadı. Listeden başka bir model seç."
+        return "Bu model bulunamadı. Kurulum ekranından başka bir model seç."
     if "HTTP 429" in text:
-        return "Çok fazla istek gönderildi ya da kota doldu. Biraz bekleyip tekrar dene."
-    if "ConnectError" in text or "ConnectTimeout" in text:
-        return "Servise ulaşılamıyor. İnternet bağlantını ya da programın açık olduğunu kontrol et."
-    if "Timeout" in text:
         return (
-            "Model zamanında cevap vermedi. Büyük modeller ilk istekte yavaş olabilir; tekrar dene."
+            "Bugünkü ücretsiz hakkın doldu ya da çok hızlı istek gönderildi. "
+            "Biraz bekle, yarın tekrar dene ya da başka bir servis ekle."
         )
+    if re.search(r"HTTP 4\d\d", text):
+        return (
+            "Model bu isteği kabul etmedi. Konuşma çok uzamış olabilir: "
+            "yeni bir görev başlat ya da başka bir model seç."
+        )
+    if re.search(r"HTTP 5\d\d", text):
+        return (
+            "Servis şu an cevap veremiyor. Sorun sende değil: "
+            "birkaç dakika sonra tekrar dene ya da başka bir model seç."
+        )
+    if "ConnectError" in text or "ConnectTimeout" in text:
+        return (
+            "Servise ulaşılamıyor. İnternet bağlantını "
+            "(ya da bilgisayarındaki modelin açık olduğunu) kontrol et."
+        )
+    if "Timeout" in text:
+        return "Model zamanında cevap vermedi. Büyük modeller yavaş olabilir; tekrar dene."
+    if re.search(r"ReadError|WriteError|RemoteProtocolError|NetworkError", text):
+        return "Bağlantı yarıda koptu. İnternet bağlantını kontrol et ve tekrar dene."
+    if "protokolü bozdu" in text or "araç çağrısı çözümlenemedi" in text:
+        return (
+            "Model ne yapacağını düzgün anlatamadı. Küçük modellerde olur: "
+            "tekrar dene ya da daha güçlü bir model seç."
+        )
+    if re.search(r"JSONDecodeError|KeyError|IndexError|ValueError", text):
+        return (
+            "Servis anlaşılmayan bir cevap gönderdi. Tekrar dene; yine olursa başka bir model seç."
+        )
+    if "beklenmeyen hata" in text:
+        return "Usta'da beklenmeyen bir şey oldu. Tekrar dene; yine olursa Ayarlar'daki \"Yardım iste\" düğmesine bas."
     return "Model cevap vermedi. Ayrıntı: " + text
 
 
@@ -827,6 +855,28 @@ def create_app(
             getattr(manager, "allowed_hosts", None),
             lan_urls=list(lan_urls or []) if pair is not None else None,
         )
+
+    @api.get("/support/report")
+    def support_report() -> dict:
+        """Yardım raporu: kullanıcı görür ve kendisi gönderir; hiçbir yere kendiliğinden gitmez."""
+        ctl = manager.model_control
+        src = ctl._source(ctl.api) if ctl and ctl.api else None
+        cur = usta_settings.load(home)
+        text = support.report(
+            home,
+            model=ctl.name if ctl else None,
+            api=ctl.api if ctl else None,
+            endpoint=src.endpoint if src else None,
+            settings={
+                "görünüm": cur.view,
+                "mod": cur.mode,
+                "düşünme": cur.think,
+                "bağlam": cur.context_window or "otomatik",
+            },
+            background=on_quit is not None,
+            lan=pair is not None,
+        )
+        return {"filename": f"usta-yardim-{time.strftime('%Y%m%d-%H%M')}.txt", "text": text}
 
     @api.post("/local/scan")
     def local_scan(body: LocalScanIn) -> list[dict]:

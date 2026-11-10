@@ -1591,6 +1591,29 @@
   $("view").addEventListener("change", () => { applyView($("view").value); saveSetting({ view: $("view").value }); });
   $("set-wizard").addEventListener("click", () => { if ($("wizard").hidden) togglePanel("wizard"); else wizShow("wiz-start"); });
   $("set-tablet").addEventListener("click", () => togglePanel("tablet"));
+  // Yardım raporu: sunucu hazırlar, kullanıcı görür ve kendisi gönderir (kendiliğinden hiçbir yere gitmez).
+  let helpReport = null;
+  $("set-help").addEventListener("click", async () => {
+    const res = await api("/support/report");
+    $("help-box").hidden = false;
+    if (!res.ok) { helpReport = null; $("help-text").textContent = ""; $("help-msg").textContent = "Rapor hazırlanamadı. Usta'yı kapatıp yeniden aç ve tekrar dene."; return; }
+    helpReport = await res.json();
+    $("help-text").textContent = helpReport.text;
+    $("help-msg").textContent = "Rapor hazır. İndir ya da kopyala, sonra sana Usta'yı veren kişiye gönder.";
+  });
+  $("help-save").addEventListener("click", () => {
+    if (!helpReport) return;
+    const url = URL.createObjectURL(new Blob([helpReport.text], { type: "text/plain;charset=utf-8" }));
+    const a = h("a"); a.href = url; a.download = helpReport.filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    $("help-msg").textContent = `"${helpReport.filename}" dosyası İndirilenler klasörüne indi. Bu dosyayı sana Usta'yı veren kişiye gönder.`;
+  });
+  $("help-copy").addEventListener("click", async () => {
+    if (!helpReport) return;
+    try { await navigator.clipboard.writeText(helpReport.text); $("help-msg").textContent = "Kopyalandı. Mesajına yapıştırıp gönderebilirsin."; }
+    catch { $("help-msg").textContent = "Kopyalanamadı. Yazıyı elle seçip kopyala ya da dosya olarak indir."; }
+  });
   let quitArmed = null;
   $("set-quit").addEventListener("click", async () => {
     const b = $("set-quit");

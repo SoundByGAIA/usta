@@ -1,5 +1,16 @@
 # Değişiklik günlüğü
 
+## 0.4.4 — sağlamlaştırma: kurulum, anlaşılır hatalar, "Yardım iste"
+
+Model davranışı DEĞİŞMEDİ.
+
+- **`Usta-Kur.bat` gerçek Windows'ta denendi ve yeniden yazıldı:** 10 Kasım 2026'da Windows 10 + Python 3.14'te, yetkisiz token ile baştan sona çalıştırıldı (kurulum, masaüstü simgesi, açılış). Artık `python` PATH'te yoksa `py` başlatıcısını dener, pip'in İngilizce uyarılarını göstermez, yazıları Türkçe karakterlerle basar ve hata olursa ne yapılacağını söyler. Python hiç yoksa çıkan dal (indirme sayfasını açar) denenmedi.
+- **Anlaşılır hata cümleleri:** bir görev ya da model denemesi başarısız olunca artık her durumda düz Türkçe bir cümle ve ne yapılacağı yazar (anahtar kabul edilmedi, bakiye bitti, model bulunamadı, günlük hak doldu, servis cevap vermiyor, bağlantı koptu, model zamanında cevap vermedi, model ne yapacağını anlatamadı...). Sunucu ve arayüz aynı cümleleri kullanır; ortak bir örnek dosyasıyla (`tests/web/friendly-errors.json`) ikisi de denetlenir.
+- **Ayarlar → "Yardım iste":** Usta'nın durumunu kısa bir yazıya döker (sürüm, işletim sistemi, bellek, Docker/Ollama kurulu mu, seçili yapay zekâ, son hataların türü ve saati, arka plan günlüğünün sonu). İçinde yazdıkların, dosyaların ve anahtarın YOKTUR; ev klasörü yolu ve bağlantı kodları da silinir. Hiçbir yere kendiliğinden gönderilmez: kullanıcı dosya olarak indirir ya da kopyalar, kendisi gönderir. Başarısız görevler artık denetim günlüğüne `task_failed` olarak yazılır (yalnız hata türü).
+- **`SECURITY.md`:** "Kırmayı deneyenler için rehber" eklendi (nerede denenir, önce nereye bakılır, hangi araçlar var, nasıl bildirilir). Bağımlılık bölümü güncellendi.
+- **Gizlilik listesi:** `usta.log` ve `running.json` dosyaları da "bilgisayarında saklananlar" listesinde.
+- Windows'ta ayrıca denendi: bozuk kapanıştan kalan `running.json` ile yeniden açılış, simgeye ikinci tıklama (yeni süreç açmaz), "Usta'yı kapat". Docker'lı komut çalıştırma ve tablet bağlantısı Windows'ta hâlâ denenmedi.
+
 ## 0.4.3 — sözlük
 
 - **Sözlük:** üst çubukta her zaman görünen "Sözlük" düğmesi. 40 kelime (JSON, Docker, Ollama, API anahtarı, token, terminal, bağlam penceresi...) 5 yaşındaki bir çocuğa anlatır gibi, her biri için gündelik bir benzetmeyle açıklanır; arama kutusu aksansız yazımı ve takma adları da bulur. Veri arayüzün içindedir, dışarıdan bir şey yüklenmez.

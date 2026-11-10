@@ -81,3 +81,18 @@ def test_friendly_errors_cover_common_cases():
     assert "bulunamadı" in f("model isteği başarısız: HTTP 404")
     assert "ulaşılamıyor" in f("model isteği başarısız: ConnectError")
     assert "Ayrıntı" in f("garip bir şey")
+
+
+def test_friendly_errors_match_the_shared_cases():
+    """Sunucu ve web aynı hata cümlelerini verir: ikisi de tests/web/friendly-errors.json ile sınanır."""
+    import json
+    from pathlib import Path
+
+    from usta.api import friendly_model_error as f
+
+    cases = json.loads((Path(__file__).parent / "web" / "friendly-errors.json").read_text("utf-8"))
+    assert len(cases) >= 20
+    for text, expected in cases:
+        out = f(text)
+        assert expected in out, (text, out)
+        assert "HTTP" not in out and "Error" not in out, out  # kullanıcıya ham kod gösterilmez

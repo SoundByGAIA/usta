@@ -2,7 +2,7 @@
 
 ## 0.4.0 — yeni kullanıcı dostu arayüz ve terminalsiz kullanım
 
-İlk kodsuz kullanıcı testinin (Windows 10, [docs/kullanici-testi-2026-11-09.md](docs/kullanici-testi-2026-11-09.md)) ve geri bildirim turunun sonucu. Model davranışı DEĞİŞMEDİ; bu sürüm kullanılabilirlik işidir. Windows'taki yeni parçalar (masaüstü simgesi, arka plan modu) bu notlar yazılırken gerçek Windows'ta denenmemişti.
+İlk kodsuz kullanıcı testinin (Windows 10, [docs/kullanici-testi-2026-11-09.md](docs/kullanici-testi-2026-11-09.md)) ve geri bildirim turunun sonucu. Model davranışı DEĞİŞMEDİ; bu sürüm kullanılabilirlik işidir. Windows'taki yeni parçalar (masaüstü simgesi, arka plan modu, tek örnek, kapatma, bellek tespiti) 10 Kasım 2026'da gerçek Windows 10 + Python 3.14'te, yetkisiz token ile denendi ve geçti. `Usta-Kur.bat` yayından sonra denenecek.
 
 - **Basit görünüm (varsayılan) ve Gelişmiş görünüm:** Basit görünümde yalnız yazı kutusu, başlangıç işleri, sonuç ve dosyalar var; araç/API/mod/çalışma alanı gibi gelişmiş öğeler gizli. Ayarlar'dan "Gelişmiş" seçilince hepsi döner. Mevcut kullanıcılar için de varsayılan "Basit"tir; Ayarlar → Görünüm'den değiştirilir.
 - **Terminalsiz kullanım:** `python -m usta --kisayol` masaüstüne "Usta" simgesi koyar (Windows `.lnk`, Linux `.desktop`); simge Usta'yı pencere açmadan arka planda (`--arka-plan`) başlatıp tarayıcıyı açar. Zaten açıksa ikinci tıklama yeni süreç açmaz, tarayıcıyı yeniden bağlar. Ayarlar → "Usta'yı kapat" ile kapatılır. Arka plan modunun günlüğü `~/.usta/usta.log`. `kurulum/Usta-Kur.bat`: Python'u denetler, Usta'yı kurar, simgeyi koyar, açar (Windows).

@@ -185,4 +185,4 @@ Apache-2.0. Bkz. [LICENSE](LICENSE).
 
 ## Emek verenler
 
-Ordis, Uğur Can Leba (kurucu), Ceren Yıldız (ürün denemesi), Berke Dündar (CTO, güvenlik sınaması) ve Claude (Anthropic, yapay zekâ ortak geliştirici). Adlar [NOTICE](NOTICE) dosyasında yazılıdır; Apache-2.0 4(d) gereği türev çalışmalarda korunmalıdır.
+Ordis. Uğur Can Leba (Ordis mimarı, kurucu) ve Claude (Anthropic, Ordis mimarı, yapay zekâ ortak geliştirici); Berke Dündar (güvenlik ve geliştirme, CTO); Ceren Yıldız (başöğretmen ve yerelleştirme). Adlar [NOTICE](NOTICE) dosyasında yazılıdır; Apache-2.0 4(d) gereği türev çalışmalarda korunmalıdır.

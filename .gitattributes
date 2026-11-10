@@ -1,1 +1,4 @@
-*.bat text eol=crlf
+# .bat dosyaları depoda da CRLF durur (-text: git satır sonlarına dokunmaz). Kullanıcı Usta-Kur.bat'ı
+# raw.githubusercontent.com'dan indirir; orası depodaki baytları verir. LF ile inen dosyayı Windows'un cmd'si
+# Türkçe karakterlerle birlikte yanlış böler ve kurulum bozulur (10 Kasım 2026'da gerçek Windows'ta görüldü).
+*.bat -text

@@ -1,5 +1,9 @@
 # Değişiklik günlüğü
 
+## 0.4.3 — sözlük
+
+- **Sözlük:** üst çubukta her zaman görünen "Sözlük" düğmesi. 40 kelime (JSON, Docker, Ollama, API anahtarı, token, terminal, bağlam penceresi...) 5 yaşındaki bir çocuğa anlatır gibi, her biri için gündelik bir benzetmeyle açıklanır; arama kutusu aksansız yazımı ve takma adları da bulur. Veri arayüzün içindedir, dışarıdan bir şey yüklenmez.
+
 ## 0.4.2 — indirmen gerekebilecek programlar
 
 - **Ayarlar → "İndirmen gerekebilecek programlar":** Ollama ve Docker Desktop için kurulu/kurulu değil durumu, düz Türkçe "gerekli mi?" açıklaması ve resmî indirme sayfasına giden düğme. İnternet servisi kullanan kişi hiçbirini indirmek zorunda değildir. `/system/info` artık `ollama_installed` ve `docker_installed` döndürür.

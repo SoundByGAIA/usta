@@ -135,4 +135,4 @@ Apache-2.0. See [LICENSE](LICENSE).
 
 ## Credits
 
-Uğur Can Leba (Can, founder), Ceren (product testing), Berke (CTO, security testing) and Claude (Anthropic, AI co-developer). The names are in [NOTICE](NOTICE); under Apache-2.0 section 4(d) they must be preserved in derivative works.
+Ordis, Uğur Can Leba (founder), Ceren Yıldız (product testing), Berke Dündar (CTO, security testing) and Claude (Anthropic, AI co-developer). The names are in [NOTICE](NOTICE); under Apache-2.0 section 4(d) they must be preserved in derivative works.

@@ -23,6 +23,7 @@ def client(tmp_path):
         ("/logic.js", "text/javascript"),
         ("/office-logic.js", "text/javascript"),
         ("/office.js", "text/javascript"),
+        ("/glossary.js", "text/javascript"),
     ],
 )
 def test_ui_files_are_public_with_right_type(tmp_path, path, ctype):

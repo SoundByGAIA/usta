@@ -11,6 +11,7 @@
     <h1>Usta</h1>
     <button id="tools-btn" class="adv" type="button" aria-pressed="false">Araçlar</button>
     <button id="apis-btn" class="adv" type="button" aria-pressed="false">API'ler</button>
+    <button id="glossary-btn" type="button" aria-pressed="false" title="Bilmediğin bir kelimeyi burada ara">Sözlük</button>
     <button id="privacy-btn" type="button" aria-pressed="false">Gizlilik</button>
     <button id="wizard-btn" class="adv" type="button" aria-pressed="false">Kurulum</button>
     <button id="tablet-btn" class="adv" type="button" aria-pressed="false">Tablet</button>
@@ -98,6 +99,13 @@
       <div class="row"><button id="wiz-test-back" type="button" hidden>Geri dön</button></div>
     </div>
     <p id="wiz-msg" class="empty" role="status"></p>
+  </section>
+
+  <section id="glossary" aria-label="Sözlük" hidden>
+    <h2>Sözlük</h2>
+    <p class="wiz-note">Bilmediğin bir kelime mi var? Aşağıya yaz, 5 yaşındaki bir çocuğa anlatır gibi açıklayayım.</p>
+    <input id="gloss-q" type="search" placeholder="Mesela: JSON, Docker, token" autocomplete="off" spellcheck="false" aria-label="Sözlükte ara">
+    <div id="gloss-list"></div>
   </section>
 
   <section id="settings" aria-label="Ayarlar" hidden>
@@ -399,6 +407,7 @@
   </main>
 
   <script src="/logic.js"></script>
+  <script src="/glossary.js"></script>
   <script src="/office-logic.js"></script>
   <script src="/office.js"></script>
   <script src="/app.js"></script>

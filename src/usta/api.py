@@ -57,6 +57,7 @@ UI_FILES = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/logic.js": ("logic.js", "text/javascript; charset=utf-8"),
     "/office-logic.js": ("office-logic.js", "text/javascript; charset=utf-8"),
+    "/glossary.js": ("glossary.js", "text/javascript; charset=utf-8"),
     "/office.js": ("office.js", "text/javascript; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
 }

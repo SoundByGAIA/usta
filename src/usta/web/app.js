@@ -776,6 +776,14 @@
     card.appendChild(actions);
     return card;
   }
+  function renderGlossary() {
+    const found = UstaGlossary.search($("gloss-q").value);
+    $("gloss-list").replaceChildren(...(found.length ? found.map((t) => {
+      const card = h("div", "card");
+      card.append(h("strong", null, t.term), h("p", null, t.say), h("p", "wiz-note", `Benzetme: ${t.like}`));
+      return card;
+    }) : [h("p", "empty", "Bunu bulamadım. Başka bir kelimeyle dene ya da Usta'ya sor.")]));
+  }
   async function loadPrograms() {
     const box = $("programs");
     let d = {};
@@ -794,7 +802,7 @@
   }
   function togglePanel(name) {
     const open = $(name).hidden;
-    for (const p of ["tools", "apis", "privacy", "wizard", "tablet", "settings"]) {
+    for (const p of ["tools", "apis", "privacy", "wizard", "tablet", "settings", "glossary"]) {
       $(p).hidden = !(open && p === name);
       $(`${p}-btn`).setAttribute("aria-pressed", String(open && p === name));
     }
@@ -805,6 +813,7 @@
     else if (name === "wizard") wizShow("wiz-start");
     else if (name === "tablet") loadTablet();
     else if (name === "settings") loadPrograms();
+    else if (name === "glossary") { $("gloss-q").value = ""; renderGlossary(); $("gloss-q").focus(); }
     else { apisMsg(""); loadApis(); }
   }
   const fmtBytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
@@ -1529,6 +1538,8 @@
   $("local-scan").addEventListener("click", scanLocal);
   $("wizard-btn").addEventListener("click", () => togglePanel("wizard"));
   $("tablet-btn").addEventListener("click", () => togglePanel("tablet"));
+  $("glossary-btn").addEventListener("click", () => togglePanel("glossary"));
+  $("gloss-q").addEventListener("input", renderGlossary);
   $("settings-btn").addEventListener("click", () => togglePanel("settings"));
   $("tablet-renew").addEventListener("click", loadTablet);
   $("wiz-local").addEventListener("click", wizLocal);

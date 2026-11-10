@@ -209,3 +209,29 @@ test("plainProgress describes tool calls in plain Turkish for the simple view", 
   const tc = L.summarize("tool_call", { tool: "write_file", args: { path: "p.txt" } });
   assert.equal(tc.tool, "write_file"); assert.deepEqual(tc.args, { path: "p.txt" });
 });
+
+// --- Sözlük (5 yaşındaki çocuğa göre) ---
+const G = require(path.resolve(__dirname, "../../src/usta/web/glossary.js"));
+
+test("sözlük: her terimin açıklaması ve benzetmesi var, kısa ve tekrarsız", () => {
+  const seen = new Set();
+  for (const t of G.TERMS) {
+    assert.ok(t.term && t.say && t.like, `eksik alan: ${t.term}`);
+    assert.ok(t.say.length <= 230, `uzun açıklama: ${t.term}`);
+    assert.ok(!seen.has(t.term.toLocaleLowerCase("tr")), `yinelenen terim: ${t.term}`);
+    seen.add(t.term.toLocaleLowerCase("tr"));
+  }
+  for (const must of ["JSON", "Docker", "Ollama", "API anahtarı", "Token", "Model", "Terminal"]) {
+    assert.ok(G.TERMS.some((t) => t.term === must), `eksik terim: ${must}`);
+  }
+});
+
+test("sözlük: arama ad, takma ad ve açıklamada bulur; ad eşleşmesi önde", () => {
+  assert.equal(G.search("json")[0].term, "JSON");
+  assert.equal(G.search("DOCKER")[0].term, "Docker");
+  assert.equal(G.search("ctx")[0].term, "Bağlam penceresi");
+  assert.equal(G.search("siyah pencere")[0].term, "Terminal");
+  assert.equal(G.search("yapay zeka")[0].term, "Yapay zekâ"); // aksansız yazım takma adla bulunur
+  assert.deepEqual(G.search("zzzzqqq"), []);
+  assert.equal(G.search("").length, G.TERMS.length);
+});

@@ -1,5 +1,9 @@
 # Değişiklik günlüğü
 
+## 0.4.2 — indirmen gerekebilecek programlar
+
+- **Ayarlar → "İndirmen gerekebilecek programlar":** Ollama ve Docker Desktop için kurulu/kurulu değil durumu, düz Türkçe "gerekli mi?" açıklaması ve resmî indirme sayfasına giden düğme. İnternet servisi kullanan kişi hiçbirini indirmek zorunda değildir. `/system/info` artık `ollama_installed` ve `docker_installed` döndürür.
+
 ## 0.4.1 — geliştirici modu düğmesi ve katkıcı adları
 
 Küçük düzeltme sürümü; model davranışı DEĞİŞMEDİ.

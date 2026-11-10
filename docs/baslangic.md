@@ -9,7 +9,7 @@ Usta, ne istediğini yazdığında bunu senin için yapan bir yapay zekâ yardı
 
 1. `kurulum/Usta-Kur.bat` dosyasını indir: bu sayfadaki bağlantıya sağ tıkla → "Bağlantıyı farklı kaydet" (adres: `https://raw.githubusercontent.com/SoundByGAIA/usta/main/kurulum/Usta-Kur.bat`).
 2. İndirdiğin dosyaya **çift tıkla**. Windows "bilinmeyen yayıncı" derse "Yine de çalıştır"a bas.
-3. Dosya Python'u kontrol eder (yoksa nasıl kuracağını söyler), Usta'yı kurar ve masaüstüne **"Usta"** simgesi koyar. Sonunda Usta kendiliğinden açılır.
+3. Dosya Python'u kontrol eder (yoksa nasıl kuracağını söyler), Usta'yı kurar ve masaüstüne **"Usta"** simgesi koyar. Sonunda Usta kendiliğinden açılır. Siyah pencerede bir süre yazı çıkmayabilir; kapatma, çalışıyor.
 4. Bundan sonra Usta'yı açmak için **masaüstündeki "Usta" simgesine çift tıkla**. Siyah pencere açılmaz; tarayıcın açılır. İşin bitince Usta'daki **Ayarlar → "Usta'yı kapat"** düğmesine bas.
 
 ### Elle kurulum (üstteki çalışmazsa)
@@ -55,7 +55,7 @@ Bu bağlantı şifrelenmez. Yalnız evindeki gibi güvendiğin bir Wi-Fi'da kull
 ## Bilmen gerekenler (dürüst notlar)
 
 - **Docker yoksa komut çalıştırılamaz.** Usta, bilgisayarında bir komut çalıştırması gerektiğinde bunu güvenlik için Docker adlı programın içinde yapar. Docker kurulu değilse Usta dosya yazabilir ve okuyabilir ama komut çalıştıramaz (ör. yazdığı kodu deneyemez). Basit sayfa/metin işleri için gerekmez.
-- **Windows'ta denendi, ama sınırlı.** Usta Linux'ta geliştirildi. 9 Kasım 2026'da gerçek bir Windows 10 bilgisayarda (Python 3.14) kurulum, açılış, ayarlar, dosya yazma ve Türkçe karakterler denendi ve buldukları düzeltildi. 10 Kasım'da masaüstü simgesi ve arka planda çalışma da denendi. Docker'lı komut çalıştırma ve tablet bağlantısı Windows'ta denenmedi. Bir şey bozulursa bize haber ver.
+- **Windows'ta denendi, ama sınırlı.** Usta Linux'ta geliştirildi. 9 Kasım 2026'da gerçek bir Windows 10 bilgisayarda (Python 3.14) kurulum, açılış, ayarlar, dosya yazma ve Türkçe karakterler denendi ve buldukları düzeltildi. 10 Kasım'da masaüstü simgesi, arka planda çalışma ve tek tıkla kurulum dosyası (`Usta-Kur.bat`) da denendi. Docker'lı komut çalıştırma ve tablet bağlantısı Windows'ta denenmedi. Bir şey bozulursa **Ayarlar → "Yardım iste"** düğmesine bas ve çıkan yazıyı sana Usta'yı veren kişiye gönder (içinde yazdıkların, dosyaların ve anahtarın olmaz).
 - **Verin nerede?** Usta'daki "Gizlilik" düğmesi, yazdıklarının nereye gittiğini ve bilgisayarında neleri sakladığını gösterir.
 
 ## Sorun olursa
@@ -67,4 +67,6 @@ Bu bağlantı şifrelenmez. Yalnız evindeki gibi güvendiğin bir Wi-Fi'da kull
 | Tarayıcı açılmadı | Siyah pencereye `/portal link` yaz, bağlantıyı tarayıcıya yapıştır. |
 | "Anahtar kabul edilmedi" | Anahtarı doğru kopyaladığından ve hesapta bakiye/kota olduğundan emin ol. |
 | "Servise ulaşılamıyor" | İnternet bağlantını ya da (bilgisayarımda seçildiyse) Ollama'nın açık olduğunu kontrol et. |
+| "Bugünkü ücretsiz hakkın doldu" | Yarın yeniden dene ya da kurulum ekranından başka bir servis seç. |
+| Ne olduğunu anlamadın | Ayarlar → "Yardım iste" düğmesine bas, çıkan yazıyı sana Usta'yı veren kişiye gönder. |
 | Tablet bağlanmıyor | Aynı Wi-Fi'da mısınız? Güvenlik duvarı sorusuna "izin ver" dedin mi? |

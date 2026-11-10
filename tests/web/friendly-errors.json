@@ -1,0 +1,82 @@
+[
+ [
+  "model isteği başarısız: HTTP 401",
+  "Anahtar kabul edilmedi"
+ ],
+ [
+  "model isteği başarısız: HTTP 403",
+  "Anahtar kabul edilmedi"
+ ],
+ [
+  "model isteği başarısız: HTTP 402",
+  "ücretsiz bir model seç"
+ ],
+ [
+  "model isteği başarısız: HTTP 404",
+  "Bu model bulunamadı"
+ ],
+ [
+  "model isteği başarısız: HTTP 429",
+  "ücretsiz hakkın doldu"
+ ],
+ [
+  "model isteği başarısız: HTTP 400",
+  "Model bu isteği kabul etmedi"
+ ],
+ [
+  "model isteği başarısız: HTTP 413",
+  "Model bu isteği kabul etmedi"
+ ],
+ [
+  "model isteği başarısız: HTTP 500",
+  "Sorun sende değil"
+ ],
+ [
+  "model isteği başarısız: HTTP 503",
+  "Sorun sende değil"
+ ],
+ [
+  "model isteği başarısız: HTTP 529",
+  "Sorun sende değil"
+ ],
+ [
+  "model isteği başarısız: ConnectError",
+  "Servise ulaşılamıyor"
+ ],
+ [
+  "model isteği başarısız: ConnectTimeout",
+  "Servise ulaşılamıyor"
+ ],
+ [
+  "model isteği başarısız: ReadTimeout",
+  "zamanında cevap vermedi"
+ ],
+ [
+  "model isteği başarısız: ReadError",
+  "Bağlantı yarıda koptu"
+ ],
+ [
+  "model isteği başarısız: RemoteProtocolError",
+  "Bağlantı yarıda koptu"
+ ],
+ [
+  "model isteği başarısız: JSONDecodeError",
+  "anlaşılmayan bir cevap"
+ ],
+ [
+  "model isteği başarısız: KeyError",
+  "anlaşılmayan bir cevap"
+ ],
+ [
+  "model protokolü bozdu: KeyError 'tool'",
+  "düzgün anlatamadı"
+ ],
+ [
+  "araç çağrısı çözümlenemedi",
+  "düzgün anlatamadı"
+ ],
+ [
+  "beklenmeyen hata",
+  "beklenmeyen bir şey oldu"
+ ]
+]

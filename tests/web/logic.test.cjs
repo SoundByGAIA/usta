@@ -184,6 +184,16 @@ test("plainApproval explains the taint-gate reason and never throws on odd input
   assert.doesNotThrow(() => L.plainApproval(undefined, undefined, undefined));
 });
 
+test("friendlyModelError matches the cases shared with the server", () => {
+  const cases = JSON.parse(require("node:fs").readFileSync(require("node:path").join(__dirname, "friendly-errors.json"), "utf8"));
+  assert.ok(cases.length >= 20);
+  for (const [text, expected] of cases) {
+    const out = L.friendlyModelError(text);
+    assert.ok(out.includes(expected), `${text} -> ${out}`);
+    assert.ok(!/HTTP|Error/.test(out), out);
+  }
+});
+
 test("friendlyModelError maps common service failures to plain sentences", () => {
   assert.match(L.friendlyModelError("model isteği başarısız: HTTP 401"), /Anahtar kabul edilmedi/);
   assert.match(L.friendlyModelError("model isteği başarısız: HTTP 402"), /bakiye yok/);

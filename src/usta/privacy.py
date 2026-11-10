@@ -22,6 +22,8 @@ FILES = {
     "audit": "yapılan işlemlerin kaydı (neyi okudu, neyi yazdı)",
     "workspaces": "çalışma alanların ve oturum geçmişin",
     "login": "tek kullanımlık giriş kodları",
+    "usta.log": "arka planda çalışırken tutulan kısa günlük (açılış ve hata satırları)",
+    "running.json": "Usta açıkken hangi kapıdan çalıştığı; kapanınca silinir",
 }
 
 

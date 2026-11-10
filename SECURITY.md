@@ -2,13 +2,45 @@
 
 ## Açık bildirme
 
-Güvenlik açığını **herkese açık issue olarak açmayın.** Depo yayınlandığında GitHub'ın özel bildirim kanalını kullanın
+Güvenlik açığını **herkese açık issue olarak açmayın.** GitHub'ın özel bildirim kanalını kullanın
 (depoda *Security → Report a vulnerability*) ya da `Can@soundbygaia.com` adresine e-posta gönderin. Bildirimde etkilenen sürüm/commit, adım adım yeniden üretme ve etkiyi yazın.
 Bildirimlere 7 gün içinde yanıt vermeyi, doğrulanan açıkları düzeltene kadar özel tutmayı hedefliyoruz.
 
 Kapsam: sandbox kaçışı, çalışma alanı dışına erişim/yazma, izin motorunu atlatma, portal kimlik doğrulaması/oturum atlatma,
 sır sızıntısı, önizleme ile portalı ele geçirme. Kapsam dışı: kendi makinenizde kendi verdiğiniz yetkiyle (ör. `--approve allow`,
 oto onay modu, eklediğiniz MCP sunucusu) yapılan eylemler; model çıktısının yanlışlığı.
+
+## Kırmayı deneyenler için rehber
+
+Usta'yı kırmaya çalışmanızı istiyoruz. Bulduğunuz her açık, kodsuz bir kullanıcının başına gelmeden kapanır.
+
+**Nerede deneyin.** Yalnız kendi kurulumunuzda: ayrı bir makine ya da sanal makine en iyisidir. Aynı makinede deneyecekseniz
+ayrı bir ev dizini ve çalışma alanı verin (`USTA_HOME=/tmp/usta-deneme python -m usta -w /tmp/usta-ws`; Windows'ta önce
+`set USTA_HOME=C:\usta-deneme`). Gerçek anahtarınızı değil, harcama sınırı düşük bir deneme anahtarı kullanın. Başkasının
+bilgisayarı, hesabı ya da model servisi kapsam dışıdır.
+
+**En değerli hedefler** (önem sırasıyla):
+
+1. Sandbox'tan çıkmak: yalıtılmış komuttan ana makinede dosya yazmak, ağa çıkmak, süreç başlatmak.
+2. Çalışma alanının dışını okumak ya da yazmak: `..`, simgesel bağ, Windows'ta dizin birleşimi (junction) ve UNC yolu, büyük/küçük harf ve
+   Unicode oyunları, `.git` ve `.usta` içine yazmak.
+3. İzin motorunu atlatmak: yasak (DENY) bir eylemi çalıştırmak, onay isteyen bir eylemi sormadan yaptırmak.
+4. Portal: jetonsuz erişim, Host başlığı ve DNS rebinding, başka bir siteden istek attırmak (CSRF), önizlemedeki sayfadan portala
+   ulaşmak, `--lan` giriş kodunu tahmin etmek ya da yeniden kullanmak, `/quit` ile başkasının Usta'sını kapatmak.
+5. Sır sızıntısı: `apis.json` içindeki anahtarı API yanıtından, denetim günlüğünden, oturum kaydından ya da hata iletisinden çıkarmak.
+6. Dolaylı komut enjeksiyonu: dosya, web sayfası ya da MCP çıktısına gizlenen talimatla ajana yasak bir iş yaptırmak (kaynak izi kapısını aşmak).
+7. Kalıcı hafızayı zehirlemek: onaysız, sonraki görevleri yönlendiren bir not yazdırmak.
+8. Windows'a özel: masaüstü simgesi, arka planda çalışma, `running.json`, `kurulum/Usta-Kur.bat`.
+
+**Hazır araçlar.** `usta lab validate` ve `usta lab smoke` izin katmanını saldırılı senaryolarla ölçer
+([docs/reliability-lab.md](docs/reliability-lab.md)); kendi senaryonuzu `src/usta/lab/scenarios/v1.jsonl` biçiminde ekleyebilirsiniz.
+Daha önce kapatılan açıkların testleri `tests/test_hardening2.py`, `tests/test_hardening3.py`, `tests/test_policy.py`,
+`tests/test_sandbox.py`, `tests/test_taint.py` ve `tests/test_portal.py` içindedir: nereye bakıldığını gösterir.
+
+**Nasıl bildirin.** Sürüm (`python -m pip show usta`), işletim sistemi, Docker var mı, adım adım yeniden üretme, beklenen ve olan,
+etkisi (ne okunuyor, ne yazılıyor, ne çalışıyor). Mümkünse en küçük örnek dosyayı ekleyin.
+
+Aşağıdaki "bilinen sınırlar" tek başına bildirim sayılmaz; ama orada yazandan **daha kötü** bir etki gösterirseniz sayılır.
 
 ## Tehdit modeli ve bilinen sınırlar
 
@@ -63,4 +95,4 @@ Ayrıntı: [docs/design.md](docs/design.md) §5. Özet ve **bilinçli sınırlar
 
 ## Bağımlılıklar
 
-`pip-audit` ile yayın öncesi taranır (şu an bilinen açık yok). Bağımlılıklar alt sınırla belirtilir; kilit dosyası yoktur.
+Bağımlılıklar `pyproject.toml`'da alt sınırla, `requirements*.lock` dosyalarında hash'li olarak sabitlenir. CI her itmede `pip-audit` ile kilit dosyasını tarar.

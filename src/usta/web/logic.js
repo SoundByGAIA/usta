@@ -224,15 +224,21 @@
     }
   }
 
-  // Model/servis hatalarını anlaşılır cümleye çevirir (sunucudaki friendly_model_error ile aynı eşleşmeler).
+  // Model/servis hatalarını anlaşılır cümleye çevirir (sunucudaki friendly_model_error ile aynı cümleler).
   function friendlyModelError(text) {
     const t = String(text || "");
     if (/HTTP 40[13]/.test(t)) return "Anahtar kabul edilmedi. Doğru kopyaladığından ve hesabında bakiye olduğundan emin ol.";
     if (/HTTP 402/.test(t)) return "Hesabında bakiye yok görünüyor. Servisin sayfasından bakiye yükle ya da ücretsiz bir model seç.";
     if (/HTTP 404/.test(t)) return "Bu model bulunamadı. Kurulum ekranından başka bir model seç.";
     if (/HTTP 429/.test(t)) return "Bugünkü ücretsiz hakkın doldu ya da çok hızlı istek gönderildi. Biraz bekle, yarın tekrar dene ya da başka bir servis ekle.";
+    if (/HTTP 4\d\d/.test(t)) return "Model bu isteği kabul etmedi. Konuşma çok uzamış olabilir: yeni bir görev başlat ya da başka bir model seç.";
+    if (/HTTP 5\d\d/.test(t)) return "Servis şu an cevap veremiyor. Sorun sende değil: birkaç dakika sonra tekrar dene ya da başka bir model seç.";
     if (/ConnectError|ConnectTimeout/.test(t)) return "Servise ulaşılamıyor. İnternet bağlantını (ya da bilgisayarındaki modelin açık olduğunu) kontrol et.";
     if (/Timeout/.test(t)) return "Model zamanında cevap vermedi. Büyük modeller yavaş olabilir; tekrar dene.";
+    if (/ReadError|WriteError|RemoteProtocolError|NetworkError/.test(t)) return "Bağlantı yarıda koptu. İnternet bağlantını kontrol et ve tekrar dene.";
+    if (/protokolü bozdu|araç çağrısı çözümlenemedi/.test(t)) return "Model ne yapacağını düzgün anlatamadı. Küçük modellerde olur: tekrar dene ya da daha güçlü bir model seç.";
+    if (/JSONDecodeError|KeyError|IndexError|ValueError/.test(t)) return "Servis anlaşılmayan bir cevap gönderdi. Tekrar dene; yine olursa başka bir model seç.";
+    if (/beklenmeyen hata/.test(t)) return "Usta'da beklenmeyen bir şey oldu. Tekrar dene; yine olursa Ayarlar'daki \"Yardım iste\" düğmesine bas.";
     return t;
   }
 

@@ -124,6 +124,15 @@
       <p class="wiz-note">Usta arka planda çalışıyor, pencere yok. Bitirdiğinde buradan kapat; tekrar açmak için masaüstündeki Usta simgesine çift tıkla.</p></div>
     <div class="set-row"><label>Tablet ve telefon</label>
       <button id="set-tablet" type="button">Tabletten ya da telefondan kullan</button></div>
+    <div class="set-row"><label>Bir şey mi bozuldu?</label>
+      <button id="set-help" type="button">Yardım iste</button>
+      <p class="wiz-note">Usta'nın durumunu kısa bir yazıya dökerim. İçinde yazdıkların, dosyaların ve anahtarın olmaz. Kendiliğinden kimseye gitmez: sen gönderirsin.</p>
+      <div id="help-box" hidden>
+        <pre id="help-text" tabindex="0" aria-label="Yardım raporu"></pre>
+        <button id="help-save" type="button">Dosya olarak indir</button>
+        <button id="help-copy" type="button">Kopyala</button>
+        <p id="help-msg" class="wiz-note" role="status"></p>
+      </div></div>
     <div class="set-row"><label for="zoom">Arayüz boyutu</label>
     <select id="zoom" title="Arayüz boyutu: Otomatik pencere/ekran boyutuna uyar">
       <option value="auto">Boyut: otomatik</option>

@@ -593,6 +593,7 @@ class TaskManager:
             if result.cancelled:
                 status = "cancelled"
         except ModelError as e:
+            audit.record("task_failed", error=str(e)[:200])
             status, error = "failed", str(e)
         except Exception as e:  # noqa: BLE001 - ayrıntı sızdırma, yalnız tür kaydedilir
             audit.record("task_error", error_type=type(e).__name__)

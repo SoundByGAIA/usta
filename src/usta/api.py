@@ -37,6 +37,7 @@ from usta import (
     mcpcatalog,
     mcpconfig,
     memory,
+    ortak,
     privacy,
     skills,
     support,
@@ -159,6 +160,21 @@ class ProfileIn(BaseModel):
     uslup: str = "sade"
     hakkimda: str = Field(default="", max_length=2000)
     bilgiler: list[str] = Field(default_factory=list, max_length=100)
+
+
+class OrtakHostIn(BaseModel):
+    acik: bool
+    ad: str | None = Field(default=None, max_length=40)
+
+
+class OrtakConnectIn(BaseModel):
+    adres: str = Field(min_length=1, max_length=200)
+    kod: str = Field(min_length=1, max_length=20)
+    ad: str = Field(default="", max_length=40)
+
+
+class OrtakNoteIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
 
 
 class SettingsIn(BaseModel):
@@ -570,6 +586,11 @@ def create_app(
 
     @api.put("/profile")
     def put_profile(body: ProfileIn) -> dict:
+        if ortak.load_link(home) is not None:
+            raise HTTPException(
+                409,
+                "Bu bilgisayar evdeki ortak hafızaya bağlı. Bilgiler ev sahibi bilgisayardan değiştirilir.",
+            )
         try:
             k = kisi.check(body.model_dump())
             kisi.save(home, k)
@@ -581,11 +602,144 @@ def create_app(
 
     @api.delete("/profile")
     def delete_profile() -> dict:
+        if ortak.load_link(home) is not None:
+            raise HTTPException(
+                409,
+                "Bu bilgisayar evdeki ortak hafızaya bağlı. Bilgiler ev sahibi bilgisayardan değiştirilir.",
+            )
         try:
             kisi.delete(home)
         except OSError:
             raise HTTPException(500, "profil silinemedi") from None
         return asdict(kisi.Kisi())
+
+    # --- evdeki ortak hafıza (tasarım: docs/ortak-hafiza-tasarim.md) ---------------------------
+    ohost = ortak.HostServer(home)
+
+    def ortak_role() -> str:
+        if ortak.load_link(home) is not None:
+            return "bagli"
+        return "ev-sahibi" if ortak.Store(home).enabled else "yok"
+
+    def ortak_host_only() -> ortak.Store:
+        store = ortak.Store(home)
+        if ortak_role() != "ev-sahibi":
+            raise HTTPException(409, "Bunu yalnız ev sahibi bilgisayar yapabilir.")
+        return store
+
+    @api.get("/ortak")
+    def ortak_status() -> dict:
+        role = ortak_role()
+        store = ortak.Store(home)
+        out: dict = {"rol": role, "bilgisayar": ortak.pc_name()}
+        if role == "ev-sahibi":
+            out.update(
+                ad=store.name,
+                adres=ohost.address,
+                calisiyor=ohost.running,
+                eslesmeler=store.peers_public(),
+                notlar=store.approved(),
+                bekleyen=store.pending(),
+            )
+        elif role == "bagli":
+            link = ortak.load_link(home) or {}
+            out["baglanti"] = {"ad": link.get("ad"), "adres": link.get("adres")}
+            try:
+                data = ortak.fetch(home)
+                out.update(ulasilamiyor=False, profil=data["profil"], notlar=data["notlar"])
+            except ortak.OrtakError as e:
+                data = ortak.cached(home) or {"profil": asdict(kisi.Kisi()), "notlar": []}
+                out.update(
+                    ulasilamiyor=True, hata=str(e), profil=data["profil"], notlar=data["notlar"]
+                )
+        return out
+
+    @api.post("/ortak/ev-sahibi")
+    def ortak_set_host(body: OrtakHostIn) -> dict:
+        store = ortak.Store(home)
+        if body.acik:
+            if ortak.load_link(home) is not None:
+                raise HTTPException(
+                    409, "Bu bilgisayar başka bir ortak hafızaya bağlı. Önce bağlantıyı kes."
+                )
+            store.configure(True, body.ad)
+            try:
+                ohost.start()
+            except ortak.OrtakError as e:
+                store.configure(False)
+                raise HTTPException(409, str(e)) from None
+        else:
+            store.configure(False)
+            ohost.stop()
+        return ortak_status()
+
+    @api.post("/ortak/kod")
+    def ortak_code() -> dict:
+        ortak_host_only()
+        if not ohost.running:
+            try:
+                ohost.start()
+            except ortak.OrtakError as e:
+                raise HTTPException(409, str(e)) from None
+        return {"kod": ohost.codes.issue(), "adres": ohost.address, "sure": 300}
+
+    @api.post("/ortak/baglan")
+    def ortak_join(body: OrtakConnectIn) -> dict:
+        if ortak.Store(home).enabled:
+            raise HTTPException(
+                409, "Bu bilgisayar ortak hafızayı kendisi tutuyor. Önce onu kapat."
+            )
+        try:
+            res = ortak.connect(home, body.adres, body.kod, body.ad or ortak.pc_name())
+        except ortak.OrtakError as e:
+            raise HTTPException(400, str(e)) from None
+        return {"ad": res["ad"], "adres": res["adres"]}
+
+    @api.post("/ortak/ayril")
+    def ortak_leave() -> dict:
+        ortak.disconnect(home)
+        return {"rol": ortak_role()}
+
+    @api.delete("/ortak/eslesmeler/{key_id}")
+    def ortak_unpair(key_id: str) -> dict:
+        store = ortak_host_only()
+        try:
+            store.remove_peer(key_id)
+        except KeyError:
+            raise HTTPException(404, "böyle bir bilgisayar yok") from None
+        return {"eslesmeler": store.peers_public()}
+
+    @api.post("/ortak/notlar")
+    def ortak_add_note(body: OrtakNoteIn) -> dict:
+        role = ortak_role()
+        try:
+            if role == "bagli":
+                res = ortak.post_note(home, body.text)
+                return {"durum": res.get("durum", "bekliyor")}
+            if role == "ev-sahibi":
+                note = ortak.Store(home).add(body.text, ortak.Store(home).name, approved=True)
+                return {"durum": note["durum"]}
+        except ortak.OrtakError as e:
+            raise HTTPException(422, str(e)) from None
+        raise HTTPException(
+            409, "Ortak hafıza kapalı. Önce ev sahibi ol ya da bir ev sahibine bağlan."
+        )
+
+    @api.post("/ortak/notlar/{note_id}/onayla")
+    def ortak_approve(note_id: str) -> dict:
+        try:
+            ortak_host_only().approve(note_id)
+        except KeyError:
+            raise HTTPException(404, "böyle bir not yok") from None
+        return {"tamam": True}
+
+    @api.delete("/ortak/notlar/{note_id}")
+    def ortak_delete(note_id: str) -> dict:
+        try:
+            ortak_host_only().delete(note_id)
+        except KeyError:
+            raise HTTPException(404, "böyle bir not yok") from None
+        return {"tamam": True}
 
     @api.get("/settings")
     def get_settings() -> dict:
@@ -892,12 +1046,25 @@ def create_app(
     def get_privacy() -> dict:
         ctl = manager.model_control
         sources = [{"name": r["name"], "endpoint": r["endpoint"]} for r in api_rows()]
+        shared, link = None, ortak.load_link(home)
+        if link is not None:
+            shared = (
+                f"Evdeki ortak hafıza: bu bilgisayar {link['adres']} adresindeki ev sahibi bilgisayarla konuşur. "
+                "Kişisel bilgilerin ve ortak notlar oradan alınır ve her görevde yapay zekâya gider. İstekler "
+                "imzalıdır ama şifrelenmez; yalnız güvendiğin ev ağında kullan."
+            )
+        elif ortak.Store(home).enabled:
+            shared = (
+                f"Bu bilgisayar evdeki ortak hafızayı tutuyor ({ohost.address or 'şu an kapalı'}). Eşleşmiş "
+                "bilgisayarlar profilini ve onayladığın notları alır. İstekler imzalıdır ama şifrelenmez."
+            )
         return privacy.report(
             home,
             sources,
             ctl.api if ctl else None,
             getattr(manager, "allowed_hosts", None),
             lan_urls=list(lan_urls or []) if pair is not None else None,
+            shared=shared,
         )
 
     @api.get("/support/report")
@@ -1116,6 +1283,7 @@ def create_app(
         return Response(full.read_bytes(), media_type=ctype, headers=PREVIEW_HEADERS)
 
     app.include_router(api)
+    app.state.ortak_host = ohost
 
     if login is not None:  # terminalin açtığı portal: tek kullanımlık kodu jetonla takas eder
 

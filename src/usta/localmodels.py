@@ -74,7 +74,7 @@ _HOSTNAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.\-]{0,61}[A-Za-z0-9])?")
 DEFAULT_LAN_PORT = 11434
 
 
-def parse_host(text: object) -> tuple[str, int]:
+def parse_host(text: object, default_port: int = DEFAULT_LAN_PORT) -> tuple[str, int]:
     """'192.168.1.20', '192.168.1.20:1234' ya da 'http://pc.local:11434/v1' → (adres, port)."""
     if not isinstance(text, str) or not text.strip() or len(text) > 200:
         raise LocalError("adres boş olamaz (örnek: 192.168.1.20)")
@@ -85,7 +85,7 @@ def parse_host(text: object) -> tuple[str, int]:
     if u.scheme != "http" or u.username or u.password or u.query or u.fragment:
         raise LocalError("adres 192.168.1.20 ya da 192.168.1.20:11434 biçiminde olmalı")
     try:
-        port = u.port or DEFAULT_LAN_PORT
+        port = u.port or default_port
     except ValueError:
         raise LocalError("port geçersiz") from None
     host = u.hostname or ""

@@ -30,6 +30,9 @@ bilgisayarı, hesabı ya da model servisi kapsam dışıdır.
    Yeni (0.5.0): `POST /local/probe-host` ve `/local/scan-lan` ile internete ya da özel ağ dışına istek attırmak (adres, ad çözümü,
    IPv6/DNS hileleri, yönlendirme), `POST /system/install` ile listedeki programdan başkasını kurdurmak ya da komuta metin sokmak
    (`src/usta/localmodels.py`, `tests/test_localmodels.py`).
+   Yeni (0.6.0), evdeki ortak hafıza (`src/usta/ortak.py`, `tests/test_ortak.py`): imzayı atlatmak ya da tekrar oynatmak, eşleşme kodunu
+   tahmin etmek, çalınmış anahtarla modele giren bir not eklemek (onay kapısını aşmak), ev sahibi dinleyicisinden portal uçlarına
+   ulaşmak, özel ağ dışından ya da tarayıcıdan (`Origin`) erişmek, bağlı bilgisayarda sahte cevapla enjeksiyon.
 5. Sır sızıntısı: `apis.json` içindeki anahtarı API yanıtından, denetim günlüğünden, oturum kaydından ya da hata iletisinden çıkarmak.
 6. Dolaylı komut enjeksiyonu: dosya, web sayfası ya da MCP çıktısına gizlenen talimatla ajana yasak bir iş yaptırmak (kaynak izi kapısını aşmak).
 7. Kalıcı hafızayı zehirlemek: onaysız, sonraki görevleri yönlendiren bir not yazdırmak.

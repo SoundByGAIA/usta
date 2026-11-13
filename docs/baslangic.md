@@ -46,6 +46,17 @@ Usta, ne istediğini yazdığında bunu senin için yapan bir yapay zekâ yardı
 
 **Ayarlar → "Seni tanıyayım"** bölümünde sana ne diye hitap etmesini, nasıl anlatmasını ve bilmesini istediğin birkaç şeyi yazabilirsin (ör. "Sayfalarımda hep büyük yazı isterim"). Bunları yalnız sen yazarsın; Usta kendiliğinden eklemez. Yazdıkların her görevde yapay zekâya gönderilir (internet servisi seçtiysen o servise de), bu yüzden şifre ya da anahtar yazma. İstediğin zaman tek tek silebilir ya da "Hepsini sil"e basabilirsin. **Ayarlar → Görünüm**'den zemin rengini, vurgu rengini ve yazı boyutunu değiştirebilirsin.
 
+## Evdeki bilgisayarlar aynı hafızayı kullansın
+
+Evde birden çok bilgisayarda Usta kullanıyorsan, kendini her birinde yeniden tanıtmana gerek yok.
+
+1. Hep açık duran (ya da en çok kullandığın) bilgisayarda **Ayarlar → Evdeki ortak hafıza → "Bu bilgisayar ortak hafızayı tutsun"** düğmesine bas. Sonra **"Yeni bilgisayar bağla: kod göster"**e bas: bir adres ve 6 haneli kod çıkar.
+2. Öbür bilgisayarda aynı yere gir, adresi ve kodu yaz, **Bağlan**'a bas. Kod 5 dakika geçerlidir ve bir kez kullanılır.
+3. Bundan sonra "Seni tanıyayım" bilgilerin ve ortak notlar her bilgisayarda aynıdır. Bilgilerini yalnız ev sahibi bilgisayardan değiştirirsin.
+4. Öbür bilgisayardan eklediğin not, ev sahibi bilgisayarda **Onayla**'ya basana kadar yapay zekâya gitmez. Bunu güvenlik için yaptık.
+
+Bu bağlantı yalnız evdeki ağda çalışır, imzalıdır ama **şifrelenmez**: yalnız güvendiğin ev Wi-Fi'ında kullan. Ortak hafızaya şifre ya da anahtar yazma. Ev sahibi bilgisayar kapalıysa diğerleri son bildiği kopyayı kullanır.
+
 ## Tabletten ya da telefondan kullanmak
 
 Bilgisayar ve tablet **aynı Wi-Fi'a** bağlı olmalı.

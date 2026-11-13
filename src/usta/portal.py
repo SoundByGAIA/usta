@@ -104,6 +104,7 @@ class Portal:
         self.url = f"http://{HOST}:{real}/"
         if self.lan:
             self._lan_urls[:] = [f"http://{ip}:{real}/" for ip in lan_addresses()]
+        self._app.state.ortak_host.start_if_enabled()  # ortak hafıza ev sahibiyse ikinci dinleyici de açılır
         return self.url
 
     def lan_urls(self) -> list[str]:
@@ -143,6 +144,7 @@ class Portal:
         return path.as_uri()
 
     def stop(self) -> None:
+        self._app.state.ortak_host.stop()
         if self._server is not None:
             self._server.should_exit = True
         if self._thread is not None:

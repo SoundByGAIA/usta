@@ -21,10 +21,10 @@ from usta import (
     bench,
     capability,
     compat,
-    kisi,
     mcp_runtime,
     mcpconfig,
     memory,
+    ortak,
     profile,
     projectcfg,
     projects,
@@ -1600,7 +1600,7 @@ def _main(argv: list[str] | None = None) -> int:
             approver=_approver,
             max_steps=args.max_steps,
             memory_context="\n\n".join(
-                c for c in (kisi.render(_home()), memory.render_context(root)) if c
+                c for c in (ortak.context(_home()), memory.render_context(root)) if c
             ),
         )
         try:

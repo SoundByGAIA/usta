@@ -1,5 +1,16 @@
 # Değişiklik günlüğü
 
+## 0.6.0 — evdeki ortak hafıza
+
+Model davranışı DEĞİŞMEDİ (ortak hafıza kapalıysa istem aynıdır). Varsayılan KAPALI.
+
+- **Ayarlar → Evdeki ortak hafıza:** evde birden çok bilgisayar varsa "Seni tanıyayım" bilgileri ve ortak notlar hepsinde aynı olur. Bir bilgisayar ev sahibi olur ("Bu bilgisayar ortak hafızayı tutsun"), kod gösterir; diğerleri adres ve 6 haneli kodla bağlanır. Yalnız evdeki ağda çalışır.
+- **İmzalı istek:** anahtar ağda gitmez; her istek ve her cevap anahtardan türetilmiş HMAC-SHA256 ile imzalanır (zaman damgası + tek kullanımlık sayaç). Araya giren sahte cevap kullanılmaz, kaydedilmiş istek tekrar oynatılamaz. **İçerik şifrelenmez** (tablet bağlantısıyla aynı sınır); arayüz ve Gizlilik sayfası bunu söyler.
+- **Yalnız sen yazarsın:** ortak hafızaya yazan bir model aracı yoktur. Ev sahibi dışından eklenen not, ev sahibinde "Onayla"ya basılana kadar hiçbir yapay zekâya gitmez. Bağlı bilgisayarda "Seni tanıyayım" bilgileri salt okunurdur (ev sahibinden değiştirilir).
+- **Sınırlar:** en çok 50 not (her biri 300 harf), 20 bilgisayar; gizli bilgi, bağlantı, komut ve izin iddiası içeren not reddedilir; yalnız özel ağ adresinden istek, `Origin` ve yanlış `Host` reddedilir, gövde 8 KB, dakikada 60 istek; dinleyici yalnız evdeki ağ adresine bağlanır ve portalın hiçbir ucunu sunmaz.
+- **Ev sahibi kapalıysa** bağlı bilgisayar son bilinen kopyayı kullanır; görev düşmez.
+- Tasarım ve tehdit tablosu: [docs/ortak-hafiza-tasarim.md](docs/ortak-hafiza-tasarim.md). Gizlilik özeti ve dosya listesi güncellendi.
+
 ## 0.5.1 — "Seni tanıyayım" ve özelleştirme
 
 Model davranışı DEĞİŞMEDİ (profil boşsa istem aynıdır).

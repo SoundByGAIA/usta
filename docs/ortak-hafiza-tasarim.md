@@ -1,6 +1,7 @@
 # Ortak hafıza: tasarım taslağı (0.6.0)
 
-Durum: **taslak, kod yok.** Berke'nin (güvenlik) incelemesi ve Can'ın kararı beklenir. Açık sorular en altta.
+Durum: **uygulandı (0.6.0): kendi küçük sunucumuz.** Can ai-memory'yi değerlendirdikten sonra vazgeçti (aşağıdaki karşılaştırma
+karar gerekçesidir). Kod: `src/usta/ortak.py`, testler: `tests/test_ortak.py`, `tests/test_ortak_api.py`. Berke'nin incelemesi bekleniyor.
 
 ## Amaç
 
@@ -27,9 +28,10 @@ enjeksiyon ortak hafızayı zehirleyemez.
 2. **Eşleştirme:** Ev sahibi 6 haneli bir kod gösterir (5 dakika geçerli, tek kullanım, 5 yanlış denemede kilit;
    tablet eşleştirmesindeki `LoginCodes` sınıfı yeniden kullanılır). Öbür bilgisayarda kullanıcı ev sahibinin adresini
    (sihirbazdaki "evdeki bilgisayar" taramasıyla bulunur) ve kodu girer.
-3. **Bağlantı anahtarı:** Kod doğruysa ev sahibi bu bilgisayara özel rastgele bir anahtar (32 bayt) üretir. Ev
-   sahibi yalnız anahtarın SHA-256 özetini saklar (`ortak-eslesme.json`, 0600); bağlanan bilgisayar anahtarın kendisini
-   saklar (0600). Eşleşmeyi ev sahibi tek tıkla siler: anahtar o an geçersiz olur.
+3. **Bağlantı anahtarı:** Kod doğruysa ev sahibi bu bilgisayara özel rastgele bir anahtar (32 bayt) üretir. İki
+   taraf da anahtarı saklar (0600; ev sahibinde `ortak/eslesmeler.json`, bağlanan bilgisayarda `ortak-baglanti.json`). **Düzeltme:**
+   ilk taslakta ev sahibinin yalnız özet saklayacağı yazıyordu; imza (HMAC) doğrulaması için ev sahibinin anahtarın kendisini
+   bilmesi gerekir. Eşleşmeyi ev sahibi tek tıkla siler: anahtar o an geçersiz olur.
 4. **Okuma/yazma:** Bağlanan bilgisayar profil ve notları ev sahibinden alır; her görevin başında güncel kopya
    okunur. Ev sahibi kapalıysa son bilinen kopya (önbellek) **salt okunur** kullanılır ve arayüz "Ortak hafıza şu an
    görünmüyor" der; görev düşmez.
@@ -107,3 +109,16 @@ tarif ettiğimiz parçaların çoğu onda var:
 
 Sonraki adım (onay bekliyor): ai-memory'nin HTTP/MCP uçlarını salt okunur olarak yoklayıp küçük bir bağlayıcı prototipi
 (`src/usta/ortakhafiza.py`): bağlan, ara, listele, onay kapısı.
+
+## Uygulanan (0.6.0) ve tasarımdan farklar
+
+- **İmza:** her istek `HMAC-SHA256(anahtar, "istek" ‖ yöntem ‖ yol ‖ zaman ‖ sayaç ‖ SHA256(gövde))`; her cevap da
+  `HMAC(anahtar, "cevap" ‖ sayaç ‖ SHA256(gövde))` ile imzalanır, bağlanan bilgisayar sahte cevabı kullanmaz. Zaman
+  sapması ±60 sn, sayaç 180 sn içinde ikinci kez kabul edilmez. Hata cevabı her durumda aynıdır (ayrıntı sızdırmaz).
+- **Eşleşme isteği imzasızdır** (anahtar henüz yok): 6 haneli kod, 5 dakika, tek kullanım, 5 yanlış denemede kilit.
+  Kodu dinleyen biri aynı 5 dakikada kodu kullanarak araya girebilir; bu, düz HTTP üzerindeki bilinen sınırdır.
+- **Profil yalnız ev sahibinde değişir.** Bağlı bilgisayarda profil salt okunurdur (aksi halde çalınmış anahtarla
+  profil üzerinden enjeksiyon yapılabilirdi). Bağlı bilgisayarlardan eklenen NOTLAR ev sahibinde onay bekler.
+- **Ev sahibi kapalıysa** bağlı bilgisayar son bilinen kopyayı (önbellek) kullanır; görev düşmez.
+- **Denenmedi (Windows):** ev sahibi olarak Windows (güvenlik duvarı sorusu); Windows'ta bağlı bilgisayar olarak gerçek ağ.
+- **Reliability Lab senaryoları** (ortak nottaki talimat, çalınmış anahtarla not) henüz eklenmedi: küme özeti değişir.

@@ -1,5 +1,16 @@
 # Değişiklik günlüğü
 
+## 0.5.0 — yeni görünüm, evdeki bilgisayara bağlanma, eksik programı Usta kursun
+
+Model davranışı DEĞİŞMEDİ. Berke'nin ve ilk kullanıcıların "arayüz zayıf, kurulum zor, evdeki başka bilgisayarı göremiyor" geri bildirimlerine yanıt.
+
+- **Yeni görünüm:** baştan tasarlandı. Çini yıldızı işareti, lacivert ve turkuaz palet (eski krem/toprak rengi bırakıldı), açık ve koyu tema, daha okunur başlıklar, kenarlıksız menü, alt çizgili sekmeler, yuvarlak yazı kutusu, telefonda taşmayan düzen. Dışarıdan font ya da görsel yüklenmez (gizlilik testi korunur).
+- **Kurulum sihirbazı adım adım:** üstte 1 Nerede çalışsın? → 2 Kur → 3 Dene şeridi; hangi adımda olduğun ve bitenler görünür.
+- **Sihirbaz hatası düzeltildi:** 0.4.3'te seçim kartları düğme içinde düğme olarak yazılmıştı; tarayıcı kartı bozup "?" düğmelerini dışarı atıyordu ve ekran dağılıyordu. Kartlar düzeltildi; `tests/test_web_markup.py` bu kalıbın geri gelmesini engeller.
+- **Evdeki başka bilgisayar (yeni seçenek):** sihirbazda "Evdeki başka bilgisayarda". Usta evdeki ağda (bu bilgisayarın /24'ü, yalnız Ollama/LM Studio/llama.cpp/vLLM'in yaygın 4 portu, yalnız model listesi sorgusu) kendisi arar; bulamazsa adresi elle yazarsın. Yalnız özel ağ adresleri kabul edilir: internetteki bir adrese ya da DNS ile dışarıya çözülen bir ada portaldan istek atılamaz. Öbür bilgisayarı nasıl hazırlayacağın düz Türkçe anlatılır. Yeni uçlar: `POST /local/scan-lan`, `POST /local/probe-host`.
+- **Eksik programı Usta kurar:** Windows'ta `winget` varsa Ollama'yı "Benim için kur" düğmesiyle Usta kurar (sihirbazda ve Ayarlar → programlar). Kurulacaklar sabit bir listedir (şimdilik yalnız Ollama), komuta kullanıcıdan ya da modelden metin girmez; kurulamazsa eskisi gibi resmî indirme sayfasına yönlendirir. Yeni uçlar: `POST/GET /system/install`, `/system/info` içinde `can_install`. **Windows'ta gerçek bir bilgisayarda henüz denenmedi** (test bilgisayarı kapalıydı); birim testleri sahte `winget` ile çalışır.
+- **Basit görünüm sadeleşti:** token sayacı ve çalışma alanı adı artık yalnız Gelişmiş görünümde.
+
 ## 0.4.4 — sağlamlaştırma: kurulum, anlaşılır hatalar, "Yardım iste"
 
 Model davranışı DEĞİŞMEDİ.

@@ -27,6 +27,9 @@ bilgisayarı, hesabı ya da model servisi kapsam dışıdır.
 3. İzin motorunu atlatmak: yasak (DENY) bir eylemi çalıştırmak, onay isteyen bir eylemi sormadan yaptırmak.
 4. Portal: jetonsuz erişim, Host başlığı ve DNS rebinding, başka bir siteden istek attırmak (CSRF), önizlemedeki sayfadan portala
    ulaşmak, `--lan` giriş kodunu tahmin etmek ya da yeniden kullanmak, `/quit` ile başkasının Usta'sını kapatmak.
+   Yeni (0.5.0): `POST /local/probe-host` ve `/local/scan-lan` ile internete ya da özel ağ dışına istek attırmak (adres, ad çözümü,
+   IPv6/DNS hileleri, yönlendirme), `POST /system/install` ile listedeki programdan başkasını kurdurmak ya da komuta metin sokmak
+   (`src/usta/localmodels.py`, `tests/test_localmodels.py`).
 5. Sır sızıntısı: `apis.json` içindeki anahtarı API yanıtından, denetim günlüğünden, oturum kaydından ya da hata iletisinden çıkarmak.
 6. Dolaylı komut enjeksiyonu: dosya, web sayfası ya da MCP çıktısına gizlenen talimatla ajana yasak bir iş yaptırmak (kaynak izi kapısını aşmak).
 7. Kalıcı hafızayı zehirlemek: onaysız, sonraki görevleri yönlendiren bir not yazdırmak.

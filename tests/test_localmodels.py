@@ -177,3 +177,224 @@ def test_system_info_and_pull_endpoints(tmp_path, monkeypatch):
     assert d["recommend"]["model"] == localmodels.MODEL_SMALL["name"]
     assert c.get("/local/pull", headers=AUTH).status_code == 200
     assert c.post("/local/pull", json={"model": "../x"}, headers=AUTH).status_code == 400
+
+
+# --- evdeki başka bilgisayar ------------------------------------------------------------------
+def _fake_lan_get(models_by_host):
+    def get(url, timeout=None, **kw):
+        host = url.split("//")[1].split(":")[0]
+        assert url.endswith("/v1/models")  # yalnız model listesi sorulur
+        req = httpx.Request("GET", url)
+        if host not in models_by_host:
+            raise httpx.ConnectError("kapalı", request=req)
+        return httpx.Response(
+            200, json={"data": [{"id": m} for m in models_by_host[host]]}, request=req
+        )
+
+    return get
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("192.168.1.20", ("192.168.1.20", 11434)),
+        ("  192.168.1.20:1234 ", ("192.168.1.20", 1234)),
+        ("http://evdeki-pc.local:11434/v1", ("evdeki-pc.local", 11434)),
+        ("10.0.0.5:8080", ("10.0.0.5", 8080)),
+    ],
+)
+def test_parse_host_accepts_common_forms(text, expected):
+    assert localmodels.parse_host(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "   ",
+        "https://192.168.1.2",
+        "http://u:p@192.168.1.2",
+        "192.168.1.2:99999",
+        "192.168.1.2:abc",
+        "a b",
+        "http://192.168.1.2/v1?x=1",
+        "x" * 300,
+        None,
+        5,
+    ],
+)
+def test_parse_host_rejects_bad_input(text):
+    with pytest.raises(localmodels.LocalError):
+        localmodels.parse_host(text)
+
+
+@pytest.mark.parametrize("host", ["8.8.8.8", "1.1.1.1", "93.184.216.34", "0.0.0.0", "224.0.0.1"])
+def test_probe_host_refuses_addresses_outside_the_home_network(monkeypatch, host):
+    def never(*a, **k):
+        raise AssertionError("dışarıya istek atılmamalı")
+
+    monkeypatch.setattr(httpx, "get", never)
+    with pytest.raises(localmodels.LocalError, match="evdeki ağın dışında"):
+        localmodels.probe_host(host)
+
+
+def test_probe_host_refuses_names_that_resolve_to_public_addresses(monkeypatch):
+    monkeypatch.setattr(
+        localmodels.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 0))]
+    )
+    with pytest.raises(localmodels.LocalError, match="evdeki ağın dışında"):
+        localmodels.probe_host("ornek.com")
+    # bir tane bile dış adres varsa reddedilir
+    monkeypatch.setattr(
+        localmodels.socket,
+        "getaddrinfo",
+        lambda *a, **k: [(2, 1, 6, "", ("192.168.1.9", 0)), (2, 1, 6, "", ("8.8.8.8", 0))],
+    )
+    with pytest.raises(localmodels.LocalError):
+        localmodels.probe_host("karisik.local")
+
+
+def test_probe_host_finds_server_and_keeps_the_typed_name(monkeypatch):
+    monkeypatch.setattr(
+        localmodels.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("192.168.1.20", 0))]
+    )
+    monkeypatch.setattr(httpx, "get", _fake_lan_get({"192.168.1.20": ["qwen3:8b"]}))
+    found = localmodels.probe_host("evdeki-pc.local")
+    assert found["endpoint"] == "http://evdeki-pc.local:11434/v1"  # yazılan ad, IP değil
+    assert found["models"] == ["qwen3:8b"] and found["port"] == 11434
+    monkeypatch.setattr(httpx, "get", _fake_lan_get({}))
+    assert localmodels.probe_host("192.168.1.20") is None
+
+
+def test_lan_scan_only_walks_the_own_private_24_on_common_ports(monkeypatch):
+    seen = []
+
+    def open_(host, port, timeout):
+        seen.append((host, port))
+        return (host, port) == ("192.168.1.20", 11434)
+
+    monkeypatch.setattr(localmodels, "own_ip", lambda: "192.168.1.7")
+    monkeypatch.setattr(localmodels, "_open", open_)
+    monkeypatch.setattr(httpx, "get", _fake_lan_get({"192.168.1.20": ["llama3.2"]}))
+    found = localmodels.lan_scan()
+    assert [(f["host"], f["port"], f["name"]) for f in found] == [("192.168.1.20", 11434, "Ollama")]
+    assert all(h.startswith("192.168.1.") and h != "192.168.1.7" for h, _ in seen)
+    assert {p for _, p in seen} == set(localmodels.COMMON_PORTS)
+    assert len(seen) == 253 * len(localmodels.COMMON_PORTS)
+
+
+@pytest.mark.parametrize("me", [None, "8.8.8.8", "127.0.0.1", "169.254.3.4", "kötü"])
+def test_lan_scan_does_nothing_without_a_private_address(monkeypatch, me):
+    monkeypatch.setattr(localmodels, "own_ip", lambda: me)
+    monkeypatch.setattr(localmodels, "_open", lambda *a: (_ for _ in ()).throw(AssertionError))
+    assert localmodels.lan_scan() == []
+
+
+def test_lan_endpoints_require_auth_and_explain_failures(tmp_path, monkeypatch):
+    monkeypatch.setattr(localmodels, "lan_scan", lambda: [{"host": "192.168.1.20", "port": 11434}])
+    monkeypatch.setattr(httpx, "get", _fake_lan_get({"192.168.1.20": ["m"]}))
+    c, _ = make_client(tmp_path, Scripted())
+    assert c.post("/local/scan-lan").status_code == 401
+    assert c.post("/local/probe-host", json={"host": "192.168.1.20"}).status_code == 401
+    assert c.post("/local/scan-lan", headers=AUTH).json()[0]["host"] == "192.168.1.20"
+    ok = c.post("/local/probe-host", json={"host": "192.168.1.20"}, headers=AUTH)
+    assert ok.status_code == 200 and ok.json()["endpoint"] == "http://192.168.1.20:11434/v1"
+    out = c.post("/local/probe-host", json={"host": "8.8.8.8"}, headers=AUTH)
+    assert out.status_code == 400 and "evdeki ağın dışında" in out.json()["detail"]
+    miss = c.post("/local/probe-host", json={"host": "192.168.1.99"}, headers=AUTH)
+    assert miss.status_code == 404 and "bulamadım" in miss.json()["detail"]
+
+
+# --- eksik programı kurmak ----------------------------------------------------------------------
+def _wait_job(job, timeout=5.0):
+    import time
+
+    end = time.time() + timeout
+    while job.snapshot().get("active") and time.time() < end:
+        time.sleep(0.01)
+    return job.snapshot()
+
+
+def test_install_only_runs_for_listed_programs_on_windows_with_winget(monkeypatch):
+    job = localmodels.InstallJob()
+    monkeypatch.setattr(
+        localmodels,
+        "_winget_install",
+        lambda i: (_ for _ in ()).throw(AssertionError("çalışmamalı")),
+    )
+    for bad in ("docker", "rm -rf /", "", None, 5, "ollama; calc"):
+        with pytest.raises(localmodels.LocalError, match="bunu kuramam"):
+            job.start(bad)
+    monkeypatch.setattr(localmodels.sys, "platform", "linux")
+    with pytest.raises(localmodels.LocalError, match="kendim kuramıyorum"):
+        job.start("ollama")
+    monkeypatch.setattr(localmodels.sys, "platform", "win32")
+    monkeypatch.setattr(localmodels.shutil, "which", lambda n: None)  # winget yok
+    assert localmodels.can_install("ollama") is False
+    with pytest.raises(localmodels.LocalError, match="kendim kuramıyorum"):
+        job.start("ollama")
+
+
+def test_install_runs_a_fixed_winget_command_and_waits_for_ollama(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(localmodels.sys, "platform", "win32")
+    monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
+    monkeypatch.setattr(localmodels, "_winget_install", lambda i: seen.update(id=i) or (0, "ok"))
+    monkeypatch.setattr(
+        localmodels, "probe", lambda port, timeout=0.8, host="127.0.0.1": {"port": port}
+    )
+    job = localmodels.InstallJob()
+    job.start("ollama")
+    done = _wait_job(job)
+    assert seen == {"id": "Ollama.Ollama"}  # kimlik sabit listeden, dışarıdan metin yok
+    assert done["done"] is True and done["error"] is None and done["active"] is False
+
+
+def test_install_failure_is_reported_in_plain_words(monkeypatch):
+    monkeypatch.setattr(localmodels.sys, "platform", "win32")
+    monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
+    monkeypatch.setattr(localmodels, "_winget_install", lambda i: (1, "ham çıktı gizli ayrıntı"))
+    job = localmodels.InstallJob()
+    job.start("ollama")
+    done = _wait_job(job)
+    assert done["done"] is False and "kurulamadı" in done["error"]
+    assert "gizli ayrıntı" not in done["error"]  # winget çıktısı kullanıcıya ham gösterilmez
+
+    def boom(i):
+        raise OSError("winget açılamadı")
+
+    monkeypatch.setattr(localmodels, "_winget_install", boom)
+    job.start("ollama")
+    assert "kurulamadı" in _wait_job(job)["error"]
+
+
+def test_install_treats_already_installed_as_success_and_blocks_a_second_job(monkeypatch):
+    import threading
+
+    gate = threading.Event()
+    monkeypatch.setattr(localmodels.sys, "platform", "win32")
+    monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
+    monkeypatch.setattr(
+        localmodels, "_winget_install", lambda i: gate.wait(5) and (-1978335189, "")
+    )
+    monkeypatch.setattr(
+        localmodels, "probe", lambda port, timeout=0.8, host="127.0.0.1": {"port": port}
+    )
+    job = localmodels.InstallJob()
+    job.start("ollama")
+    with pytest.raises(localmodels.LocalError, match="sürüyor"):
+        job.start("ollama")
+    gate.set()
+    assert _wait_job(job)["done"] is True
+
+
+def test_install_endpoints_require_auth_and_refuse_unlisted(tmp_path, monkeypatch):
+    monkeypatch.setattr(localmodels.sys, "platform", "linux")
+    c, _ = make_client(tmp_path, Scripted())
+    assert c.post("/system/install", json={"what": "ollama"}).status_code == 401
+    assert c.get("/system/install").status_code == 401
+    assert c.post("/system/install", json={"what": "calc"}, headers=AUTH).status_code == 400
+    r = c.post("/system/install", json={"what": "ollama"}, headers=AUTH)
+    assert r.status_code == 400 and "kendim kuramıyorum" in r.json()["detail"]
+    assert c.get("/system/info", headers=AUTH).json()["can_install"] == {"ollama": False}
+    assert c.get("/system/install", headers=AUTH).json()["active"] is False

@@ -784,12 +784,41 @@
       return card;
     }) : [h("p", "empty", "Bunu bulamadım. Başka bir kelimeyle dene ya da Usta'ya sor.")]));
   }
+  // --- eksik programı Usta kursun (şimdilik Ollama, yalnız Windows'ta) ---
+  let installTimer = null;
+  function installButton(what, label, onDone) {
+    const box = h("div", "install-box");
+    const btn = h("button", "primary", label);
+    btn.type = "button";
+    const msg = h("p", "wiz-note", "");
+    msg.setAttribute("role", "status");
+    const bar = h("progress", "wiz-progress");
+    bar.hidden = true;
+    const poll = async () => {
+      let s = {};
+      try { const r = await api("/system/install"); if (r.ok) s = await r.json(); } catch { /* sonraki turda dene */ }
+      if (s.active) { msg.textContent = `${s.status || "Kuruluyor"}… Bu birkaç dakika sürebilir. Pencereyi kapatma.`; installTimer = setTimeout(poll, 2000); return; }
+      bar.hidden = true; btn.disabled = false;
+      if (s.done) { msg.textContent = s.status || "Hazır."; onDone(); return; }
+      msg.textContent = s.error || "Kurulum olmadı. Aşağıdaki bağlantıdan kendin indirebilirsin.";
+    };
+    btn.addEventListener("click", async () => {
+      btn.disabled = true; bar.hidden = false; msg.textContent = "Başlıyorum…";
+      const r = await api("/system/install", { method: "POST", body: JSON.stringify({ what }) });
+      if (!r.ok) { btn.disabled = false; bar.hidden = true; msg.textContent = await errorText(r); return; }
+      clearTimeout(installTimer);
+      installTimer = setTimeout(poll, 1500);
+    });
+    box.append(btn, bar, msg);
+    return box;
+  }
+
   async function loadPrograms() {
     const box = $("programs");
     let d = {};
     try { const res = await api("/system/info"); if (res.ok) d = await res.json(); } catch { /* durum bilinmiyor */ }
     const items = [
-      { name: "Ollama", ok: d.ollama_installed, why: "Yapay zekâyı kendi bilgisayarında çalıştırır. Gerekli mi? Yalnız \"Bilgisayarımda\" seçeneğini seçersen. İnternet servisi kullanıyorsan gerekmez.", url: "https://ollama.com/download", text: "Ollama'yı indir" },
+      { name: "Ollama", ok: d.ollama_installed, why: "Yapay zekâyı kendi bilgisayarında çalıştırır. Gerekli mi? Yalnız \"Bu bilgisayarda\" seçeneğini seçersen. İnternet servisi kullanıyorsan gerekmez.", url: "https://ollama.com/download", text: "Ollama'yı indir", install: d.can_install && d.can_install.ollama ? "ollama" : null },
       { name: "Docker Desktop", ok: d.docker_installed, why: "Usta'nın bilgisayarında komut çalıştırmasını güvenli bir kutuda yapar. Gerekli mi? Sayfa, yazı, hesap makinesi gibi basit işler için hayır. Yazdığı kodu denemesini istiyorsan evet.", url: "https://www.docker.com/products/docker-desktop/", text: "Docker Desktop'ı indir" },
     ];
     box.replaceChildren(...items.map((it) => {
@@ -798,7 +827,8 @@
       const ask = h("button", "q", "?");
       ask.type = "button"; ask.dataset.gloss = it.name.split(" ")[0]; ask.title = "Bu ne demek?"; ask.setAttribute("aria-label", `Bu ne demek? ${it.name}`);
       card.append(h("strong", null, `${it.name}${state} `), ask, h("p", null, it.why));
-      if (!it.ok) card.appendChild(wizLink(it.url, it.text));
+      if (!it.ok && it.install) card.appendChild(installButton(it.install, `${it.name}'ı benim için kur`, loadPrograms));
+      if (!it.ok) card.appendChild(wizLink(it.url, it.install ? "ya da kendin indir" : it.text));
       return card;
     }));
   }
@@ -1029,12 +1059,19 @@
       steps: ["Sayfa açılınca hesap aç ve giriş yap.", "Kullanmak için ödeme bilgisi ekle ya da kredi yükle.", "\"API keys\" sayfasında anahtar oluştur ve kopyala."],
       note: "Ücretlidir.", prefer: "" },
   ];
-  const WIZ_STEPS = ["wiz-start", "wiz-local-step", "wiz-cloud-step", "wiz-test-step"];
+  const WIZ_STEPS = ["wiz-start", "wiz-lan-step", "wiz-local-step", "wiz-cloud-step", "wiz-test-step"];
+  const WIZ_RAIL = { "wiz-start": 1, "wiz-lan-step": 2, "wiz-local-step": 2, "wiz-cloud-step": 2, "wiz-test-step": 3 };
   const WIZ_EXAMPLES = ["Bir hesap makinesi web sayfası yap.", "Bu klasördeki dosyaları incele ve ne işe yaradıklarını kısaca anlat.", "Bugünün tarihini büyük yazıyla gösteren basit bir sayfa yap."];
   const wizMsg = (t, c) => { const m = $("wiz-msg"); m.textContent = t || ""; m.className = c || "empty"; };
   function wizBusy(on, text) { $("wizard").classList.toggle("wiz-busy", !!on); wizMsg(on ? text : "", on ? "ok" : "empty"); }
   function wizShow(id) {
     for (const s of WIZ_STEPS) $(s).hidden = s !== id;
+    const n = WIZ_RAIL[id] || 1;
+    for (const li of $("wiz-rail").children) {
+      const k = Number(li.dataset.n);
+      li.classList.toggle("done", k < n);
+      if (k === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+    }
     wizMsg("");
     if (id === "wiz-start") wizReco();
   }
@@ -1052,11 +1089,13 @@
     let d = null;
     try { const r = await api("/system/info"); if (r.ok) d = await r.json(); } catch (_) { /* yoksay */ }
     const ram = d && d.ram_gb ? `${d.ram_gb} GB` : null;
+    $("wiz-pick-cloud").classList.add("reco");
     if (d && d.recommend && !d.recommend.model) {
       el.textContent = `Bilgisayarının belleği az (${ram}). İnternet servisiyle başla; ücretsiz seçenek olarak Google Gemini'yi deneyebilirsin.`;
     } else {
       el.textContent = "Yeni başlıyorsan ve anahtar almaktan çekinmiyorsan: İnternet servisiyle başla, ücretsiz seçenek olarak Google Gemini'yi dene. "
-        + `Yazdıklarının bilgisayarından çıkmaması senin için çok önemliyse: Bilgisayarımda${ram ? ` (belleğin ${ram}, bu iş için uygun)` : ""}, ama zor işlerde zayıf kalabileceğini bil.`;
+        + `Yazdıklarının bilgisayarından çıkmaması senin için çok önemliyse: Bu bilgisayarda${ram ? ` (belleğin ${ram}, bu iş için uygun)` : ""}, ama zor işlerde zayıf kalabileceğini bil. `
+        + "Evde daha güçlü bir bilgisayarın varsa: Evdeki başka bilgisayarda.";
     }
   }
 
@@ -1103,10 +1142,14 @@
     if (!d.ollama_running) {
       const card = h("div", "card");
       card.append(h("strong", null, "1. Ollama programını kur"),
-        h("p", null, "Ollama, yapay zekâ modellerini bilgisayarında çalıştıran ücretsiz bir programdır."),
-        wizLink("https://ollama.com/download", "Ollama indirme sayfasını aç"));
+        h("p", null, "Ollama, yapay zekâ modellerini bilgisayarında çalıştıran ücretsiz bir programdır."));
+      const canAuto = d.can_install && d.can_install.ollama;
+      if (canAuto) {
+        card.append(h("p", "wiz-note", "İstersen düğmeye bas, Usta senin için kurar (yaklaşık 1 GB iner)."), installButton("ollama", "Ollama'yı benim için kur", wizLocal));
+      }
+      card.appendChild(wizLink("https://ollama.com/download", canAuto ? "Ya da kendin indir: Ollama sayfasını aç" : "Ollama indirme sayfasını aç"));
       const ol = h("ol", "wiz-steps");
-      for (const t of ["İndirdiğin dosyayı aç ve kur.", "Kurulum bitince Ollama'yı bir kez aç (Başlat menüsünde \"Ollama\").", "Bu pencereye dön ve aşağıdaki \"Tekrar ara\" düğmesine bas."]) ol.appendChild(h("li", null, t));
+      for (const t of canAuto ? ["Kurulum bitince bu sayfa kendiliğinden devam eder."] : ["İndirdiğin dosyayı aç ve kur.", "Kurulum bitince Ollama'yı bir kez aç (Başlat menüsünde \"Ollama\").", "Bu pencereye dön ve aşağıdaki \"Tekrar ara\" düğmesine bas."]) ol.appendChild(h("li", null, t));
       card.appendChild(ol);
       body.replaceChildren(...out, card);
       return;
@@ -1164,6 +1207,70 @@
       wizPullTimer = setTimeout(poll, 1000);
     };
     poll();
+  }
+
+  // --- evdeki başka bilgisayar ---
+  const lanApiName = (host) => `ev-${String(host).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`.slice(0, 30).replace(/-+$/, "") || "ev-pc";
+  async function wizLanUse(found, model) {
+    try {
+      const endpoint = trimSlash(found.endpoint);
+      const rows = await (await api("/apis")).json();
+      let name = (rows.find((a) => trimSlash(a.endpoint) === endpoint) || {}).name;
+      if (!name) {
+        name = lanApiName(found.host || found.endpoint);
+        const r = await api("/apis", { method: "POST", body: JSON.stringify({ name, endpoint }) });
+        if (!r.ok) { wizMsg(await errorText(r), "error"); return; }
+      }
+      wizUse(name, model);
+    } catch (e) { wizMsg(String(e.message || e), "error"); }
+  }
+  function lanCard(found) {
+    const card = h("div", "card wiz-lan-card");
+    const where = found.host || found.endpoint;
+    card.append(h("strong", null, `${found.name} · ${where}`));
+    if (!found.models.length) {
+      card.append(h("p", "wiz-note", "Bu bilgisayarda henüz indirilmiş bir model yok. Öbür bilgisayarda bir model indir, sonra \"Tekrar ara\"ya bas."));
+      return card;
+    }
+    card.append(h("p", "wiz-note", `${found.models.length} model var. Hangisini kullanalım?`));
+    const sel = h("select");
+    sel.setAttribute("aria-label", "Model");
+    for (const m of found.models) sel.append(h("option", null, m));
+    const go = h("button", "primary", "Bunu kullan");
+    go.type = "button";
+    go.addEventListener("click", () => wizLanUse(found, sel.value));
+    const row = h("div", "row");
+    row.append(sel, go);
+    card.append(row);
+    return card;
+  }
+  async function wizLan() {
+    wizStopPull();
+    wizShow("wiz-lan-step");
+    const box = $("wiz-lan-found");
+    box.replaceChildren(h("p", null, "Evdeki ağa bakıyorum… (birkaç saniye sürer)"));
+    $("wiz-lan-rescan").disabled = true;
+    let list = [];
+    try {
+      const r = await api("/local/scan-lan", { method: "POST" });
+      if (!r.ok) { box.replaceChildren(h("p", "error", await errorText(r))); return; }
+      list = await r.json();
+    } finally { $("wiz-lan-rescan").disabled = false; }
+    if (!list.length) {
+      box.replaceChildren(h("p", null, "Evdeki ağda yapay zekâ bulamadım. Öbür bilgisayar açık ve \"ağa açık\" mı? Aşağıdan nasıl hazırlanacağına bak ya da adresi kendin yaz."));
+      return;
+    }
+    box.replaceChildren(h("p", null, list.length === 1 ? "Bir tane buldum:" : `${list.length} tane buldum:`), ...list.map(lanCard));
+  }
+  async function wizLanTry(ev) {
+    ev.preventDefault();
+    const host = $("wiz-lan-host").value.trim();
+    if (!host) return;
+    const box = $("wiz-lan-found");
+    box.replaceChildren(h("p", null, `${host} adresine bakıyorum…`));
+    const r = await api("/local/probe-host", { method: "POST", body: JSON.stringify({ host }) });
+    if (!r.ok) { box.replaceChildren(h("p", "error", await errorText(r))); return; }
+    box.replaceChildren(lanCard(await r.json()));
   }
 
   let wizService = null;
@@ -1553,6 +1660,10 @@
   $("tablet-renew").addEventListener("click", loadTablet);
   $("wiz-local").addEventListener("click", wizLocal);
   $("wiz-cloud").addEventListener("click", wizCloud);
+  $("wiz-lan").addEventListener("click", wizLan);
+  $("wiz-lan-back").addEventListener("click", () => wizShow("wiz-start"));
+  $("wiz-lan-rescan").addEventListener("click", wizLan);
+  $("wiz-lan-form").addEventListener("submit", wizLanTry);
   $("wiz-local-back").addEventListener("click", () => wizShow("wiz-start"));
   $("wiz-local-rescan").addEventListener("click", wizLocal);
   $("wiz-cloud-back").addEventListener("click", () => wizShow("wiz-start"));

@@ -35,9 +35,10 @@ Usta, ne istediğini yazdığında bunu senin için yapan bir yapay zekâ yardı
 
 (Hangi yoldan kurduysan, Usta ilk açıldığında bu ekranı gösterir.)
 
-- Tarayıcıda "Yapay zekâ nerede çalışsın?" ekranı çıkar. İki seçeneğin artıları ve eksileri yazılıdır, altında da senin bilgisayarına göre bir öneri vardır.
+- Tarayıcıda "Yapay zekâ nerede çalışsın?" ekranı çıkar. Üstteki şerit hangi adımda olduğunu gösterir (1 Nerede çalışsın? → 2 Kur → 3 Dene). Üç seçeneğin artıları ve eksileri yazılıdır, altında da senin bilgisayarına göre bir öneri vardır.
   - **İnternet servisiyle** (çoğu kişi için önerilir): Daha güçlü ve hızlıdır. Bir servisten **anahtar** almalısın (uzun bir şifre gibi bir yazı). Ekran, her servis için adımları ve anahtar sayfasının bağlantısını gösterir; yaklaşık 5-10 dakika sürer. **Ücretsiz seçenekler:** Google Gemini ve OpenRouter (ücretsiz katmanlarında günlük istek sınırı düşüktür ve yazdıkların servis tarafından ürün geliştirmede kullanılabilir). DeepSeek, OpenAI, Claude (Anthropic) ve OpenCode ücretlidir.
-  - **Bilgisayarımda**: Ücretsizdir ve yazdıkların bilgisayarından çıkmaz. Ekran bilgisayarının belleğine bakıp sana bir model önerir ve adım adım yürütür: önce Ollama programını kurarsın, sonra "İndir" düğmesiyle modeli indirirsin (2-5 GB, ilerleme çubuğu görünür). Küçük modeller basit işlerde iyidir, zor işlerde başarısız olabilir.
+  - **Bu bilgisayarda**: Ücretsizdir ve yazdıkların bilgisayarından çıkmaz. Ekran bilgisayarının belleğine bakıp sana bir model önerir ve adım adım yürütür: önce Ollama programını kurarsın (Windows'ta "Benim için kur" düğmesi varsa Usta kurar), sonra "İndir" düğmesiyle modeli indirirsin (2-5 GB, ilerleme çubuğu görünür). Küçük modeller basit işlerde iyidir, zor işlerde başarısız olabilir.
+  - **Evdeki başka bilgisayarda**: Evde güçlü bir bilgisayarın varsa yapay zekâ onda çalışır. Usta evdeki ağı birkaç saniyede kendisi tarar; bulamazsa öbür bilgisayarın adresini (ör. `192.168.1.20`) kendin yazarsın. Öbür bilgisayarda Ollama'da **Settings → "Expose Ollama to the network"** kutusu (LM Studio'da **Developer → "Serve on Local Network"**) açık olmalı. Yalnız evdeki (özel ağ) adresler kabul edilir.
 - Model seçince Usta modeli tanımak için yarım dakikaya kadar bekler ("Modeli tanıyorum" yazar), bu sırada başka bir şeye basma.
 - Sonunda "Hazır!" yazar. Altındaki örneklerden birine bas ve dene.
 

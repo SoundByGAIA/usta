@@ -395,30 +395,69 @@ def _ollama_exe() -> str | None:
     return cand if cand and os.path.exists(cand) else None
 
 
-def _winget_install(winget_id: str) -> tuple[int, str]:
+_PROGRESS = re.compile(r"(\d+(?:[.,]\d+)?)\s*([KMG]B)\s*/\s*(\d+(?:[.,]\d+)?)\s*([KMG]B)")
+# winget çıkış kodları (işaretsiz): kullanıcıya anlaşılır karşılıklar
+_INSTALL_ERRORS = {
+    0x8A15000F: "Windows'un program listesi (winget) güncellenemedi. Biraz sonra tekrar dene ya da kendin indir.",
+    0x8A150008: "İndirme olmadı. İnternet bağlantını kontrol edip tekrar dene ya da kendin indir.",
+}
+
+
+def parse_progress(chunk: str) -> str | None:
+    """winget'in "140 MB / 1.20 GB" biçimindeki ilerleme satırını kısa bir cümleye çevirir; yoksa None."""
+    found = _PROGRESS.findall(chunk)
+    if not found:
+        return None
+    a, ua, b, ub = found[-1]
+    return f"indiriliyor: {a} {ua} / {b} {ub}"
+
+
+def _winget_install(winget_id: str, on_progress=None) -> tuple[int, str]:
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    r = subprocess.run(  # kimlik sabit listeden gelir
+    proc = subprocess.Popen(  # kimlik sabit listeden gelir
         [
-            "winget",
-            "install",
-            "--id",
-            winget_id,
-            "--exact",
-            "--silent",
-            "--accept-source-agreements",
-            "--accept-package-agreements",
+            "winget", "install", "--id", winget_id, "--exact", "--silent",
+            "--accept-source-agreements", "--accept-package-agreements",
             "--disable-interactivity",
         ],
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=INSTALL_TIMEOUT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         creationflags=flags,
         stdin=subprocess.DEVNULL,
-    )
-    return r.returncode, (r.stdout or "") + (r.stderr or "")
+    )  # fmt: skip
+    tail: list[str] = []
+
+    def handle(seg: str) -> None:
+        if not on_progress:
+            return
+        msg = parse_progress(seg)
+        if msg:
+            on_progress(msg)
+        elif "Starting package install" in seg or "Paket yüklemesi başlatılıyor" in seg:
+            on_progress("kuruluyor")
+
+    def pump() -> None:
+        assert proc.stdout is not None
+        pending = ""
+        while chunk := proc.stdout.read1(256):  # eldeki kadarını okur, 256 bayt dolmasını beklemez
+            text = chunk.decode("utf-8", errors="replace")
+            tail[:] = [("".join(tail) + text)[-400:]]
+            *done, pending = re.split(
+                r"[\r\n]", pending + text
+            )  # winget ilerlemeyi \r ile günceller
+            for seg in done:
+                handle(seg)
+        handle(pending)
+
+    reader = threading.Thread(target=pump, daemon=True)
+    reader.start()
+    try:
+        code = proc.wait(timeout=INSTALL_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        code = -1
+    reader.join(timeout=5)
+    return code, "".join(tail)
 
 
 def _start_ollama() -> None:
@@ -445,7 +484,13 @@ class InstallJob:
 
     def snapshot(self) -> dict:
         with self._lock:
-            return dict(self.state)
+            snap = dict(self.state)
+        started = snap.pop("started", None)
+        if snap.get("active") and started:
+            # winget, çıktı boruya yazılırken indirme ilerlemesi basmaz (Windows'ta denendi): her zaman doğru olan
+            # tek şey geçen süredir.
+            snap["elapsed"] = int(time.time() - started)
+        return snap
 
     def _set(self, **kw) -> None:
         with self._lock:
@@ -468,6 +513,7 @@ class InstallJob:
                 "status": "başlıyor",
                 "done": False,
                 "error": None,
+                "started": time.time(),
             }
         threading.Thread(target=self._run, args=(what,), daemon=True).start()
 
@@ -475,12 +521,14 @@ class InstallJob:
         label = INSTALLABLE[what]["label"]
         try:
             self._set(status=f"{label} indiriliyor ve kuruluyor")
-            code, _out = _winget_install(INSTALLABLE[what]["winget_id"])
+            code, _out = _winget_install(
+                INSTALLABLE[what]["winget_id"], lambda msg: self._set(status=f"{label} {msg}")
+            )
             if code not in _INSTALL_OK:  # "zaten kurulu" da başarıdır
-                self._set(
-                    active=False,
-                    error=f"{label} kurulamadı (kod {code}). Resmî sayfadan kendin indirebilirsin.",
+                why = _INSTALL_ERRORS.get(
+                    code & 0xFFFFFFFF, f"{label} kurulamadı (kod {code & 0xFFFFFFFF:#x})."
                 )
+                self._set(active=False, error=f"{why} Resmî sayfadan da indirebilirsin.")
                 return
             if what == "ollama":
                 self._set(status="Ollama başlatılıyor")

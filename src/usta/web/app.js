@@ -804,7 +804,8 @@
     const poll = async () => {
       let s = {};
       try { const r = await api("/system/install"); if (r.ok) s = await r.json(); } catch { /* sonraki turda dene */ }
-      if (s.active) { msg.textContent = `${s.status || "Kuruluyor"}… Bu birkaç dakika sürebilir. Pencereyi kapatma.`; installTimer = setTimeout(poll, 2000); return; }
+      if (s.active) { const mins = Math.floor((s.elapsed || 0) / 60);
+      msg.textContent = `${s.status || "Kuruluyor"}… ${mins} dakikadır sürüyor. Program yaklaşık 1 GB; yavaş internette saatler sürebilir. Pencereyi kapatma; istersen aşağıdaki bağlantıdan kendin indir.`; installTimer = setTimeout(poll, 2000); return; }
       bar.hidden = true; btn.disabled = false;
       if (s.done) { msg.textContent = s.status || "Hazır."; onDone(); return; }
       msg.textContent = s.error || "Kurulum olmadı. Aşağıdaki bağlantıdan kendin indirebilirsin.";

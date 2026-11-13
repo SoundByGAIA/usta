@@ -320,7 +320,7 @@ def test_install_only_runs_for_listed_programs_on_windows_with_winget(monkeypatc
     monkeypatch.setattr(
         localmodels,
         "_winget_install",
-        lambda i: (_ for _ in ()).throw(AssertionError("çalışmamalı")),
+        lambda i, cb=None: (_ for _ in ()).throw(AssertionError("çalışmamalı")),
     )
     for bad in ("docker", "rm -rf /", "", None, 5, "ollama; calc"):
         with pytest.raises(localmodels.LocalError, match="bunu kuramam"):
@@ -339,7 +339,9 @@ def test_install_runs_a_fixed_winget_command_and_waits_for_ollama(monkeypatch):
     seen = {}
     monkeypatch.setattr(localmodels.sys, "platform", "win32")
     monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
-    monkeypatch.setattr(localmodels, "_winget_install", lambda i: seen.update(id=i) or (0, "ok"))
+    monkeypatch.setattr(
+        localmodels, "_winget_install", lambda i, cb=None: seen.update(id=i) or (0, "ok")
+    )
     monkeypatch.setattr(
         localmodels, "probe", lambda port, timeout=0.8, host="127.0.0.1": {"port": port}
     )
@@ -353,14 +355,16 @@ def test_install_runs_a_fixed_winget_command_and_waits_for_ollama(monkeypatch):
 def test_install_failure_is_reported_in_plain_words(monkeypatch):
     monkeypatch.setattr(localmodels.sys, "platform", "win32")
     monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
-    monkeypatch.setattr(localmodels, "_winget_install", lambda i: (1, "ham çıktı gizli ayrıntı"))
+    monkeypatch.setattr(
+        localmodels, "_winget_install", lambda i, cb=None: (1, "ham çıktı gizli ayrıntı")
+    )
     job = localmodels.InstallJob()
     job.start("ollama")
     done = _wait_job(job)
     assert done["done"] is False and "kurulamadı" in done["error"]
     assert "gizli ayrıntı" not in done["error"]  # winget çıktısı kullanıcıya ham gösterilmez
 
-    def boom(i):
+    def boom(i, cb=None):
         raise OSError("winget açılamadı")
 
     monkeypatch.setattr(localmodels, "_winget_install", boom)
@@ -375,7 +379,7 @@ def test_install_treats_already_installed_as_success_and_blocks_a_second_job(mon
     monkeypatch.setattr(localmodels.sys, "platform", "win32")
     monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
     monkeypatch.setattr(
-        localmodels, "_winget_install", lambda i: gate.wait(5) and (-1978335189, "")
+        localmodels, "_winget_install", lambda i, cb=None: gate.wait(5) and (-1978335189, "")
     )
     monkeypatch.setattr(
         localmodels, "probe", lambda port, timeout=0.8, host="127.0.0.1": {"port": port}
@@ -398,3 +402,94 @@ def test_install_endpoints_require_auth_and_refuse_unlisted(tmp_path, monkeypatc
     assert r.status_code == 400 and "kendim kuramıyorum" in r.json()["detail"]
     assert c.get("/system/info", headers=AUTH).json()["can_install"] == {"ollama": False}
     assert c.get("/system/install", headers=AUTH).json()["active"] is False
+
+
+def test_winget_progress_line_becomes_a_short_sentence():
+    assert localmodels.parse_progress("  ██▒▒  140 MB / 1.20 GB") == "indiriliyor: 140 MB / 1.20 GB"
+    assert (
+        localmodels.parse_progress("a\r  1,5 MB / 1.20 GB\r  900 KB / 1.20 GB")
+        == "indiriliyor: 900 KB / 1.20 GB"
+    )  # son satır
+    assert localmodels.parse_progress("Starting package install...") is None
+    assert localmodels.parse_progress("") is None
+
+
+def test_install_shows_download_progress_and_plain_winget_errors(monkeypatch):
+    monkeypatch.setattr(localmodels.sys, "platform", "win32")
+    monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
+    seen = []
+
+    def fake(i, cb=None):
+        cb("indiriliyor: 140 MB / 1.20 GB")
+        seen.append(job.snapshot()["status"])
+        cb("kuruluyor")
+        seen.append(job.snapshot()["status"])
+        return 0x8A15000F, ""  # kaynak verisi eksik
+
+    monkeypatch.setattr(localmodels, "_winget_install", fake)
+    job = localmodels.InstallJob()
+    job.start("ollama")
+    done = _wait_job(job)
+    assert seen == ["Ollama indiriliyor: 140 MB / 1.20 GB", "Ollama kuruluyor"]
+    assert "program listesi (winget) güncellenemedi" in done["error"] and "kod" not in done["error"]
+    monkeypatch.setattr(localmodels, "_winget_install", lambda i, cb=None: (0x8A150008, ""))
+    job.start("ollama")
+    assert "İndirme olmadı" in _wait_job(job)["error"]
+    monkeypatch.setattr(localmodels, "_winget_install", lambda i, cb=None: (7, ""))
+    job.start("ollama")
+    assert "0x7" in _wait_job(job)["error"]  # bilinmeyen kod: onaltılık, ham çıktı değil
+
+
+@pytest.mark.skipif(localmodels.sys.platform == "win32", reason="sahte winget bir kabuk betiği")
+def test_real_subprocess_streams_progress_before_it_finishes(tmp_path, monkeypatch):
+    import os
+    import stat
+    import threading
+
+    fake = tmp_path / "winget"
+    fake.write_text(
+        "#!/bin/sh\n"
+        "printf '  1.5 MB / 1.20 GB\\r'\n"
+        "sleep 1\n"  # süreç bitmeden ilk ilerleme gelmeli
+        "printf '  600 MB / 1.20 GB\\r'\n"
+        "sleep 1\n"
+        "printf 'Starting package install...\\n'\n"
+        "exit 0\n"
+    )
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
+    first = threading.Event()
+    msgs: list[str] = []
+
+    def cb(m):
+        msgs.append(m)
+        first.set()
+
+    result: list = []
+    t = threading.Thread(
+        target=lambda: result.append(localmodels._winget_install("Ollama.Ollama", cb))
+    )
+    t.start()
+    assert first.wait(1.5) and t.is_alive()  # ilk ilerleme, süreç hâlâ çalışırken geldi
+    t.join(10)
+    assert result[0][0] == 0
+    assert msgs[0] == "indiriliyor: 1.5 MB / 1.20 GB" and "indiriliyor: 600 MB / 1.20 GB" in msgs
+    assert msgs[-1] == "kuruluyor"
+
+
+def test_install_status_reports_elapsed_time_only_while_active(monkeypatch):
+    import threading
+
+    gate = threading.Event()
+    monkeypatch.setattr(localmodels.sys, "platform", "win32")
+    monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
+    monkeypatch.setattr(localmodels, "_winget_install", lambda i, cb=None: gate.wait(5) and (1, ""))
+    job = localmodels.InstallJob()
+    assert "elapsed" not in job.snapshot()
+    job.start("ollama")
+    snap = job.snapshot()
+    assert snap["active"] and isinstance(snap["elapsed"], int) and snap["elapsed"] >= 0
+    assert "started" not in snap  # iç alan dışarı çıkmaz
+    gate.set()
+    done = _wait_job(job)
+    assert "elapsed" not in done and "started" not in done

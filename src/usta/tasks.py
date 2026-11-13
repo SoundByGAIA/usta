@@ -11,7 +11,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from usta import attachments, kisi, mcpconfig, memory, projectcfg, projects
+from usta import attachments, mcpconfig, memory, ortak, projectcfg, projects
 from usta.agent import SYSTEM_PROMPT, Agent
 from usta.audit import AuditLog
 from usta.breaker import CircuitBreaker
@@ -540,7 +540,7 @@ class TaskManager:
             with contextlib.suppress(OSError, ValueError):  # hafıza yoksa/bozuksa görev sürer
                 memory_context = memory.render_context(task.root)
             with contextlib.suppress(OSError, ValueError):  # profil yoksa/bozuksa görev sürer
-                profile = kisi.render(self.home)
+                profile = ortak.context(self.home)
                 memory_context = (
                     f"{profile}\n\n{memory_context}".strip() if profile else memory_context
                 )

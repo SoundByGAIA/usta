@@ -92,7 +92,11 @@ def delete(home: Path) -> None:
 
 def render(home: Path) -> str:
     """Her görevin başına eklenen veri bloğu; profil boşsa boş metin."""
-    k = load(home)
+    return render_kisi(load(home))
+
+
+def render_kisi(k: Kisi) -> str:
+    """Verilen profili (yerel ya da evdeki ortak hafızadan gelen) veri bloğuna çevirir."""
     if k.empty():
         return ""
     nonce = secrets.token_hex(8)

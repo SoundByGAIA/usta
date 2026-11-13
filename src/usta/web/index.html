@@ -194,6 +194,44 @@
       <div class="row"><button id="kisi-save" class="primary" type="button">Kaydet</button><button id="kisi-clear" type="button">Hepsini sil</button></div>
       <p id="kisi-msg" class="wiz-note" role="status"></p>
     </div>
+    <h3 class="set-group">Evdeki ortak hafıza</h3>
+    <div class="set-row" id="set-ortak">
+      <p class="wiz-note">Evde birden çok bilgisayarın varsa, "Seni tanıyayım" bilgilerin ve ortak notlar hepsinde aynı olur. Bir bilgisayar bunları tutar (ev sahibi), diğerleri ona bağlanır. Bağlantı yalnız evdeki ağda çalışır. İstekler imzalıdır ama şifrelenmez; yalnız güvendiğin ev ağında kullan. Ortak hafızaya yalnız sen yazarsın, Usta yazamaz.</p>
+      <p id="ortak-durum" class="wiz-note" role="status">Bakıyorum…</p>
+      <div id="ortak-yok" hidden>
+        <div class="row"><button id="ortak-ac" type="button">Bu bilgisayar ortak hafızayı tutsun</button></div>
+        <form id="ortak-baglan-form" class="ortak-form" autocomplete="off">
+          <label for="ortak-adres">Ya da evdeki başka bir bilgisayara bağlan</label>
+          <input id="ortak-adres" placeholder="Öbür bilgisayarın adresi, örnek: 192.168.1.20:8766" spellcheck="false" required>
+          <input id="ortak-kod" inputmode="numeric" maxlength="6" placeholder="Öbür bilgisayarda gördüğün 6 haneli kod" required>
+          <button class="primary" type="submit">Bağlan</button>
+        </form>
+      </div>
+      <div id="ortak-sahip" hidden>
+        <div class="row"><button id="ortak-kod-al" class="primary" type="button">Yeni bilgisayar bağla: kod göster</button><button id="ortak-kapat" type="button">Ortak hafızayı kapat</button></div>
+        <p id="ortak-kod-kutu" class="wiz-pin" hidden></p>
+        <p id="ortak-kod-not" class="wiz-note" hidden></p>
+        <h4 class="set-sub">Bağlı bilgisayarlar</h4>
+        <ul id="ortak-esler" class="kisi-liste"></ul>
+        <h4 class="set-sub">Onay bekleyen notlar</h4>
+        <p class="wiz-note">Başka bir bilgisayardan eklenen notlar, sen onaylayana kadar yapay zekâya gitmez.</p>
+        <ul id="ortak-bekleyen" class="kisi-liste"></ul>
+      </div>
+      <div id="ortak-bagli" hidden>
+        <p id="ortak-uyari" class="wiz-note" hidden></p>
+        <div class="row"><button id="ortak-ayril" type="button">Bağlantıyı kes</button></div>
+      </div>
+      <div id="ortak-notlar-kutu" hidden>
+        <h4 class="set-sub">Ortak notlar</h4>
+        <ul id="ortak-notlar" class="kisi-liste"></ul>
+        <form id="ortak-not-form" class="key-row" autocomplete="off">
+          <input id="ortak-not" maxlength="300" placeholder="Örnek: Evdeki yazıcının adı Mavi" aria-label="Yeni ortak not">
+          <button type="submit">Ekle</button>
+        </form>
+        <p class="wiz-note">Şifre, anahtar, bağlantı ya da komut yazma; Usta bunları kabul etmez.</p>
+      </div>
+      <p id="ortak-msg" class="wiz-note" role="status"></p>
+    </div>
     <h3 class="set-group">Görünüm</h3>
     <div class="set-row"><label for="theme">Zemin</label>
     <select id="theme" title="Ekranın zemin rengi (terminalle ortak)">

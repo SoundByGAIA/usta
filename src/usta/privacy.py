@@ -17,6 +17,9 @@ FILES = {
     "config.json": "ayarların (tema, mod, model, düşünme, bağlam); sır içermez",
     "apis.json": "bağladığın API'ler ve anahtarları; yalnız sen okuyabilirsin",
     "kisi.json": "senin yazdığın tanışma bilgileri (ad, anlatım biçimi, notların); her görevde yapay zekâya gönderilir",
+    "ortak": "evdeki ortak hafıza (ev sahibiysen): ortak notlar ve eşleşmiş bilgisayarların anahtarları",
+    "ortak-baglanti.json": "bir ev sahibine bağlıysan: onun adresi ve ortak anahtarın; yalnız sen okuyabilirsin",
+    "ortak-onbellek.json": "ev sahibinden alınmış son kopya (bağlantı kesilirse onu kullanırım)",
     "token": "portal giriş jetonun",
     "mcp.json": "bağladığın MCP araç sunucuları",
     "profiles.json": "modellerin ölçülmüş yetenek profilleri",
@@ -52,7 +55,12 @@ def _size(p: Path) -> int:
 
 
 def report(
-    home: Path, sources: list[dict], current_api: str | None, allowed_hosts, lan_urls=None
+    home: Path,
+    sources: list[dict],
+    current_api: str | None,
+    allowed_hosts,
+    lan_urls=None,
+    shared: str | None = None,
 ) -> dict:
     """`sources`: [{name, endpoint}]; `current_api`: kullanılan API adı (yoksa None)."""
     rows = [
@@ -93,6 +101,7 @@ def report(
         "sends": sends,
         "other": [
             *lan,
+            *([shared] if shared else []),
             "Komutlar Docker içinde çalışır; Docker yoksa çalışmaz, bilgisayarında doğrudan çalışmaz. "
             + (
                 f"Ağ yalnız şu adreslere açıktır: {', '.join(hosts)}."

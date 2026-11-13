@@ -851,6 +851,58 @@
     kisiMsg("Kaydettim. Bundan sonraki görevlerde bunları bilerek çalışırım.", "ok");
   }
 
+  // --- evdeki ortak hafıza ---
+  const ortakMsg = (t, c) => { const m = $("ortak-msg"); m.textContent = t || ""; m.className = "wiz-note" + (c ? ` ${c}` : ""); };
+  async function ortakCall(path, method, body) {
+    const r = await api(path, { method: method || "POST", body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) { ortakMsg(await errorText(r), "error"); return null; }
+    return r.json();
+  }
+  function ortakRow(text, who, buttons) {
+    const li = h("li");
+    const left = h("span", null, text);
+    if (who) left.append(h("span", "who", `  (${who})`));
+    const acts = h("span", "acts");
+    for (const [label, fn] of buttons) { const b = h("button", null, label); b.type = "button"; b.setAttribute("aria-label", `${label}: ${text}`); b.addEventListener("click", fn); acts.append(b); }
+    li.append(left, acts);
+    return li;
+  }
+  async function loadOrtak() {
+    const r = await api("/ortak");
+    if (!r.ok) { $("ortak-durum").textContent = "Ortak hafıza durumunu alamadım."; return; }
+    const d = await r.json();
+    for (const id of ["ortak-yok", "ortak-sahip", "ortak-bagli", "ortak-notlar-kutu"]) $(id).hidden = true;
+    $("ortak-kod-kutu").hidden = true; $("ortak-kod-not").hidden = true;
+    const profileLocked = d.rol === "bagli";
+    for (const id of ["kisi-ad", "kisi-uslup", "kisi-hakkimda", "kisi-yeni"]) $(id).disabled = profileLocked;
+    for (const id of ["kisi-save", "kisi-clear"]) $(id).disabled = profileLocked;
+    $("kisi-form").querySelector("button").disabled = profileLocked;
+    if (d.rol === "yok") {
+      $("ortak-durum").textContent = "Şu an kapalı: bilgilerin yalnız bu bilgisayarda.";
+      $("ortak-yok").hidden = false;
+      return;
+    }
+    $("ortak-notlar-kutu").hidden = false;
+    $("ortak-notlar").replaceChildren(...(d.notlar || []).map((n) => ortakRow(n.text, n.kaynak, d.rol === "ev-sahibi" ? [["Sil", async () => { if (await ortakCall(`/ortak/notlar/${n.id}`, "DELETE")) loadOrtak(); }]] : [])));
+    if (d.rol === "ev-sahibi") {
+      $("ortak-durum").textContent = d.calisiyor ? `Bu bilgisayar ortak hafızayı tutuyor (${d.adres}). Adı: ${d.ad}.` : "Ortak hafıza açık ama şu an dinlemiyor (ağa bağlı mısın?).";
+      $("ortak-sahip").hidden = false;
+      $("ortak-esler").replaceChildren(...((d.eslesmeler || []).length ? d.eslesmeler.map((e) => ortakRow(e.ad, "", [["Kaldır", async () => { if (await ortakCall(`/ortak/eslesmeler/${e.id}`, "DELETE")) loadOrtak(); }]])) : [h("li", "wiz-note", "Henüz bağlı bilgisayar yok.")]));
+      $("ortak-bekleyen").replaceChildren(...((d.bekleyen || []).length ? d.bekleyen.map((n) => ortakRow(n.text, `${n.kaynak} ekledi`, [
+        ["Onayla", async () => { if (await ortakCall(`/ortak/notlar/${n.id}/onayla`)) loadOrtak(); }],
+        ["Reddet", async () => { if (await ortakCall(`/ortak/notlar/${n.id}`, "DELETE")) loadOrtak(); }],
+      ])) : [h("li", "wiz-note", "Bekleyen not yok.")]));
+    } else {
+      $("ortak-durum").textContent = `Bu bilgisayar "${d.baglanti.ad}" bilgisayarındaki (${d.baglanti.adres}) ortak hafızaya bağlı. Bilgilerini orada değiştirirsin.`;
+      $("ortak-bagli").hidden = false;
+      const w = $("ortak-uyari");
+      w.hidden = !d.ulasilamiyor;
+      w.textContent = d.ulasilamiyor ? `Ev sahibine şu an ulaşamıyorum (${d.hata}). Son bildiğim kopyayı kullanıyorum.` : "";
+      if (d.profil) { $("kisi-ad").value = d.profil.ad || ""; $("kisi-uslup").value = d.profil.uslup || "sade"; $("kisi-hakkimda").value = d.profil.hakkimda || ""; kisiFacts = (d.profil.bilgiler || []).slice(); renderKisiFacts(); }
+      kisiMsg("Bu bilgiler ev sahibi bilgisayardan geliyor; burada değiştirilemez.");
+    }
+  }
+
   async function loadPrograms() {
     const box = $("programs");
     let d = {};
@@ -882,7 +934,7 @@
     else if (name === "privacy") loadPrivacy();
     else if (name === "wizard") wizShow("wiz-start");
     else if (name === "tablet") loadTablet();
-    else if (name === "settings") { loadPrograms(); loadProfile(); }
+    else if (name === "settings") { loadPrograms(); loadProfile().then(loadOrtak); }
     else if (name === "glossary") { $("gloss-q").value = ""; renderGlossary(); $("gloss-q").focus(); }
     else { apisMsg(""); loadApis(); }
   }
@@ -1734,6 +1786,29 @@
     kisiFacts.push(v); $("kisi-yeni").value = ""; renderKisiFacts(); kisiMsg("Eklendi. Kalıcı olması için Kaydet'e bas.");
   });
   $("kisi-save").addEventListener("click", saveProfile);
+  $("ortak-ac").addEventListener("click", async () => { ortakMsg("Açıyorum…"); if (await ortakCall("/ortak/ev-sahibi", "POST", { acik: true })) { ortakMsg("Açıldı. Şimdi \"kod göster\"e basıp öbür bilgisayardan bağlanabilirsin.", "ok"); loadOrtak(); } });
+  $("ortak-kapat").addEventListener("click", async () => { if (await ortakCall("/ortak/ev-sahibi", "POST", { acik: false })) { ortakMsg("Kapattım. Bağlı bilgisayarlar artık ulaşamaz.", "ok"); loadOrtak(); } });
+  $("ortak-kod-al").addEventListener("click", async () => {
+    const d = await ortakCall("/ortak/kod");
+    if (!d) return;
+    $("ortak-kod-kutu").textContent = d.kod; $("ortak-kod-kutu").hidden = false;
+    $("ortak-kod-not").textContent = `Öbür bilgisayarda "Evdeki ortak hafıza" bölümüne şu adresi ve bu kodu yaz: ${d.adres}. Kod 5 dakika geçerli ve bir kez kullanılır.`;
+    $("ortak-kod-not").hidden = false; ortakMsg("");
+  });
+  $("ortak-baglan-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    ortakMsg("Bağlanıyorum…");
+    const d = await ortakCall("/ortak/baglan", "POST", { adres: $("ortak-adres").value.trim(), kod: $("ortak-kod").value.trim() });
+    if (d) { $("ortak-baglan-form").reset(); ortakMsg(`Bağlandım: ${d.ad}.`, "ok"); await loadProfile(); loadOrtak(); }
+  });
+  $("ortak-ayril").addEventListener("click", async () => { if (await ortakCall("/ortak/ayril")) { ortakMsg("Bağlantıyı kestim. Bilgilerin yine bu bilgisayarın kendi bilgileri.", "ok"); await loadProfile(); loadOrtak(); } });
+  $("ortak-not-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const v = $("ortak-not").value.trim();
+    if (!v) return;
+    const d = await ortakCall("/ortak/notlar", "POST", { text: v });
+    if (d) { $("ortak-not").value = ""; ortakMsg(d.durum === "bekliyor" ? "Notu ev sahibine gönderdim. O onaylayana kadar yapay zekâya gitmez." : "Not eklendi.", "ok"); loadOrtak(); }
+  });
   $("kisi-clear").addEventListener("click", async () => {
     const r = await api("/profile", { method: "DELETE" });
     if (!r.ok) { kisiMsg(await errorText(r), "error"); return; }

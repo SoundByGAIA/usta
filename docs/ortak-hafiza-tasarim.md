@@ -120,5 +120,5 @@ Sonraki adım (onay bekliyor): ai-memory'nin HTTP/MCP uçlarını salt okunur ol
 - **Profil yalnız ev sahibinde değişir.** Bağlı bilgisayarda profil salt okunurdur (aksi halde çalınmış anahtarla
   profil üzerinden enjeksiyon yapılabilirdi). Bağlı bilgisayarlardan eklenen NOTLAR ev sahibinde onay bekler.
 - **Ev sahibi kapalıysa** bağlı bilgisayar son bilinen kopyayı (önbellek) kullanır; görev düşmez.
-- **Denenmedi (Windows):** ev sahibi olarak Windows (güvenlik duvarı sorusu); Windows'ta bağlı bilgisayar olarak gerçek ağ.
+- **Windows'ta denendi (0.6.1):** Linux ev sahibi + Windows bağlanan, gerçek ağda (eşleşme, okuma, onay kapısı, kesme). **Denenmedi:** Windows'un ev sahibi olması (güvenlik duvarı sorusu).
 - **Reliability Lab senaryoları** (ortak nottaki talimat, çalınmış anahtarla not) henüz eklenmedi: küme özeti değişir.

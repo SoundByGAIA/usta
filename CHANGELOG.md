@@ -1,5 +1,23 @@
 # Değişiklik günlüğü
 
+## 0.6.1 — Windows'ta gerçek denemelerden düzeltmeler
+
+Model davranışı DEĞİŞMEDİ. 0.6.0 ve 0.5.x'in Windows'ta ilk gerçek denemesi (Windows 10, Python 3.14, yetkisiz kullanıcı).
+
+**Windows'ta denendi ve çalıştı**
+- Yayınlanmış `Usta-Kur.bat` GitHub'dan indirilip çalıştırıldı: 0.6.0 kuruldu, masaüstü simgesi geldi, Usta arka planda açıldı.
+- **Evdeki ortak hafıza, gerçek ağda Windows ↔ Linux:** Linux ev sahibi, Windows bağlanan. Kodla eşleşme, profil ve notların gelmesi, Windows'tan eklenen notun ev sahibinde "bekliyor" olması, onay öncesi Windows'taki modele **girmemesi**, onaydan sonra girmesi, bağlıyken profilin yerelde değiştirilememesi ve bağlantıyı kesme doğrulandı.
+- **Evdeki ağda arama (`/local/scan-lan`)** gerçek ağda ev sahibi PC'deki model sunucusunu buldu; elle adres çalıştı; internet adresi (`8.8.8.8`) reddedildi.
+- **`winget` ile program kurma (gerçek winget):** kullanıcının kendi oturumunda `winget` programı buldu ve indirmeyi başlattı; küçük bir paketle (jq) kurulum uçtan uca başarılı oldu ve kaldırıldı.
+
+**Bulunan ve düzeltilenler**
+- **İlerleme:** `winget`, çıktısı boruya yazılırken indirme ilerlemesi (MB/GB) basmaz; bu yüzden gösterilmeye çalışılan ilerleme hiç çıkmıyordu. Artık kurulumun **kaç dakikadır sürdüğü** gösterilir ("Program yaklaşık 1 GB; yavaş internette saatler sürebilir"). "Kuruluyor" aşaması gerçek `winget` çıktısından algılanır.
+- **Anlaşılır winget hataları:** kaynak verisi eksik (`0x8A15000F`) ve indirme hatası (`0x8A150008`) için düz cümle; bilinmeyen kodlar onaltılık yazılır, ham çıktı gösterilmez.
+- **Yavaş indirme:** denenen bilgisayarda GitHub'dan indirme saniyede yaklaşık 83 KB idi; 1,2 GB'lık Ollama saatler sürerdi. Bu kodla ilgili değil; kullanıcı için "kendin indir" bağlantısı kurulum düğmesinin altında kalır.
+- İlerleme ayrıştırması arabelleğin tamamını tekrar tarıyordu (eski indirme satırı "kuruluyor"un üstüne yazılıyordu); satır satır işleniyor, gerçek bir alt süreçle test edildi.
+
+**Denenmedi:** Windows'ta ev sahibi olmak (güvenlik duvarı sorusu), Ollama'nın Windows'ta başından sonuna kurulması (indirme çok yavaştı), Python hiç yokken `Usta-Kur.bat`.
+
 ## 0.6.0 — evdeki ortak hafıza
 
 Model davranışı DEĞİŞMEDİ (ortak hafıza kapalıysa istem aynıdır). Varsayılan KAPALI.

@@ -70,13 +70,40 @@ enjeksiyon ortak hafızayı zehirleyemez.
 - Reliability Lab'a yeni senaryolar: ortak nottaki gizli talimat, bekleyen notun sızması, çalınmış anahtarla not ekleme.
 - Gerçek ağ: iki bilgisayarla uçtan uca (Windows + Linux).
 
-## Açık sorular (karar gerekir)
+## Kararlar (Can, 14 Kasım 2026)
 
-1. **Taşıma şifrelemesi.** Seçenekler: (a) tablet gibi düz HTTP + açık uyarı (bağımlılık yok, dinleyen notları okur);
-   (b) `cryptography` bağımlılığı ekleyip kendinden imzalı TLS + parmak izi sabitleme (güvenli, ama yeni bağımlılık ve
-   tedarik zinciri yüzeyi); (c) anahtardan türetilmiş HMAC imzası (anahtar çalınamaz ama içerik okunur). Önerim: ilk
-   sürümde (c), şifreleme için (b) ayrı kararla.
-2. **Dinlenme anında şifreleme.** Ortak notlar ev sahibinde düz JSON mu, anahtarla şifreli mi? Şifreli olunca anahtarı
-   nerede tutacağız (aynı diskte tutmak çoğu saldırıya karşı bir şey katmaz)?
-3. **Ev sahibi seçimi.** Hep açık duran bir bilgisayar (ör. ana PC) mi önerilsin, yoksa herhangi biri mi?
-4. **Onay kapısı** her yeni not için mi, yoksa yalnız ev sahibi dışından gelenler için mi? (Önerim: yalnız dışarıdan gelenler.)
+1. **Taşıma:** imzalı istek (anahtarın kendisi ağda gitmez; her istek anahtardan türetilmiş HMAC imzası ve tek
+   kullanımlık sayaç taşır). İçerik şifrelenmez; arayüz bunu söyler.
+2. **Notlar düz dosya** (düz JSON ya da markdown; dinlenme anında şifreleme yok).
+3. **Onay kapısı yalnız dışarıdan gelen notlar için.**
+4. **Ev sahibi:** "ai-memory reposunu konumlandırabiliriz" dendi. Aşağıdaki karşılaştırma bu yüzden eklendi.
+
+## İki yol: kendi küçük sunucumuz mu, ai-memory mi
+
+[ai-memory](https://github.com/akitaonrails/ai-memory) (MIT lisanslı, Rust, 15 bini aşkın yıldız) zaten evdeki bir
+sunucuda çalışan, birden çok bilgisayarın ve aracın (20'den fazla) ortak kullandığı bir hafıza sunucusudur. Bizim yukarıda
+tarif ettiğimiz parçaların çoğu onda var:
+
+| İhtiyaç | Kendi sunucumuz (yukarıdaki tasarım) | ai-memory'yi kullanmak |
+|---|---|---|
+| Sunucu, eşleştirme, kimlik | Yazılacak (`LoginCodes` üstüne) | Hazır: `aim_` anahtarları, çok kullanıcılı kimlik, proje bazlı yetki |
+| Denetim kaydı | Yazılacak | Hazır (`audit_log`) |
+| Notlar düz dosya | Yazılacak | Hazır: kaynak gerçek, git'li düz markdown viki |
+| İmzalı istek | Yazılacak (karar 1) | **Yok:** Bearer anahtarı kullanır; ev ağında şifresiz HTTP'de anahtar dinlenebilir. Çözüm: yalnız `127.0.0.1` + SSH tüneli ya da TLS proxy (kendi belgesi önerir) |
+| Yeni kullanıcıya kurulum | Usta içinde, düğmeyle | **Ağır:** Docker ve bir sunucu gerekir; sıfır bilgili kullanıcıya göre değil |
+| Gizlilik duruşu | Her şeyi kullanıcı yazar | Kanca (hook) ile istemleri ve araç çağrılarını sessizce kaydeder. Usta'da bunu KULLANMAYIZ |
+| Bakım yükü | Bizde | Onda (ama ona bağımlıyız) |
+
+**Önerim: ikisini birleştirmek, ai-memory'yi gelişmiş kullanıcılar için bağlayıcı olarak eklemek.**
+- Usta, ai-memory'ye **istemci** olur: model yalnız OKUR (`memory_query`/`memory_recent` benzeri, salt okunur araçlar);
+  yazmayı yalnız kullanıcı, arayüzdeki "Ortak notlara ekle" düğmesiyle yapar. Kanca ve sessiz kayıt yoktur.
+- Bağlantı adresi ve anahtarı `apis.json` gibi 0600 dosyada durur; adres yalnız loopback ya da özel ağ olabilir.
+- ai-memory'den gelen her içerik `<<<ORTAK-HAFIZA id=…>>>` içinde VERİ olarak ve kaynak etiketiyle girer; dışarıdan
+  (başka kullanıcı/araç) yazılmış kayıtlar kullanıcı onaylayana kadar modele girmez (karar 3).
+- Kendi küçük sunucumuz **sonraya** kalır: yalnız ai-memory kurmak istemeyen, evde birden çok bilgisayarı olan
+  yeni kullanıcılar için. Gerekirse o zaman yapılır.
+- Bu yolda "imzalı istek" kararı ai-memory'nin Bearer modeline karşılık gelir; ev ağında kullanılacaksa TLS proxy ya da
+  SSH tüneli ŞARTTIR (Usta, bağlantı adresi loopback ya da `https://` değilse uyarı verir).
+
+Sonraki adım (onay bekliyor): ai-memory'nin HTTP/MCP uçlarını salt okunur olarak yoklayıp küçük bir bağlayıcı prototipi
+(`src/usta/ortakhafiza.py`): bağlan, ara, listele, onay kapısı.

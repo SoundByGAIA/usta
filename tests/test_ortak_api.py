@@ -106,9 +106,7 @@ def test_full_flow_pair_note_approval_model_context_and_unpair(duo):
     nid = host.get("/ortak", headers=AUTH).json()["notlar"][0]["id"]
     assert host.delete(f"/ortak/notlar/{nid}", headers=AUTH).status_code == 200
     assert host.delete(f"/ortak/notlar/{nid}", headers=AUTH).status_code == 404
-    bad = host.post(
-        "/ortak/notlar", json={"text": "API_KEY=sk-abcdefghijklmnopqrstuvwxyz"}, headers=AUTH
-    )
+    bad = host.post("/ortak/notlar", json={"text": "API_KEY=" + "sk-" + "a" * 26}, headers=AUTH)
     assert (
         bad.status_code == 422
         and "gizli" in bad.json()["detail"].lower()

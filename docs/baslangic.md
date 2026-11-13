@@ -42,6 +42,10 @@ Usta, ne istediğini yazdığında bunu senin için yapan bir yapay zekâ yardı
 - Model seçince Usta modeli tanımak için yarım dakikaya kadar bekler ("Modeli tanıyorum" yazar), bu sırada başka bir şeye basma.
 - Sonunda "Hazır!" yazar. Altındaki örneklerden birine bas ve dene.
 
+## Usta seni tanısın
+
+**Ayarlar → "Seni tanıyayım"** bölümünde sana ne diye hitap etmesini, nasıl anlatmasını ve bilmesini istediğin birkaç şeyi yazabilirsin (ör. "Sayfalarımda hep büyük yazı isterim"). Bunları yalnız sen yazarsın; Usta kendiliğinden eklemez. Yazdıkların her görevde yapay zekâya gönderilir (internet servisi seçtiysen o servise de), bu yüzden şifre ya da anahtar yazma. İstediğin zaman tek tek silebilir ya da "Hepsini sil"e basabilirsin. **Ayarlar → Görünüm**'den zemin rengini, vurgu rengini ve yazı boyutunu değiştirebilirsin.
+
 ## Tabletten ya da telefondan kullanmak
 
 Bilgisayar ve tablet **aynı Wi-Fi'a** bağlı olmalı.

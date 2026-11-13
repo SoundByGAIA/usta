@@ -326,6 +326,7 @@ def test_settings_requires_auth_and_has_defaults(tmp_path):
         "mode": "manual",
         "guard": False,
         "zoom": "auto",
+        "accent": "cini",
         "think": "auto",
         "view": "simple",
         "context_window": 0,
@@ -344,6 +345,7 @@ def test_settings_put_validates_persists_and_shares_with_terminal(tmp_path):
         "mode": "plan",
         "guard": False,
         "zoom": "auto",
+        "accent": "cini",
         "think": "auto",
         "view": "simple",
         "context_window": 0,
@@ -456,3 +458,15 @@ def test_reveal_opens_only_the_workspace_folder(tmp_path, monkeypatch):
     assert len(opened) == 1  # olmayan alan için hiçbir şey açılmaz
     monkeypatch.setattr(compat, "open_folder", lambda p: (_ for _ in ()).throw(OSError("yok")))
     assert c.post(f"/workspaces/{ws}/reveal", headers=AUTH).status_code == 500
+
+
+def test_accent_color_is_a_validated_setting(tmp_path):
+    c, _ = make_client(tmp_path, Scripted())
+    for ok in ("cini", "turkuaz", "nar", "zeytin", "mor"):
+        assert c.put("/settings", json={"accent": ok}, headers=AUTH).json()["accent"] == ok
+    assert c.get("/settings", headers=AUTH).json()["accent"] == "mor"
+    assert c.put("/settings", json={"accent": "pembe"}, headers=AUTH).status_code == 422
+    assert (
+        c.put("/settings", json={"accent": "red;}body{display:none"}, headers=AUTH).status_code
+        == 422
+    )

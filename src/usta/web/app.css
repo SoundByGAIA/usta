@@ -300,6 +300,7 @@ select { font: inherit; color: inherit; background: var(--bg); border: 1px solid
 .set-row label { font-weight: 600; }
 .set-row + .set-row { padding-top: 14px; border-top: 1px solid var(--line); }
 .set-row select { max-width: 360px; }
+.set-row button.q { align-self: flex-start; }
 
 /* basit görünüm: gelişmiş öğeler gizlenir */
 body.simple .adv { display: none !important; }
@@ -325,6 +326,30 @@ button.q { min-width: 24px; height: 24px; padding: 0 6px; margin: 0 2px; border:
 button.q:hover, button.q:focus-visible { background: var(--accent-soft); }
 #help-box { margin-top: 8px; }
 #help-text { max-height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-word; padding: 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
+
+/* vurgu rengi (Ayarlar → Görünüm); çini mavisi varsayılandır ve tema kurallarında tanımlıdır */
+:root[data-accent="turkuaz"][data-theme="beyaz"] { --accent: #0a7c86; --accent-soft: #dcf2f3; --accent-text: #ffffff; }
+:root[data-accent="turkuaz"][data-theme="gri"], :root[data-accent="turkuaz"][data-theme="siyah"] { --accent: #4fd0d6; --accent-soft: #14353a; --accent-text: #06161a; }
+:root[data-accent="nar"][data-theme="beyaz"] { --accent: #b8321f; --accent-soft: #fbe5e1; --accent-text: #ffffff; }
+:root[data-accent="nar"][data-theme="gri"], :root[data-accent="nar"][data-theme="siyah"] { --accent: #ff8a74; --accent-soft: #3d1b16; --accent-text: #240a06; }
+:root[data-accent="zeytin"][data-theme="beyaz"] { --accent: #4d6b1f; --accent-soft: #e8f0d8; --accent-text: #ffffff; }
+:root[data-accent="zeytin"][data-theme="gri"], :root[data-accent="zeytin"][data-theme="siyah"] { --accent: #a9cf6a; --accent-soft: #25301a; --accent-text: #10190a; }
+:root[data-accent="mor"][data-theme="beyaz"] { --accent: #6b3fa0; --accent-soft: #eee5f8; --accent-text: #ffffff; }
+:root[data-accent="mor"][data-theme="gri"], :root[data-accent="mor"][data-theme="siyah"] { --accent: #b896ff; --accent-soft: #2c2147; --accent-text: #120a24; }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.swatch { width: 34px; height: 34px; padding: 0; border-radius: 50%; border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
+.swatch[data-accent="cini"] { background: #1d3d9c; } .swatch[data-accent="turkuaz"] { background: #08808c; }
+.swatch[data-accent="nar"] { background: #bf3825; } .swatch[data-accent="zeytin"] { background: #4d6b1f; }
+.swatch[data-accent="mor"] { background: #6b3fa0; }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--accent); }
+.set-group { margin: 30px 0 4px; padding-top: 18px; border-top: 1px solid var(--line); font: 700 19px/1.3 var(--display); }
+.set-group:first-of-type { margin-top: 12px; border-top: 0; padding-top: 0; }
+#set-profile { gap: 8px; }
+#set-profile label { margin-top: 6px; }
+#set-profile input, #set-profile textarea, #set-profile select { max-width: 560px; width: 100%; }
+.kisi-liste { list-style: none; margin: 0; padding: 0; max-width: 560px; }
+.kisi-liste li { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.kisi-liste li button { padding: 2px 10px; flex: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .wiz-hero .mark { animation: none; }

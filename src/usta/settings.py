@@ -14,6 +14,7 @@ from usta import compat, theme, thinking
 
 MODES = ("manual", "auto", "plan")
 VIEWS = ("simple", "advanced")
+ACCENTS = ("cini", "turkuaz", "nar", "zeytin", "mor")  # arayüz vurgu rengi
 ZOOMS = ("auto", "0.9", "1", "1.1", "1.25", "1.5", "1.75")
 MAX_TEXT = 2048
 
@@ -31,12 +32,15 @@ class Settings:
     view: str = "simple"  # simple: yeni kullanıcı görünümü | advanced: tüm araçlar
     portal: bool = True
     zoom: str = "auto"  # portal arayüz boyutu: auto ya da çarpan
+    accent: str = "cini"  # portal vurgu rengi (bkz. ACCENTS)
     guard: bool = (
         False  # koruma: doğrulama kapısı + devre kesici (varsayılan kapalı, ölçüm sonrası açılır)
     )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "theme", theme.resolve(self.theme))
+        if self.accent not in ACCENTS:
+            raise ValueError(f"geçersiz renk: {self.accent!r}")
         if self.zoom not in ZOOMS:
             raise ValueError(f"geçersiz zoom: {self.zoom!r}")
         if self.think not in thinking.THINK:

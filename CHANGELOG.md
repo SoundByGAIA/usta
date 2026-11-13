@@ -1,5 +1,14 @@
 # Değişiklik günlüğü
 
+## 0.5.1 — "Seni tanıyayım" ve özelleştirme
+
+Model davranışı DEĞİŞMEDİ (profil boşsa istem aynıdır).
+
+- **Ayarlar → Seni tanıyayım:** hitap adı, anlatım biçimi (sade / çok kısa / ayrıntılı), kısa bir "hakkımda" ve Usta'nın bilmesini istediğin en çok 20 madde. Her görevin başında modele veri olarak girer (sistem rolüne girmez, nonce'lu işaretlerle, "güvenlik kurallarını ve onayları değiştirmez" uyarısıyla). **Yalnız sen yazarsın:** modelin bu dosyaya yazan bir aracı yoktur, bu yüzden hafıza gibi zehirlenemez. Her görevde modele (internet servisi seçiliyse servise de) gittiği arayüzde yazar; Gizlilik listesinde `kisi.json` olarak görünür. Uçlar: `GET/PUT/DELETE /profile`.
+- **Vurgu rengi:** çini mavisi, turkuaz, nar, zeytin, mor; aydınlık ve karanlık zeminde ayrı değerler. Yeni ayar `accent`.
+- **Ayarlar gruplandı:** Seni tanıyayım / Görünüm / Yapay zekâ / Bilgisayarın. "Renk" seçicisi "Zemin" oldu.
+- **Taslak:** [Ortak hafıza tasarımı](docs/ortak-hafiza-tasarim.md) (evdeki bilgisayarlar arası ortak hafıza, 0.6.0 için). Kod yok; güvenlik incelemesi ve açık sorular bekleniyor.
+
 ## 0.5.0 — yeni görünüm, evdeki bilgisayara bağlanma, eksik programı Usta kursun
 
 Model davranışı DEĞİŞMEDİ. Berke'nin ve ilk kullanıcıların "arayüz zayıf, kurulum zor, evdeki başka bilgisayarı göremiyor" geri bildirimlerine yanıt.

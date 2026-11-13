@@ -172,28 +172,43 @@
 
   <section id="settings" aria-label="Ayarlar" hidden>
     <h2>Ayarlar</h2>
-    <div class="set-row"><label for="view">Geliştirici modu</label>
-      <select id="view">
-        <option value="simple">Kapalı: sade ekran (yeni başlayanlar için)</option>
-        <option value="advanced">Açık: tüm araçlar görünsün</option>
-      </select></div>
-    <div class="set-row"><label>İndirmen gerekebilecek programlar</label>
-      <div id="programs"><p class="wiz-note">Bakıyorum…</p></div></div>
-    <div class="set-row"><label>Yapay zekâ</label>
-      <button id="set-wizard" type="button">Yapay zekâyı değiştir / kurulumu yeniden yap</button></div>
-    <div class="set-row" id="set-quit-row" hidden><label>Usta'yı kapat</label>
-      <button id="set-quit" type="button">Usta'yı kapat</button>
-      <p class="wiz-note">Usta arka planda çalışıyor, pencere yok. Bitirdiğinde buradan kapat; tekrar açmak için masaüstündeki Usta simgesine çift tıkla.</p></div>
-    <div class="set-row"><label>Tablet ve telefon</label>
-      <button id="set-tablet" type="button">Tabletten ya da telefondan kullan</button></div>
-    <div class="set-row"><label>Bir şey mi bozuldu?</label>
-      <button id="set-help" type="button">Yardım iste</button>
-      <p class="wiz-note">Usta'nın durumunu kısa bir yazıya dökerim. İçinde yazdıkların, dosyaların ve anahtarın olmaz. Kendiliğinden kimseye gitmez: sen gönderirsin.</p>
-      <div id="help-box" hidden>
-        <pre id="help-text" tabindex="0" aria-label="Yardım raporu"></pre>
-        <button id="help-save" type="button">Dosya olarak indir</button>
-        <button id="help-copy" type="button">Kopyala</button>
-        <p id="help-msg" class="wiz-note" role="status"></p>
+    <h3 class="set-group">Seni tanıyayım</h3>
+    <div class="set-row" id="set-profile">
+      <p class="wiz-note">Burada yazdıkların her görevde yapay zekâya gönderilir; internet servisi seçtiysen o servise de gider. Şifre, anahtar ya da gizli bir şey yazma. Bunları yalnız sen yazarsın, Usta kendiliğinden eklemez.</p>
+      <label for="kisi-ad">Sana ne diye hitap edeyim?</label>
+      <input id="kisi-ad" maxlength="40" autocomplete="off" placeholder="Örnek: Ceren">
+      <label for="kisi-uslup">Nasıl anlatayım?</label>
+      <select id="kisi-uslup">
+        <option value="sade">Sade: düz ve kısa Türkçe</option>
+        <option value="kisa">Çok kısa: yalnız gerekeni söyle</option>
+        <option value="ayrintili">Ayrıntılı: adım adım, nedenleriyle</option>
+      </select>
+      <label for="kisi-hakkimda">Kendini kısaca anlat</label>
+      <textarea id="kisi-hakkimda" rows="3" maxlength="500" placeholder="Örnek: Öğretmenim, bilgisayardan pek anlamam."></textarea>
+      <label for="kisi-yeni">Usta bunları da bilsin</label>
+      <ul id="kisi-liste" class="kisi-liste"></ul>
+      <form id="kisi-form" class="key-row" autocomplete="off">
+        <input id="kisi-yeni" maxlength="200" placeholder="Örnek: Sayfalarımda hep büyük yazı isterim" aria-label="Yeni madde">
+        <button type="submit">Ekle</button>
+      </form>
+      <div class="row"><button id="kisi-save" class="primary" type="button">Kaydet</button><button id="kisi-clear" type="button">Hepsini sil</button></div>
+      <p id="kisi-msg" class="wiz-note" role="status"></p>
+    </div>
+    <h3 class="set-group">Görünüm</h3>
+    <div class="set-row"><label for="theme">Zemin</label>
+    <select id="theme" title="Ekranın zemin rengi (terminalle ortak)">
+      <option value="siyah">Siyah</option>
+      <option value="gri">Gri</option>
+      <option value="beyaz">Beyaz</option>
+    </select>
+    </div>
+    <div class="set-row"><label id="accent-label">Vurgu rengi</label>
+      <div id="accent" class="swatches" role="group" aria-labelledby="accent-label">
+        <button type="button" class="swatch" data-accent="cini" aria-label="Çini mavisi" title="Çini mavisi"></button>
+        <button type="button" class="swatch" data-accent="turkuaz" aria-label="Turkuaz" title="Turkuaz"></button>
+        <button type="button" class="swatch" data-accent="nar" aria-label="Nar kırmızısı" title="Nar kırmızısı"></button>
+        <button type="button" class="swatch" data-accent="zeytin" aria-label="Zeytin yeşili" title="Zeytin yeşili"></button>
+        <button type="button" class="swatch" data-accent="mor" aria-label="Mor" title="Mor"></button>
       </div></div>
     <div class="set-row"><label for="zoom">Arayüz boyutu</label>
     <select id="zoom" title="Arayüz boyutu: Otomatik pencere/ekran boyutuna uyar">
@@ -206,6 +221,9 @@
       <option value="1.75">%175</option>
     </select>
     </div>
+    <h3 class="set-group">Yapay zekâ</h3>
+    <div class="set-row"><label>Hangi yapay zekâ kullanılsın?</label>
+      <button id="set-wizard" type="button">Yapay zekâyı değiştir / kurulumu yeniden yap</button></div>
     <div class="set-row"><label for="think">Düşünme</label>
     <select id="think" title="Düşünme: model cevap vermeden önce ne kadar düşünsün (desteklemeyen modelde etkisizdir)">
       <option value="auto">Düşünme: model karar versin</option>
@@ -226,13 +244,28 @@
       <option value="131072">128K</option>
     </select>
     </div>
-    <div class="set-row"><label for="theme">Renk</label>
-    <select id="theme" title="Tema (terminalle ortak)">
-      <option value="siyah">Siyah</option>
-      <option value="gri">Gri</option>
-      <option value="beyaz">Beyaz</option>
-    </select>
-    </div>
+    <h3 class="set-group">Bilgisayarın</h3>
+    <div class="set-row"><label>İndirmen gerekebilecek programlar</label>
+      <div id="programs"><p class="wiz-note">Bakıyorum…</p></div></div>
+    <div class="set-row"><label>Tablet ve telefon</label>
+      <button id="set-tablet" type="button">Tabletten ya da telefondan kullan</button></div>
+    <div class="set-row" id="set-quit-row" hidden><label>Usta'yı kapat</label>
+      <button id="set-quit" type="button">Usta'yı kapat</button>
+      <p class="wiz-note">Usta arka planda çalışıyor, pencere yok. Bitirdiğinde buradan kapat; tekrar açmak için masaüstündeki Usta simgesine çift tıkla.</p></div>
+    <div class="set-row"><label>Bir şey mi bozuldu?</label>
+      <button id="set-help" type="button">Yardım iste</button>
+      <p class="wiz-note">Usta'nın durumunu kısa bir yazıya dökerim. İçinde yazdıkların, dosyaların ve anahtarın olmaz. Kendiliğinden kimseye gitmez: sen gönderirsin.</p>
+      <div id="help-box" hidden>
+        <pre id="help-text" tabindex="0" aria-label="Yardım raporu"></pre>
+        <button id="help-save" type="button">Dosya olarak indir</button>
+        <button id="help-copy" type="button">Kopyala</button>
+        <p id="help-msg" class="wiz-note" role="status"></p>
+      </div></div>
+    <div class="set-row"><label for="view">Geliştirici modu</label>
+      <select id="view">
+        <option value="simple">Kapalı: sade ekran (yeni başlayanlar için)</option>
+        <option value="advanced">Açık: tüm araçlar görünsün</option>
+      </select></div>
   </section>
 
   <section id="tablet" aria-label="Tablet ve telefon" hidden>

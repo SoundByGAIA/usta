@@ -21,6 +21,7 @@ from usta import (
     bench,
     capability,
     compat,
+    kisi,
     mcp_runtime,
     mcpconfig,
     memory,
@@ -1598,7 +1599,9 @@ def _main(argv: list[str] | None = None) -> int:
             audit,
             approver=_approver,
             max_steps=args.max_steps,
-            memory_context=memory.render_context(root),
+            memory_context="\n\n".join(
+                c for c in (kisi.render(_home()), memory.render_context(root)) if c
+            ),
         )
         try:
             result = agent.run(args.prompt)

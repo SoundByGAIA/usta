@@ -36,6 +36,12 @@
     document.documentElement.dataset.theme = ["beyaz", "gri", "siyah"].includes(name) ? name : "";
     $("theme").value = ["beyaz", "gri", "siyah"].includes(name) ? name : "siyah";
   }
+  const ACCENTS = ["cini", "turkuaz", "nar", "zeytin", "mor"];
+  function applyAccent(name) {
+    const a = ACCENTS.includes(name) ? name : "cini";
+    document.documentElement.dataset.accent = a;
+    for (const b of document.querySelectorAll("#accent .swatch")) b.setAttribute("aria-pressed", String(b.dataset.accent === a));
+  }
   function applyMode(mode) {
     $("mode").value = ["manual", "auto", "plan"].includes(mode) ? mode : "manual";
     $("mode-warn").hidden = $("mode").value !== "auto";
@@ -66,6 +72,7 @@
     if (!res.ok) return;
     const s = await res.json();
     applyTheme(s.theme);
+    applyAccent(s.accent);
     applyMode(s.mode);
     $("guard").checked = !!s.guard;
     state.defaultWs = s.workspace || null;
@@ -813,6 +820,37 @@
     return box;
   }
 
+  // --- "Seni tanıyayım" (kişisel profil; yalnız kullanıcı yazar) ---
+  let kisiFacts = [];
+  const kisiMsg = (t, c) => { const m = $("kisi-msg"); m.textContent = t || ""; m.className = "wiz-note" + (c ? ` ${c}` : ""); };
+  function renderKisiFacts() {
+    $("kisi-liste").replaceChildren(...kisiFacts.map((f, i) => {
+      const li = h("li");
+      const del = h("button", null, "Sil");
+      del.type = "button"; del.setAttribute("aria-label", `Sil: ${f}`);
+      del.addEventListener("click", () => { kisiFacts.splice(i, 1); renderKisiFacts(); kisiMsg("Silindi. Kalıcı olması için Kaydet'e bas."); });
+      li.append(h("span", null, f), del);
+      return li;
+    }));
+  }
+  async function loadProfile() {
+    const r = await api("/profile");
+    if (!r.ok) return;
+    const k = await r.json();
+    $("kisi-ad").value = k.ad || "";
+    $("kisi-uslup").value = k.uslup || "sade";
+    $("kisi-hakkimda").value = k.hakkimda || "";
+    kisiFacts = Array.isArray(k.bilgiler) ? k.bilgiler.slice() : [];
+    renderKisiFacts();
+    kisiMsg("");
+  }
+  async function saveProfile() {
+    const body = { ad: $("kisi-ad").value, uslup: $("kisi-uslup").value, hakkimda: $("kisi-hakkimda").value, bilgiler: kisiFacts };
+    const r = await api("/profile", { method: "PUT", body: JSON.stringify(body) });
+    if (!r.ok) { kisiMsg(await errorText(r), "error"); return; }
+    kisiMsg("Kaydettim. Bundan sonraki görevlerde bunları bilerek çalışırım.", "ok");
+  }
+
   async function loadPrograms() {
     const box = $("programs");
     let d = {};
@@ -844,7 +882,7 @@
     else if (name === "privacy") loadPrivacy();
     else if (name === "wizard") wizShow("wiz-start");
     else if (name === "tablet") loadTablet();
-    else if (name === "settings") loadPrograms();
+    else if (name === "settings") { loadPrograms(); loadProfile(); }
     else if (name === "glossary") { $("gloss-q").value = ""; renderGlossary(); $("gloss-q").focus(); }
     else { apisMsg(""); loadApis(); }
   }
@@ -1688,6 +1726,25 @@
   $("preview-go").addEventListener("click", loadPreview);
   $("preview-reload").addEventListener("click", loadPreview);
   $("preview-path").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); loadPreview(); } });
+  $("kisi-form").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const v = $("kisi-yeni").value.trim();
+    if (!v) return;
+    if (kisiFacts.length >= 20) { kisiMsg("En çok 20 madde yazabilirsin. Birini silip yenisini ekle.", "error"); return; }
+    kisiFacts.push(v); $("kisi-yeni").value = ""; renderKisiFacts(); kisiMsg("Eklendi. Kalıcı olması için Kaydet'e bas.");
+  });
+  $("kisi-save").addEventListener("click", saveProfile);
+  $("kisi-clear").addEventListener("click", async () => {
+    const r = await api("/profile", { method: "DELETE" });
+    if (!r.ok) { kisiMsg(await errorText(r), "error"); return; }
+    await loadProfile(); kisiMsg("Hepsini sildim.", "ok");
+  });
+  $("accent").addEventListener("click", (ev) => {
+    const b = ev.target.closest && ev.target.closest(".swatch");
+    if (!b) return;
+    applyAccent(b.dataset.accent);
+    saveSetting({ accent: b.dataset.accent });
+  });
   $("zoom").addEventListener("change", () => {
     state.zoom = $("zoom").value;
     saveSetting({ zoom: state.zoom });

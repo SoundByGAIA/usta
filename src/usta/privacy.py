@@ -16,6 +16,7 @@ LOCAL, LAN, INTERNET = "bu-bilgisayar", "yerel-ağ", "internet"
 FILES = {
     "config.json": "ayarların (tema, mod, model, düşünme, bağlam); sır içermez",
     "apis.json": "bağladığın API'ler ve anahtarları; yalnız sen okuyabilirsin",
+    "kisi.json": "senin yazdığın tanışma bilgileri (ad, anlatım biçimi, notların); her görevde yapay zekâya gönderilir",
     "token": "portal giriş jetonun",
     "mcp.json": "bağladığın MCP araç sunucuları",
     "profiles.json": "modellerin ölçülmüş yetenek profilleri",

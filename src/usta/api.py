@@ -16,6 +16,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -30,6 +31,7 @@ from usta import (
     attachments,
     compat,
     filetree,
+    kisi,
     localmodels,
     mcp_runtime,
     mcpcatalog,
@@ -152,6 +154,13 @@ PREVIEW_HEADERS = {
 }
 
 
+class ProfileIn(BaseModel):
+    ad: str = Field(default="", max_length=200)
+    uslup: str = "sade"
+    hakkimda: str = Field(default="", max_length=2000)
+    bilgiler: list[str] = Field(default_factory=list, max_length=100)
+
+
 class SettingsIn(BaseModel):
     """Portaldan yalnız görünüm ve mod değiştirilebilir; uç nokta/model/sırlar buradan değişmez."""
 
@@ -159,6 +168,7 @@ class SettingsIn(BaseModel):
     mode: Literal["manual", "auto", "plan"] | None = None
     guard: bool | None = None
     zoom: Literal["auto", "0.9", "1", "1.1", "1.25", "1.5", "1.75"] | None = None
+    accent: Literal["cini", "turkuaz", "nar", "zeytin", "mor"] | None = None
     think: Literal["auto", "off", "low", "medium", "high"] | None = None
     view: Literal["simple", "advanced"] | None = None
     context_window: int | None = Field(default=None, ge=0, le=2_000_000)  # 0: otomatik (sınır yok)
@@ -553,6 +563,30 @@ def create_app(
             raise HTTPException(400, "hafıza yazılamadı") from None
         return {"cleared": True}
 
+    @api.get("/profile")
+    def get_profile() -> dict:
+        """Kullanıcının kendi yazdığı tanışma bilgileri (modelin yazabildiği bir yol yoktur)."""
+        return asdict(kisi.load(home))
+
+    @api.put("/profile")
+    def put_profile(body: ProfileIn) -> dict:
+        try:
+            k = kisi.check(body.model_dump())
+            kisi.save(home, k)
+        except kisi.KisiError as e:
+            raise HTTPException(422, str(e)) from None
+        except OSError:
+            raise HTTPException(500, "profil kaydedilemedi") from None
+        return asdict(k)
+
+    @api.delete("/profile")
+    def delete_profile() -> dict:
+        try:
+            kisi.delete(home)
+        except OSError:
+            raise HTTPException(500, "profil silinemedi") from None
+        return asdict(kisi.Kisi())
+
     @api.get("/settings")
     def get_settings() -> dict:
         cur = usta_settings.load(home)
@@ -561,6 +595,7 @@ def create_app(
             "mode": cur.mode,
             "guard": cur.guard,
             "zoom": cur.zoom,
+            "accent": cur.accent,
             "think": cur.think,
             "view": cur.view,
             "context_window": cur.context_window or 0,
@@ -596,6 +631,7 @@ def create_app(
             "mode": new.mode,
             "guard": new.guard,
             "zoom": new.zoom,
+            "accent": new.accent,
             "think": new.think,
             "view": new.view,
             "context_window": new.context_window or 0,

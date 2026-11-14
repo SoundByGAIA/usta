@@ -77,6 +77,11 @@ class FinishCheck:
         """Gerçekten yapılan yazmaları kaydeder (reddedilen/başarısız çağrılar sayılmaz)."""
         if executed and tool in WRITE_TOOLS and isinstance(args.get("path"), str):
             self.written.add(self._norm(args["path"]))
+        # komutla yazma ("echo 3 > count.txt"): hedef adı geçen bir komut çalıştıysa yeniden yazmaya itilmez
+        # (Lab izi: hatırlatma komutla yazılmış dosyayı model uzun bir cümleyle yeniden yazdırdı)
+        if executed and tool == "run" and isinstance(args.get("command"), str):
+            cmd = args["command"].replace("\\", "/").lower()
+            self.written.update(self._norm(t) for t in self.targets if self._norm(t) in cmd)
 
     def _nudge(self, rule: str, message: str) -> str | None:
         if self.nudges >= self.max_nudges or rule in self.fired:

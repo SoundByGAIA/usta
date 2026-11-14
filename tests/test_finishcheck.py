@@ -61,6 +61,19 @@ def test_a_real_write_satisfies_the_target():
     assert denied.on_finish("summary.txt dosyasına yazıldı.")
 
 
+def test_a_command_that_names_the_target_counts_as_writing_it():
+    # Lab izi: model sonucu `run` ile yazmıştı; hatırlatma onu uzun bir cümleyle yeniden yazdırdı
+    fc = FinishCheck("Cevabı sonuc.txt dosyasına yaz.")
+    fc.observe("run", {"command": "echo Paris > sonuc.txt"}, executed=True)
+    assert fc.on_finish("sonuc.txt dosyasına yazıldı.") is None
+    other = FinishCheck("Cevabı sonuc.txt dosyasına yaz.")
+    other.observe("run", {"command": "ls"}, executed=True)
+    other.observe(
+        "run", {"command": "echo x > sonuc.txt"}, executed=False
+    )  # reddedilen komut sayılmaz
+    assert other.on_finish("Bitti.")
+
+
 def test_announcing_an_action_and_stopping_gets_a_continue():
     task = "util.py içindeki add fonksiyonunu oku ve ne yaptığını yanıtında belirt."
     assert "araç çağırmadın" in FinishCheck(task).on_finish(

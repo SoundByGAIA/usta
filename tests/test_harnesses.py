@@ -599,3 +599,28 @@ def test_env_allowlist_has_the_windows_basics_and_no_secrets():
         for k in harnesses.ENV_ALLOW
         for bad in ("KEY", "TOKEN", "SECRET", "PASSWORD", "AUTH", "USTA")
     )
+
+
+# --- DSH telemetrisi: belgelenmiş çıkış anahtarı varsayılan olarak verilir -------------------------------------
+def test_dsh_gets_its_documented_telemetry_opt_out_and_nobody_else_gets_extras():
+    assert dict(harnesses.CATALOG["dsh"].env_extra) == {"DSH_TELEMETRY_DISABLED": "1"}
+    assert all(not h.env_extra for h in harnesses.CATALOG.values() if h.id != "dsh")
+    env = harnesses.child_env({"PATH": "/usr/bin"}, dict(harnesses.CATALOG["dsh"].env_extra))
+    assert env["DSH_TELEMETRY_DISABLED"] == "1" and env[harnesses.DELEGATED_ENV] == "1"
+    assert "DSH_TELEMETRY_DISABLED" not in harnesses.child_env(
+        {"PATH": "/usr/bin"}
+    )  # başkaları için eklenmez
+    assert (
+        harnesses.child_env({}, {harnesses.DELEGATED_ENV: "0"})[harnesses.DELEGATED_ENV] == "1"
+    )  # ezemez
+    assert (
+        "DSH_TELEMETRY_DISABLED" not in harnesses.ENV_ALLOW
+    )  # kullanıcı ortamından geçmez: katalog tek kaynak
+
+
+@posix
+def test_run_passes_the_catalog_extras_to_the_child(path_with, tmp_path, monkeypatch):
+    path_with("dsh", '#!/bin/sh\ncat >/dev/null\necho "TEL=${DSH_TELEMETRY_DISABLED:-yok}"\n')
+    monkeypatch.setattr(harnesses, "_node_version", lambda: (24, 9))
+    out = harnesses.run(harnesses.CATALOG["dsh"], "x", write=True, root=tmp_path)
+    assert "TEL=1" in out

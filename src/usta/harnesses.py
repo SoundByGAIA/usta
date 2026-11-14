@@ -73,6 +73,8 @@ class Harness:
     needs_node: tuple[int, int] | None = (
         None  # (ana, alt): Node.js sürüm şartı (programın package.json'u)
     )
+    # çocuk sürece EK verilen sabit değişkenler (ör. belgelenmiş telemetri kapatma); yalnız katalogdan gelir
+    env_extra: tuple[tuple[str, str], ...] = ()
 
     @property
     def read_only_supported(self) -> bool:
@@ -109,6 +111,7 @@ CATALOG: dict[str, Harness] = {
             "Yalnız okuma kipi yok: bu program her çağrıda dosya yazabilir. Geliştirici önizlemesidir; kendi güvenlik notu "
             "denetlenmediğini söyler.",
             needs_node=(24, 9),
+            env_extra=(("DSH_TELEMETRY_DISABLED", "1"),),  # DSH'nin belgelenmiş çıkış anahtarı: boş olmayan her değer kapatır
         ),
         Harness(
             "hermes", "Hermes", "hermes",
@@ -233,10 +236,16 @@ def detect(enabled: set[str] | frozenset[str] = frozenset()) -> list[dict]:
     ]
 
 
-def child_env(base: dict[str, str] | None = None) -> dict[str, str]:
-    """Çocuk süreç ortamı: yalnız izin listesi + `USTA_DELEGATED=1`. Usta'nın anahtarları ve USTA_* geçmez."""
+def child_env(
+    base: dict[str, str] | None = None, extra: dict[str, str] | None = None
+) -> dict[str, str]:
+    """Çocuk süreç ortamı: yalnız izin listesi + katalogdaki sabit ek değişkenler + `USTA_DELEGATED=1`.
+
+    Usta'nın anahtarları ve USTA_* geçmez; `extra` yalnız katalogdan gelir (kullanıcı/model veremez) ve `USTA_DELEGATED`'ı ezemez.
+    """
     src = os.environ if base is None else base
     env = {k: v for k, v in src.items() if k.upper() in ENV_ALLOW}
+    env.update(extra or {})
     env[DELEGATED_ENV] = "1"
     return env
 
@@ -310,7 +319,7 @@ def run(
         proc = subprocess.Popen(
             argv,
             cwd=str(Path(root).resolve()),
-            env=child_env(base_env),
+            env=child_env(base_env, dict(h.env_extra)),
             stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

@@ -8,7 +8,7 @@ Kapı bunu yakalar: write_file/edit_file yolu ve `run` komutundaki yol/adres ben
 gelen metinde geçiyor ve kullanıcı metninde (istem, ekler, görev sırasında gönderilen mesajlar) geçmiyorsa, eylem
 `ASK` olur (manuel modda kullanıcıya sorulur, oto modda reddedilir). Sezgiseldir; kesin koruma değildir.
 
-Güvenilmeyen kaynaklar: read_file/read_symbol (depo içeriği), fetch_url, web_search ve MCP araçları. Komut çıktıları
+Güvenilmeyen kaynaklar: read_file/read_symbol (depo içeriği), fetch_url, web_search, delegate (başka programın çıktısı) ve MCP araçları. Komut çıktıları
 (`run`) ve dizin listeleri kapsam dışıdır: ajanın kendi çalıştırdığı kod/izler ve dosya adları meşru hedefleri
 sürekli işaretlerdi (ör. test çıktısındaki izden hatalı dosyayı düzeltmek).
 """
@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 import shlex
 
-UNTRUSTED_TOOLS = frozenset({"read_file", "read_symbol", "fetch_url", "web_search"})
+UNTRUSTED_TOOLS = frozenset({"read_file", "read_symbol", "fetch_url", "web_search", "delegate"})
 MAX_BLOB = 400_000  # güvenilmeyen metin üst sınırı (karakter); eskiler atılır
 MIN_LEN = 4  # bundan kısa parçalar eşleşme sayılmaz (".py", "ls" gibi)
 _URL = re.compile(r"https?://([^\s/'\"<>]+)", re.IGNORECASE)
@@ -83,6 +83,12 @@ class Taint:
         """Boş dize: sorun yok. Aksi halde gerekçe (hedef ve nerede bulunduğu)."""
         if not self._blobs:
             return ""
+        if tool == "delegate" and (
+            args.get("write") is True or str(args.get("write")).lower() == "true"
+        ):
+            # Yetki yükseltme: başka programın cevabı "yazma izni verildi" diyerek yazma kipini ister (Lab: küçük model 4/4 uydu).
+            # Onay zaten sorulur; kullanıcı bu isteğin az önce okunan içerikten sonra geldiğini bilsin.
+            return "yazma izni, Usta az önce başka bir içerik okuduktan sonra isteniyor (bu içerik isteği yönlendirmiş olabilir)"
         user = "\n".join(self._user)
         blob = "\n".join(self._blobs)
         low_user, low_blob = user.lower(), blob.lower()

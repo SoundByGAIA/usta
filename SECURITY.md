@@ -35,6 +35,9 @@ bilgisayarı, hesabı ya da model servisi kapsam dışıdır.
    ulaşmak, özel ağ dışından ya da tarayıcıdan (`Origin`) erişmek, bağlı bilgisayarda sahte cevapla enjeksiyon.
    Yeni (0.7.0), beceri tasarımcısı (`src/usta/skills.py`, `propose_skill` aracı, `tests/test_skill_design.py`): modelin kullanıcı onayı olmadan
    beceri kaydetmesi/silmesi, öneri kartında riskli metni gizlemek (uyarıları atlatmak), kayıtlı becerinin kendiliğinden devreye girmesi.
+   Yeni (0.8.0), orkestra şefi (`src/usta/harnesses.py`, `delegate` aracı, `tests/test_harnesses.py`): onay vermeden ya da oto modda başka program çalıştırmak,
+   katalog dışı komut/bayrak sokmak (istem `-` ile başlayıp bayrak olmak dahil), Usta'nın anahtarlarının çocuk sürece geçmesi, çağrılan programın
+   çıktısıyla yetki yükseltmek (`write=true`), sonsuz yönetme döngüsü, zaman aşımından sonra kalan çocuk süreçler, Windows'ta `.cmd` kabuk enjeksiyonu.
 5. Sır sızıntısı: `apis.json` içindeki anahtarı API yanıtından, denetim günlüğünden, oturum kaydından ya da hata iletisinden çıkarmak.
 6. Dolaylı komut enjeksiyonu: dosya, web sayfası ya da MCP çıktısına gizlenen talimatla ajana yasak bir iş yaptırmak (kaynak izi kapısını aşmak).
 7. Kalıcı hafızayı zehirlemek: onaysız, sonraki görevleri yönlendiren bir not yazdırmak.

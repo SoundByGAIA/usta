@@ -90,3 +90,15 @@ def test_skill_design_markup_and_the_card_never_saves_by_itself():
         "content: d.content" in card
         and "args.instructions" not in card[card.index('method: "PUT"') :]
     )
+
+
+def test_harness_settings_markup_and_every_program_starts_closed():
+    html = INDEX.read_text(encoding="utf-8")
+    for needed in ("harness-list", "harness-msg"):
+        assert f'id="{needed}"' in html
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    block = js[js.index("async function loadHarnesses") : js.index("async function loadPrograms")]
+    assert (
+        "box.checked = !!p.enabled" in block
+    )  # kutu sunucunun söylediği durumdan gelir; varsayılan açık değil
+    assert "/harnesses/${encodeURIComponent(p.id)}" in block and 'method: "PUT"' in block

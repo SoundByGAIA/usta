@@ -62,6 +62,7 @@ def report(
     allowed_hosts,
     lan_urls=None,
     shared: str | None = None,
+    delegates: tuple[str, ...] = (),
 ) -> dict:
     """`sources`: [{name, endpoint}]; `current_api`: kullanılan API adı (yoksa None)."""
     rows = [
@@ -103,6 +104,16 @@ def report(
         "other": [
             *lan,
             *([shared] if shared else []),
+            *(
+                [
+                    "Usta'nın çağırabileceği yardımcı programlar AÇIK: "
+                    + ", ".join(delegates)
+                    + ". Usta bunlardan birine iş verirse işin metni o programa ve onun bağlı olduğu yapay zekâ servisine "
+                    "gider (senin Usta'da seçtiğin servise değil, o programın kendi servisine). Her seferinde sana sorulur."
+                ]
+                if delegates
+                else []
+            ),
             "Komutlar Docker içinde çalışır; Docker yoksa çalışmaz, bilgisayarında doğrudan çalışmaz. "
             + (
                 f"Ağ yalnız şu adreslere açıktır: {', '.join(hosts)}."

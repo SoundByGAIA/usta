@@ -56,6 +56,17 @@ Hep aynı şekilde yapmasını istediğin bir iş varsa (ör. "haftalık raporu 
 4. Kartta kırmızı bir uyarı varsa (bağlantı, komut, "onay gerekmez" gibi), "Uyarıları okudum"u işaretlemeden Kaydet açılmaz. Emin değilsen Vazgeç.
 5. Kullanmak için **Ayarlar → Becerilerim → Kullan**'a bas ya da kutuya `/beceri-adı` yaz. Beceriler kendiliğinden çalışmaz.
 
+## Usta başka yapay zekâ programlarından yardım alsın
+
+Bilgisayarında Claude Code, Codex gibi başka yapay zekâ programları kuruluysa Usta işi onlara da verebilir.
+
+1. **Ayarlar → Yardımcı yapay zekâ programları**'nda kurulu olanları görürsün. **Hepsi kapalı başlar.** İstediğini **"Usta çağırabilsin"** kutusuyla açarsın.
+2. Usta bir programa iş vermek istediğinde sana **sorar**: hangi program, ne iş, yalnız okuyacak mı yoksa dosya da yazabilecek mi. Beğenmezsen Reddet.
+3. "Otomatik onay" açıkken Usta başka programı hiç çağırmaz.
+4. Programın cevabı Usta için **veridir**, komut değildir; içindeki talimatlara uymaz.
+5. Dikkat: iş metni o programa ve onun kendi yapay zekâ servisine gider. Çağrılan program kendi izinleriyle çalışır; Usta onun içini denetleyemez. Bu yüzden önce "yalnız okuma" kullanılır.
+6. Bazı programlar bu bilgisayarda çalışmaz (ör. DeepSeek Harness Node.js 24.9 ister); Ayarlar nedenini yazar. OpenCode ve Hermes şimdilik Windows'ta desteklenmez.
+
 ## Evdeki bilgisayarlar aynı hafızayı kullansın
 
 Evde birden çok bilgisayarda Usta kullanıyorsan, kendini her birinde yeniden tanıtmana gerek yok.

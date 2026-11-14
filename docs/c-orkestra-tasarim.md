@@ -99,9 +99,10 @@ Argümanla istem alan programlar (OpenCode, Hermes) Windows'ta **desteklenmez**:
 - **OpenCode (v2.3.0):** yerel Ollama'ya bağlı izole bir ayarla çalıştı (komut biçimi, argümanla istem, çıktı sarma, zaman aşımı sonrası süreç ağacının temizliği doğrulandı). Küçük yerel modelin cevabı kalitesizdi; bu Usta'nın konusu değil.
 - **Hermes (v0.19.0):** yerel Ollama'ya bağlı izole ayarla çalıştı ve **kendi uyarısını** döndürdü: araç kullanımı için en az 64K bağlam ister (8K'lık modelle çalışmaz). Usta cevabı doğru taşıdı.
 - **Codex (0.147):** komut biçimi doğru çalıştı ve API'ye ulaştı; kullanıcının kendi Codex ayarındaki model, ChatGPT hesabıyla desteklenmediği için hata verdi (Codex'in kendi yapılandırması, Usta'dan bağımsız).
+- **DeepSeek Harness (0.2.2-rc.1), 14 Kasım güncellemesi:** Node.js 24.22 + gerçek DeepSeek anahtarıyla uçtan uca denendi (yalnız okuma sorusuna doğru cevap, 9 sn, dosya değişmedi; yazma kipinde tam istenen tek dosya oluştu); telemetri `DSH_TELEMETRY_DISABLED=1` ile kapalı çağrılır (katalog `env_extra`). Aşağıdaki ilk not (Node 22'de sessiz çıkış) hâlâ geçerlidir.
 - **DeepSeek Harness (0.2.2-rc.1):** kuruldu ama **Node.js 24.9 ve üstünü ister** (`engines`); bu bilgisayarda 22.17 var ve program **hata vermeden sessizce çıkıyor.** Usta bunu artık önceden bilir: Ayarlar "Node.js 24.9 ya da daha yenisi gerekli (sende 22.17)" der ve açılmasına izin vermez. DeepSeek anahtarı olmadığı için gerçek cevap alınamadı; komut biçimi yalnız belgeden doğrulandı.
 - İlk kurulum notu: bu programlardan Hermes ve OpenCode'un kurulumu yavaş bağlantıda (saniyede ~100 KB) onlarca dakika sürdü.
 
 **Windows (0.8.1):** sahte `.cmd` programlarla gerçek Windows 10'da denendi (stdin/Türkçe/ortam/cwd/zaman aşımı/çıktı sınırı/hata); **bulunan hata:** zaman aşımında çocuk süreçler kalıyordu, `taskkill /T` ile düzeltildi.
 
-**Denenmedi:** Windows'ta gerçek bir harness; DSH ile gerçek cevap; yazma kipi (`write=true`) gerçek programlarla.
+**Denenmedi:** Windows'ta gerçek bir harness; Codex ile yazma kipi (kullanıcının Codex modeli ChatGPT hesabıyla desteklenmiyor).

@@ -1,5 +1,14 @@
 # Değişiklik günlüğü
 
+## 0.8.2 — DeepSeek Harness gerçek denemesi ve telemetri kapatma
+
+Model davranışı DEĞİŞMEDİ.
+
+- **DSH telemetrisi varsayılan olarak kapalı çağrılır:** DeepSeek Harness'in ürün telemetrisi (OTLP ile DeepSeek'in toplayıcısına) vardır ve kendi belgelenmiş çıkış anahtarı `DSH_TELEMETRY_DISABLED` (boş olmayan her değer kapatır). Usta DSH'yi çağırırken bunu katalogdan verir. Katalogdaki "ek ortam değişkeni" yalnız koddan gelir (model/kullanıcı veremez), kullanıcı ortamından geçmez ve `USTA_DELEGATED`'ı ezemez; testle denetlenir. Diğer programlar için böyle bir ek yoktur (kendi telemetri ayarları Usta'nın denetiminde değildir).
+- **DSH gerçek anahtarla uçtan uca denendi** (Node.js 24.22, izole `HOME`, DeepSeek API): yalnız okuma sorusuna doğru cevap (9 sn, dosya değişmedi, cevap veri olarak sarıldı); yazma kipinde (DSH'nin tek kipi) tam istenen tek dosya oluştu, başkasına dokunulmadı. Harcama bir sentin altında. Anahtar yalnızca DSH'nin kendi `.env` dosyasında durdu, çalışma alanına ya da başka dosyaya sızmadı.
+- **Yazma kipi gerçek programla doğrulandı:** Claude Code yalnız okuma kipinde dosya oluşturmadı, yazma kipinde tam istenen dosyayı oluşturdu.
+- **Notlar:** DSH, Node.js 24.9+ ister ve npm 11 kurulumda 5 paketin kurulum betiğini (`node-pty`, `koffi` vb.) varsayılan olarak çalıştırmaz; denemede bunlar olmadan headless çalıştı. Usta bunları kendiliğinden açmaz.
+
 ## 0.8.1 — Windows'ta orkestra şefi: süreç ağacı düzeltmesi
 
 Model davranışı DEĞİŞMEDİ. 0.8.0'ın başka programları çağırma özelliğinin ilk gerçek Windows denemesi (Windows 10, Python 3.14, yetkisiz kullanıcının kendi oturumu; programlar yerine sahte `.cmd` sarmalayıcılar).

@@ -1,6 +1,6 @@
 [project]
 name = "usta"
-version = "0.8.1"
+version = "0.8.2"
 description = "Genel amaçlı, açık kaynak yapay zekâ ajanı"
 readme = "README.md"
 license = { text = "Apache-2.0" }

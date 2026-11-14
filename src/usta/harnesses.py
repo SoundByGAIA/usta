@@ -21,7 +21,6 @@ import contextlib
 import functools
 import os
 import re
-import shutil
 import signal
 import subprocess
 import sys
@@ -124,8 +123,34 @@ CATALOG: dict[str, Harness] = {
 }  # fmt: skip
 
 
+def safe_which(name: str) -> str | None:
+    """Programı YALNIZ PATH'teki MUTLAK klasörlerde arar.
+
+    `shutil.which` Windows'ta önce bulunduğu klasöre bakar; boş ya da göreli PATH girişleri de bulunduğu klasör demektir.
+    Usta bir proje klasöründe açıldıysa o klasördeki kötü niyetli bir `claude.cmd`, kullanıcı "Claude Code'u çağır"ı
+    onayladığında onun yerine çalışabilirdi. Burada boş/göreli girişler ve bulunduğu klasör HİÇ aranmaz.
+    """
+    win = _platform() == "win32"
+    exts = [""]
+    if win:
+        exts = [
+            e.lower()
+            for e in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")
+            if e.strip()
+        ]
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        d = d.strip().strip('"')
+        if not d or not os.path.isabs(d):
+            continue  # boş ya da göreli giriş = bulunduğu klasör: atla
+        for ext in exts:
+            cand = os.path.join(d, name + ext)
+            if os.path.isfile(cand) and (win or os.access(cand, os.X_OK)):
+                return cand
+    return None
+
+
 def _which(h: Harness) -> str | None:
-    return shutil.which(h.binary)
+    return safe_which(h.binary)
 
 
 def _platform() -> str:
@@ -136,7 +161,7 @@ def _platform() -> str:
 
 @functools.lru_cache(maxsize=1)
 def _node_version() -> tuple[int, int] | None:
-    exe = shutil.which("node")
+    exe = safe_which("node")
     if not exe:
         return None
     try:

@@ -46,6 +46,21 @@ def owns(path) -> bool:
     return path.stat().st_uid == getuid()
 
 
+EXE_SEARCH_ENV = "NoDefaultCurrentDirectoryInExePath"
+
+
+def harden_exe_search(windows: bool | None = None) -> None:
+    """Windows: bir program çıplak adla (`docker`, `taskkill`, `cmd`) çalıştırılırken BULUNDUĞU KLASÖRE bakılmasını kapatır.
+
+    Windows (CreateProcess ve `shutil.which`) varsayılan olarak önce bulunduğu klasörde arar. Masaüstü simgesiyle açılan
+    Usta'nın bulunduğu klasör ajanın çalışma alanıdır ve Docker kutusuna yazılabilir bağlıdır: kutudaki bir komutun
+    bıraktığı `docker.exe` bir sonraki kutu komutunda ANA BİLGİSAYARDA çalışırdı (gerçek Windows'ta doğrulandı).
+    Bu değişken, Usta'nın kendisi ve tüm çocuk süreçleri için bu aramayı kapatır.
+    """
+    if (sys.platform == "win32") if windows is None else windows:
+        os.environ[EXE_SEARCH_ENV] = "1"
+
+
 def kill_group(pid: int) -> None:
     """Süreci ve alt süreçlerini sonlandırır; zaten yoksa sessizce geçer."""
     killpg, sigkill = getattr(os, "killpg", None), getattr(signal, "SIGKILL", None)

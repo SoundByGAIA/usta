@@ -10,6 +10,10 @@ Kapsam: sandbox kaçışı, çalışma alanı dışına erişim/yazma, izin moto
 sır sızıntısı, önizleme ile portalı ele geçirme. Kapsam dışı: kendi makinenizde kendi verdiğiniz yetkiyle (ör. `--approve allow`,
 oto onay modu, eklediğiniz MCP sunucusu) yapılan eylemler; model çıktısının yanlışlığı.
 
+## Düzeltilen açıklar
+
+- **0.8.3, Windows:** çıplak adla çalıştırılan programların (`docker`, `taskkill`, `cmd`) bulunduğu klasörden (çalışma alanı) çalıştırılabilmesi; Docker'lı kullanıcıda kutu kaçışına yol açabilirdi. Usta artık `NoDefaultCurrentDirectoryInExePath=1` ayarlar. Ayrıca `delegate` programları yalnız mutlak PATH klasörlerinde aranır.
+
 ## Kırmayı deneyenler için rehber
 
 Usta'yı kırmaya çalışmanızı istiyoruz. Bulduğunuz her açık, kodsuz bir kullanıcının başına gelmeden kapanır.

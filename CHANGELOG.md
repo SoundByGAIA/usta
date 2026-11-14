@@ -1,5 +1,14 @@
 # Değişiklik günlüğü
 
+## 0.8.3 — güvenlik: Windows'ta program yolu ele geçirme (kutu kaçışı) kapatıldı
+
+Model davranışı DEĞİŞMEDİ. Güvenlik turunun ilk bulguları; ikisi de gerçek ortamda kanıtlanıp düzeltildi.
+
+- **[Önemli, Windows] Bulunduğu klasördeki programın çalıştırılması:** Windows, bir program çıplak adla (`docker`, `taskkill`, `cmd`) çalıştırılırken önce bulunduğu klasöre bakar. Masaüstü simgesiyle açılan Usta'nın bulunduğu klasör ajanın çalışma alanıdır ve Docker kutusuna yazılabilir bağlıdır: kutudaki bir komutun bıraktığı `docker.exe`, Usta'nın bir sonraki kutu komutunda **ana bilgisayarda** çalışırdı (kutu kaçışı). Gerçek Windows 10 + Python 3.14'te kanıtlandı: Docker kurulu olmayan bilgisayarda `docker` çağrısı klasördeki sahte dosyayı çalıştırdı. **Düzeltme:** Usta, paket yüklenir yüklenmez Windows'ta `NoDefaultCurrentDirectoryInExePath=1` ayarlar; bu Usta'nın kendisi ve tüm çocuk süreçleri için klasör aramasını kapatır. Aynı bilgisayarda doğrulandı (gerçek `taskkill`/`cmd` çalıştı, sahte `docker.exe` çalışmadı).
+- **Başka programları çağırırken yol araması:** `delegate` programı artık yalnız PATH'teki **mutlak** klasörlerde aranıyor (`harnesses.safe_which`); boş/göreli PATH girişleri ve bulunduğu klasör hiç aranmaz. Önceden göreli bir PATH girişi ya da Windows'un klasör araması, kullanıcı "Claude Code'u çağır"ı onayladığında başka bir betiği çalıştırabilirdi.
+- **Ortak hafızada kaynak etiketi taklidi:** bilgisayar adları artık `[ ] < > { } \` |` karakterlerinden temizlenir; `]` içeren bir ad modele giden `[kaynak: ...]` etiketini kırıp sahte bir kaynak yazdıramaz.
+- Testler: göreli/boş PATH girişleri, Windows uzantı kuralı, ortam değişkeninin yalnız Windows'ta ayarlanması ve paket yüklenirken çağrılması, ad temizliği.
+
 ## 0.8.2 — DeepSeek Harness gerçek denemesi ve telemetri kapatma
 
 Model davranışı DEĞİŞMEDİ.

@@ -75,3 +75,18 @@ def test_glossary_balloon_and_back_button_markup():
     # "?" artık sözlük sayfasına atlamaz: balon açar, sayfa değişmez (sözlüğe ancak balondaki düğmeyle gidilir)
     click = js[js.index("const b = qBtn(ev);") :][:200]
     assert "showGlossTip" in click and 'togglePanel("glossary")' not in click
+
+
+def test_skill_design_markup_and_the_card_never_saves_by_itself():
+    html = INDEX.read_text(encoding="utf-8")
+    for needed in ("skill-design", "my-skills", "design-note", "design-off"):
+        assert f'id="{needed}"' in html
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    card = js[js.index("function skillProposalNode") : js.index("async function loadMySkills")]
+    # kayıt yalnız Kaydet düğmesinin tıklamasında ve kullanıcının gördüğü (sunucunun doğruladığı) metinle yapılır
+    assert card.count('method: "PUT"') == 1
+    assert card.index('method: "PUT"') > card.index('save.addEventListener("click"')
+    assert (
+        "content: d.content" in card
+        and "args.instructions" not in card[card.index('method: "PUT"') :]
+    )

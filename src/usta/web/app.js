@@ -3,7 +3,7 @@
   "use strict";
   const L = window.UstaLogic;
   const $ = (id) => document.getElementById(id);
-  const state = { token: "", ws: null, task: null, active: false, abort: null, approvals: {}, contextWindow: null, files: [], replay: false, openFile: null, openDirs: new Set(), selDir: "", defaultWs: null, zoom: "auto", fsMode: null, tab: "stream", resultOn: false, panelStack: [] };
+  const state = { token: "", ws: null, task: null, active: false, abort: null, approvals: {}, contextWindow: null, files: [], replay: false, openFile: null, openDirs: new Set(), selDir: "", defaultWs: null, zoom: "auto", fsMode: null, tab: "stream", resultOn: false, panelStack: [], designSkill: false };
   const STATUS = {
     running: "çalışıyor", awaiting_approval: "onay bekliyor", cancelling: "durduruluyor",
     done: "bitti", cancelled: "durduruldu", failed: "başarısız",
@@ -222,6 +222,7 @@
   function renderEvent(type, data) {
     if (type === "usage") { officeEvent(type, data); showUsage(data, state.contextWindow); officeContextWindow(); return; } // usage sayaçları değiştirmez
     officeEvent(type, data);
+    if (type === "tool_call" && data && data.tool === "propose_skill" && !state.replay) return addNode(skillProposalNode(data.args || {}));
     const s = L.summarize(type, data);
     if (type === "message" && !s.body) return;
     if (s.kind === "tool" || s.kind === "result") {
@@ -624,9 +625,11 @@
     leaveReplay();
     const body = { prompt, mode, guard: $("guard").checked, files: files.map((f) => ({ name: f.name, content: f.content })) };
     if (planId) { body.apply_plan = planId; if (phased) body.phased = true; }
+    if (state.designSkill && mode !== "plan") body.design_skill = true;
     const res = await api(`/workspaces/${encodeURIComponent(state.ws)}/tasks`, { method: "POST", body: JSON.stringify(body) });
     if (!res.ok) { addNode(h("div", "msg error", await errorText(res))); return; }
     const task = await res.json();
+    setDesignSkill(false);  // tek seferlik: bir sonraki görev yine normal
     state.contextWindow = task.context_window || null;
     showUsage(null);
     officeContextWindow(); // modelin bağlam penceresi Ofis göstergelerine
@@ -908,6 +911,79 @@
     }
   }
 
+  // --- Beceri tasarımcısı: Usta önerir, SEN onaylarsan kaydedilir ---
+  function setDesignSkill(on) {
+    state.designSkill = !!on;
+    $("design-note").hidden = !on;
+  }
+  function startSkillDesign() {
+    closePanels();
+    showTab("stream");
+    setDesignSkill(true);
+    fillPrompt("Şu işi her seferinde aynı şekilde yapan bir beceri tasarla: ");
+  }
+  const rowOf = (...nodes) => { const r = h("div", "row"); r.append(...nodes); return r; };  // h() yalnız metin alır
+  function skillProposalNode(args) {
+    const box = h("div", "msg skill-proposal");
+    box.append(h("strong", null, "Usta yeni bir beceri önerdi"), h("p", "wiz-note", "Okuyup beğenirsen Kaydet'e bas. Sen onaylamadan hiçbir şey kaydedilmez."));
+    const body = h("div");
+    body.append(h("p", "wiz-note", "Öneri kontrol ediliyor…"));
+    box.append(body);
+    (async () => {
+      let d;
+      try {
+        const r = await api("/skills/check", { method: "POST", body: JSON.stringify({ name: String(args.name ?? ""), description: String(args.description ?? ""), instructions: String(args.instructions ?? "") }) });
+        if (!r.ok) { body.replaceChildren(h("p", "error", `Bu öneri kaydedilemez: ${await errorText(r)}`)); return; }
+        d = await r.json();
+      } catch (_) { body.replaceChildren(h("p", "error", "Öneri kontrol edilemedi.")); return; }
+      const parts = [h("p", null, `Adı: /${d.name}`), h("pre", "skill-text", d.content)];
+      const ack = h("input"); ack.type = "checkbox"; ack.id = `ack-${d.name}-${Math.random().toString(36).slice(2, 7)}`;
+      const save = h("button", "primary", "Kaydet"); save.type = "button";
+      const drop = h("button", null, "Vazgeç"); drop.type = "button";
+      const msg = h("p", "wiz-note", ""); msg.setAttribute("role", "status");
+      if (d.risky) {
+        box.classList.add("risky");
+        const list = h("ul", "wiz-list con");
+        for (const w of d.warnings) list.append(h("li", null, w));
+        const lab = h("label"); lab.htmlFor = ack.id; lab.append(" Uyarıları okudum, yine de kaydetmek istiyorum.");
+        parts.push(h("p", "plain-warn", "Dikkat: bu öneride şunlar var."), list, rowOf(ack, lab));
+        save.disabled = true;
+        ack.addEventListener("change", () => { save.disabled = !ack.checked; });
+      }
+      parts.push(rowOf(save, drop), msg);
+      body.replaceChildren(...parts);
+      save.addEventListener("click", async () => {
+        save.disabled = true; drop.disabled = true;
+        const r = await api(`/skills/${encodeURIComponent(d.name)}`, { method: "PUT", body: JSON.stringify({ content: d.content }) });  // kullanıcının gördüğü metin
+        if (!r.ok) { msg.textContent = await errorText(r); msg.className = "error"; save.disabled = d.risky && !ack.checked; drop.disabled = false; return; }
+        for (const b of box.querySelectorAll("button, input")) b.disabled = true;
+        msg.textContent = `Kaydettim. Kullanmak için /${d.name} yaz ya da Ayarlar → Becerilerim → Kullan.`; msg.className = "wiz-note ok";
+        loadMySkills();
+      });
+      drop.addEventListener("click", () => { for (const b of box.querySelectorAll("button, input")) b.disabled = true; msg.textContent = "Vazgeçtin, bir şey kaydedilmedi."; });
+    })();
+    return box;
+  }
+  async function loadMySkills() {
+    const list = $("my-skills");
+    const r = await api("/skills");
+    if (!r.ok) { list.replaceChildren(h("li", "wiz-note", "Becerileri alamadım.")); return; }
+    const rows = await r.json();
+    list.replaceChildren(...(rows.length ? rows.map((s) => {
+      const li = h("li");
+      const left = h("span", null, `/${s.name}`);
+      left.append(h("span", "who", `  ${s.description}`));
+      const acts = h("span", "acts");
+      const use = h("button", null, "Kullan"); use.type = "button";
+      use.addEventListener("click", () => { closePanels(); showTab("stream"); fillPrompt(`/${s.name} `); });
+      const del = h("button", null, "Sil"); del.type = "button"; del.setAttribute("aria-label", `Sil: /${s.name}`);
+      del.addEventListener("click", async () => { const d = await api(`/skills/${encodeURIComponent(s.name)}`, { method: "DELETE" }); if (d.ok) loadMySkills(); });
+      acts.append(use, del);
+      li.append(left, acts);
+      return li;
+    }) : [h("li", "wiz-note", "Henüz becerin yok. \"Usta'ya yeni bir iş öğret\"e basarak başla.")]));
+  }
+
   async function loadPrograms() {
     const box = $("programs");
     let d = {};
@@ -947,7 +1023,7 @@
     else if (name === "privacy") loadPrivacy();
     else if (name === "wizard") wizShow("wiz-start");
     else if (name === "tablet") loadTablet();
-    else if (name === "settings") { loadPrograms(); loadProfile().then(loadOrtak); }
+    else if (name === "settings") { loadPrograms(); loadMySkills(); loadProfile().then(loadOrtak); }
     else if (name === "glossary") { $("gloss-q").value = ""; renderGlossary(); $("gloss-q").focus(); }
     else { apisMsg(""); loadApis(); }
   }
@@ -1851,6 +1927,8 @@
     kisiFacts.push(v); $("kisi-yeni").value = ""; renderKisiFacts(); kisiMsg("Eklendi. Kalıcı olması için Kaydet'e bas.");
   });
   $("kisi-save").addEventListener("click", saveProfile);
+  $("skill-design").addEventListener("click", startSkillDesign);
+  $("design-off").addEventListener("click", () => { setDesignSkill(false); $("prompt").value = ""; });
   $("ortak-ac").addEventListener("click", async () => { ortakMsg("Açıyorum…"); if (await ortakCall("/ortak/ev-sahibi", "POST", { acik: true })) { ortakMsg("Açıldı. Şimdi \"kod göster\"e basıp öbür bilgisayardan bağlanabilirsin.", "ok"); loadOrtak(); } });
   $("ortak-kapat").addEventListener("click", async () => { if (await ortakCall("/ortak/ev-sahibi", "POST", { acik: false })) { ortakMsg("Kapattım. Bağlı bilgisayarlar artık ulaşamaz.", "ok"); loadOrtak(); } });
   $("ortak-kod-al").addEventListener("click", async () => {

@@ -99,6 +99,10 @@ class Policy:
         if tool == "remember":
             # kalıcı hafıza sonraki görevleri etkiler: komut/URL/gizli bilgi/onay iddiası içeren not kullanıcı onayı ister
             return Decision.ASK if memory.suspicious(args.get("text")) else Decision.ALLOW
+        if tool == "propose_skill":
+            return (
+                Decision.ALLOW
+            )  # yan etkisiz: yalnız kullanıcıya öneri gösterir; kaydı kullanıcının düğmesi yapar
         if tool == "web_search":
             return Decision.ASK
         return Decision.DENY

@@ -46,6 +46,16 @@ Usta, ne istediğini yazdığında bunu senin için yapan bir yapay zekâ yardı
 
 **Ayarlar → "Seni tanıyayım"** bölümünde sana ne diye hitap etmesini, nasıl anlatmasını ve bilmesini istediğin birkaç şeyi yazabilirsin (ör. "Sayfalarımda hep büyük yazı isterim"). Bunları yalnız sen yazarsın; Usta kendiliğinden eklemez. Yazdıkların her görevde yapay zekâya gönderilir (internet servisi seçtiysen o servise de), bu yüzden şifre ya da anahtar yazma. İstediğin zaman tek tek silebilir ya da "Hepsini sil"e basabilirsin. **Ayarlar → Görünüm**'den zemin rengini, vurgu rengini ve yazı boyutunu değiştirebilirsin.
 
+## Usta'ya yeni bir iş öğret (beceriler)
+
+Hep aynı şekilde yapmasını istediğin bir iş varsa (ör. "haftalık raporu şu düzende yaz"), Usta'ya öğretebilirsin.
+
+1. **Ayarlar → Becerilerim → "Usta'ya yeni bir iş öğret"**'e bas, açılan kutuya işi yaz ve gönder.
+2. Usta bir **öneri kartı** gösterir: becerinin adı ve tam metni. İyice oku.
+3. Beğendiysen **Kaydet**'e bas. Beğenmediysen **Vazgeç**. Sen onaylamadan hiçbir şey kaydedilmez.
+4. Kartta kırmızı bir uyarı varsa (bağlantı, komut, "onay gerekmez" gibi), "Uyarıları okudum"u işaretlemeden Kaydet açılmaz. Emin değilsen Vazgeç.
+5. Kullanmak için **Ayarlar → Becerilerim → Kullan**'a bas ya da kutuya `/beceri-adı` yaz. Beceriler kendiliğinden çalışmaz.
+
 ## Evdeki bilgisayarlar aynı hafızayı kullansın
 
 Evde birden çok bilgisayarda Usta kullanıyorsan, kendini her birinde yeniden tanıtmana gerek yok.

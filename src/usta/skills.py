@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import os
 import re
+import unicodedata
 from pathlib import Path
 
-from usta import compat
+from usta import compat, memory
 
 NAME = re.compile(r"[a-z0-9çğıöşü][a-z0-9çğıöşü_-]{0,29}")
 MAX_SIZE = 20_000
+MAX_PROPOSAL = 4_000  # Usta'nın önerdiği beceri: kullanıcı baştan sona okuyabilsin
+MAX_DESCRIPTION = 120
 
 
 class SkillError(Exception):
@@ -79,3 +82,50 @@ def expand(home: Path, prompt: str) -> str:
         return prompt
     extra = (m.group(2) or "").strip()
     return f"{body.strip()}\n\nGörev: {extra}" if extra else body.strip()
+
+
+def _clean_lines(text: str) -> str:
+    """Denetim/biçim (bidi, sıfır genişlik) karakterlerini atar; satır sonlarını korur, satırdaki boşlukları teke indirir."""
+    kept = "".join(
+        c if c in "\n\t" or unicodedata.category(c) not in ("Cc", "Cf") else " " for c in text
+    )
+    lines = [
+        " ".join(ln.split()) for ln in kept.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    ]
+    return "\n".join(lines).strip("\n")
+
+
+def validate_proposal(name: object, description: object, instructions: object) -> dict:
+    """Usta'nın önerdiği becerinin temizlenmiş hâli: {name, content}. Yazmaz; geçersizse SkillError.
+
+    `content` ilk satırı açıklama olan beceri dosyasıdır (mevcut biçim).
+    """
+    if not all(isinstance(x, str) for x in (name, description, instructions)):
+        raise SkillError("ad, açıklama ve yönerge metin olmalı")
+    n = name.strip().casefold()
+    if not NAME.fullmatch(n):
+        raise SkillError("ad küçük harf/rakam/-/_ olmalı (en çok 30 karakter)")
+    desc = " ".join(_clean_lines(description).split())
+    if not desc:
+        raise SkillError("açıklama boş olamaz")
+    if len(desc) > MAX_DESCRIPTION:
+        raise SkillError(f"açıklama en çok {MAX_DESCRIPTION} karakter olabilir")
+    body = _clean_lines(instructions)
+    if not body:
+        raise SkillError("yönerge boş olamaz")
+    content = f"{desc}\n\n{body}"
+    if len(content) > MAX_PROPOSAL:
+        raise SkillError(
+            f"beceri en çok {MAX_PROPOSAL} karakter olabilir (kullanıcı hepsini okuyabilsin)"
+        )
+    return {"name": n, "content": content}
+
+
+def check_proposal(home: Path, name: object, description: object, instructions: object) -> dict:
+    """Öneri kartı için: temizlenmiş içerik + UYARILAR (riskli desenler, üzerine yazma). Yazmaz."""
+    d = validate_proposal(name, description, instructions)
+    warnings = [f"Metinde {why} var." for why in memory.suspicious_all(d["content"])]
+    overwrites = read(home, d["name"]) is not None
+    if overwrites:
+        warnings.append(f"/{d['name']} adında bir beceri zaten var; kaydedersen üzerine yazılır.")
+    return {**d, "warnings": warnings, "overwrites": overwrites, "risky": bool(warnings)}

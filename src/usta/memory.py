@@ -96,6 +96,13 @@ def suspicious(text: object) -> str | None:
     return None
 
 
+def suspicious_all(text: object) -> list[str]:
+    """`suspicious` ile aynı desenler; ilk değil, EŞLEŞEN TÜM gerekçeler (beceri önerisi kartı hepsini gösterir)."""
+    if not isinstance(text, str):
+        return []
+    return [why for rx, why in _SUSPICIOUS if rx.search(text)]
+
+
 def split_source(note: str) -> tuple[str, str]:
     """`- metin  [kaynak: ...]` -> (metin, kaynak); kaynak yoksa boş (kullanıcı/eski not)."""
     m = SOURCE.search(note)

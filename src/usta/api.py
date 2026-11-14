@@ -99,6 +99,9 @@ class TaskIn(BaseModel):
     phased: bool = (
         False  # planı PLAN.md aşamalarına bölüp her aşamayı taze bağlamla ayrı görev koştur
     )
+    design_skill: bool = (
+        False  # "Usta'ya yeni bir iş öğret": propose_skill aracı bu görevde verilir
+    )
 
 
 class MessageIn(BaseModel):
@@ -153,6 +156,12 @@ PREVIEW_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
 }
+
+
+class SkillProposalIn(BaseModel):
+    name: str = Field(max_length=200)
+    description: str = Field(max_length=2000)
+    instructions: str = Field(max_length=20_000)
 
 
 class ProfileIn(BaseModel):
@@ -497,6 +506,14 @@ def create_app(
     @api.get("/skills")
     def list_skills() -> list[dict]:
         return skills.list_skills(home)
+
+    @api.post("/skills/check")
+    def check_skill_proposal(body: SkillProposalIn) -> dict:
+        """Usta'nın önerdiği becerinin temizlenmiş hâli ve uyarıları (öneri kartı bunu gösterir). Hiçbir şey yazmaz."""
+        try:
+            return skills.check_proposal(home, body.name, body.description, body.instructions)
+        except skills.SkillError as e:
+            raise HTTPException(422, str(e)) from None
 
     @api.put("/skills/{name}")
     def put_skill(name: str, body: SkillIn) -> dict:
@@ -919,7 +936,15 @@ def create_app(
             files = [(f.name, f.content) for f in body.files]
             prompt = body.prompt if body.apply_plan else skills.expand(home, body.prompt)
             return manager.start(
-                workspace, root, prompt, body.mode, body.guard, files, body.apply_plan, body.phased
+                workspace,
+                root,
+                prompt,
+                body.mode,
+                body.guard,
+                files,
+                body.apply_plan,
+                body.phased,
+                design_skill=body.design_skill,
             ).public()
         except PlanNotFound:
             raise HTTPException(

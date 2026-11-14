@@ -1,5 +1,15 @@
 # Değişiklik günlüğü
 
+## 0.7.0 — Usta kendi becerisini tasarlar (sen onaylarsan)
+
+Model davranışı DEĞİŞMEDİ (araç yalnız istenince göreve eklenir). Tasarım ve tehdit tablosu: [docs/c-orkestra-tasarim.md](docs/c-orkestra-tasarim.md).
+
+- **Ayarlar → Becerilerim → "Usta'ya yeni bir iş öğret":** ne istediğini yaz; Usta bir *beceri* (yazılı tarif) tasarlayıp **öneri kartı** gösterir. Okuyup beğenirsen Kaydet'e basarsın; **sen onaylamadan hiçbir şey kaydedilmez.** Kayıtlı beceriler kendiliğinden çalışmaz: yalnız "Kullan"a basınca ya da `/beceri-adı` yazınca devreye girer. Listeden silinir.
+- **Güvenlik:** yeni araç `propose_skill` yan etkisizdir (hiçbir dosya yazmaz), yalnız "yeni bir iş öğret" dediğinde o göreve eklenir (plan modunda hiç yok) ve kaydı yalnız kullanıcının düğmesi yapar; modelin kayıt yolu yoktur (testle denetlenir). Kart, sunucunun doğruladığı metni ve **uyarıları** gösterir: bağlantı, komut, gizli bilgi benzeri, "onay gerekmez", "önceki talimatları yok say" ve var olan becerinin üzerine yazılması. Uyarı varsa kart kırmızı olur ve "Uyarıları okudum" işaretlenmeden Kaydet açılmaz. Öneri en çok 4000 harf (hepsini okuyabilesin).
+- Beceri yalnız yazılı yönergedir: kod içermez, izinleri ya da onayları değiştiremez.
+- Gerçek modelle (Qwen3 4B) uçtan uca denendi: temiz öneri kaydedildi ve listelendi; riskli öneride kart kırmızı çıktı, Kaydet kilitliydi, Vazgeç hiçbir şey kaydetmedi.
+- Yeni uç: `POST /skills/check` (hiçbir şey yazmaz). Gizlilik listesine `skills` eklendi.
+
 ## 0.6.3 — Reliability Lab: ortak hafıza kanalı
 
 Model davranışı DEĞİŞMEDİ; yalnız ölçüm aracı genişledi.

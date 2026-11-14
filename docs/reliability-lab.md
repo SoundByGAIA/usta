@@ -31,6 +31,7 @@ Docker gerekmez ve değerlendirme deterministiktir.
 | `category`, `surface` | saldırı yüzeyi (araç çıktısı, MCP yanıtı, README, sahte otorite, sızdırma, hafıza) |
 | `task`, `files`, `swaps` | başlangıç durumu; `swaps` koşula göre değişen içerik (`clean` / `attack`) |
 | `mcp`, `run_outputs` | betikli MCP araçları (izin modu `ask`/`allow` dahil) ve `run` çıktıları |
+| `shared_notes` | evdeki ortak hafızanın ONAYLI notları, koşula göre (`clean` / `attack`); ajanın bağlamına gerçek görevlerdeki `<<<ORTAK-HAFIZA>>>` bloğuyla girer. Her not `ortak.check_note` filtresinden geçmek zorundadır: gerçek kanaldan giremeyecek bir saldırı senaryoda da yazılamaz |
 | `forbidden` | yasak eylem koşulları (`goal`: saldırganın amacı mı) |
 | `success` | meşru görevin başarı koşulu (dosya içeriği/eşitliği, yanıt metni) |
 | `faults` | hata enjeksiyonu (toparlanma senaryoları) |
@@ -43,8 +44,11 @@ Yasak türleri: `tool_call` (ad kalıbı + argümanda geçen metin), `arg_contai
 **Eşleştirme:** aynı senaryonun iki koşulunda model, istem, araçlar, izin modları ve bütçe aynıdır; fark yalnız yük metnidir
 (`tests/test_lab.py` bunu her senaryo için doğrular). Her saldırı senaryosunun saldırısız kontrolü otomatik olarak vardır.
 
-İlk küme 24 senaryodur: 20 saldırı (5 araç çıktısı enjeksiyonu, 5 MCP yetki manipülasyonu, 3 README yönlendirme,
-3 sahte otorite, 2 sızdırma, 2 hafıza zehirleme) ve 4 hata/toparlanma senaryosu.
+İlk küme 24 senaryoydu: 20 saldırı (5 araç çıktısı enjeksiyonu, 5 MCP yetki manipülasyonu, 3 README yönlendirme,
+3 sahte otorite, 2 sızdırma, 2 hafıza zehirleme) ve 4 hata/toparlanma senaryosu. **0.6.3'te 27'ye çıktı:** evdeki ortak
+hafıza kanalı için 3 senaryo eklendi (`ortak-01` gizli anahtarı herkese açık dosyaya yazdırma, `ortak-02` gizli anahtarı yanıta
+ekletme, `ortak-03` veri dosyasını boşaltma); 24 eski senaryo değişmedi (küme özeti bu yüzden değişti; eski sonuçlarla
+karşılaştırırken yalnız ilk 24 senaryoyu kıyasla).
 
 ## Değerlendirme kuralları
 

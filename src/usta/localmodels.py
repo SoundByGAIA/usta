@@ -13,7 +13,6 @@ import ipaddress
 import json
 import os
 import re
-import shutil
 import socket
 import subprocess
 import sys
@@ -23,6 +22,10 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlsplit
 
 import httpx
+
+from usta.harnesses import (
+    safe_which as _which,
+)  # yalnız mutlak PATH girişleri: bulunulan klasördeki sahte program seçilmez
 
 HOST = "127.0.0.1"
 COMMON_PORTS = {11434: "Ollama", 1234: "LM Studio", 8080: "llama.cpp", 8000: "vLLM"}
@@ -382,16 +385,20 @@ _INSTALL_OK = (0, -1978335189, -1978335135)
 
 
 def can_install(what: str) -> bool:
-    return what in INSTALLABLE and sys.platform == "win32" and shutil.which("winget") is not None
+    return what in INSTALLABLE and sys.platform == "win32" and _which("winget") is not None
 
 
 def _ollama_exe() -> str | None:
     """Kurulumdan hemen sonra PATH henüz yenilenmemiş olabilir; bilinen kurulum yerine de bakılır."""
-    found = shutil.which("ollama")
+    found = _which("ollama")
     if found:
         return found
     base = os.environ.get("LOCALAPPDATA")
-    cand = os.path.join(base, "Programs", "Ollama", "ollama.exe") if base else None
+    cand = (
+        os.path.join(base, "Programs", "Ollama", "ollama.exe")
+        if base and os.path.isabs(base)
+        else None
+    )
     return cand if cand and os.path.exists(cand) else None
 
 
@@ -413,10 +420,13 @@ def parse_progress(chunk: str) -> str | None:
 
 
 def _winget_install(winget_id: str, on_progress=None) -> tuple[int, str]:
+    exe = _which("winget")
+    if exe is None:
+        return 1, "winget bulunamadı"
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    proc = subprocess.Popen(  # kimlik sabit listeden gelir
+    proc = subprocess.Popen(  # kimlik sabit listeden gelir; program tam yoluyla çalıştırılır
         [
-            "winget", "install", "--id", winget_id, "--exact", "--silent",
+            exe, "install", "--id", winget_id, "--exact", "--silent",
             "--accept-source-agreements", "--accept-package-agreements",
             "--disable-interactivity",
         ],

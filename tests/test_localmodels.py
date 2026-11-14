@@ -329,7 +329,7 @@ def test_install_only_runs_for_listed_programs_on_windows_with_winget(monkeypatc
     with pytest.raises(localmodels.LocalError, match="kendim kuramıyorum"):
         job.start("ollama")
     monkeypatch.setattr(localmodels.sys, "platform", "win32")
-    monkeypatch.setattr(localmodels.shutil, "which", lambda n: None)  # winget yok
+    monkeypatch.setattr(localmodels, "_which", lambda n: None)  # winget yok
     assert localmodels.can_install("ollama") is False
     with pytest.raises(localmodels.LocalError, match="kendim kuramıyorum"):
         job.start("ollama")
@@ -338,7 +338,7 @@ def test_install_only_runs_for_listed_programs_on_windows_with_winget(monkeypatc
 def test_install_runs_a_fixed_winget_command_and_waits_for_ollama(monkeypatch):
     seen = {}
     monkeypatch.setattr(localmodels.sys, "platform", "win32")
-    monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
+    monkeypatch.setattr(localmodels, "_which", lambda n: "C:/winget.exe")
     monkeypatch.setattr(
         localmodels, "_winget_install", lambda i, cb=None: seen.update(id=i) or (0, "ok")
     )
@@ -354,7 +354,7 @@ def test_install_runs_a_fixed_winget_command_and_waits_for_ollama(monkeypatch):
 
 def test_install_failure_is_reported_in_plain_words(monkeypatch):
     monkeypatch.setattr(localmodels.sys, "platform", "win32")
-    monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
+    monkeypatch.setattr(localmodels, "_which", lambda n: "C:/winget.exe")
     monkeypatch.setattr(
         localmodels, "_winget_install", lambda i, cb=None: (1, "ham çıktı gizli ayrıntı")
     )
@@ -377,7 +377,7 @@ def test_install_treats_already_installed_as_success_and_blocks_a_second_job(mon
 
     gate = threading.Event()
     monkeypatch.setattr(localmodels.sys, "platform", "win32")
-    monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
+    monkeypatch.setattr(localmodels, "_which", lambda n: "C:/winget.exe")
     monkeypatch.setattr(
         localmodels, "_winget_install", lambda i, cb=None: gate.wait(5) and (-1978335189, "")
     )
@@ -416,7 +416,7 @@ def test_winget_progress_line_becomes_a_short_sentence():
 
 def test_install_shows_download_progress_and_plain_winget_errors(monkeypatch):
     monkeypatch.setattr(localmodels.sys, "platform", "win32")
-    monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
+    monkeypatch.setattr(localmodels, "_which", lambda n: "C:/winget.exe")
     seen = []
 
     def fake(i, cb=None):
@@ -482,7 +482,7 @@ def test_install_status_reports_elapsed_time_only_while_active(monkeypatch):
 
     gate = threading.Event()
     monkeypatch.setattr(localmodels.sys, "platform", "win32")
-    monkeypatch.setattr(localmodels.shutil, "which", lambda n: "C:/winget.exe")
+    monkeypatch.setattr(localmodels, "_which", lambda n: "C:/winget.exe")
     monkeypatch.setattr(localmodels, "_winget_install", lambda i, cb=None: gate.wait(5) and (1, ""))
     job = localmodels.InstallJob()
     assert "elapsed" not in job.snapshot()
@@ -493,3 +493,23 @@ def test_install_status_reports_elapsed_time_only_while_active(monkeypatch):
     gate.set()
     done = _wait_job(job)
     assert "elapsed" not in done and "started" not in done
+
+
+def test_installer_programs_are_found_only_on_absolute_path_entries(tmp_path, monkeypatch):
+    import os
+
+    # 0.8.3 kutu kaçışının ikinci katmanı: bulunulan klasördeki ya da göreli PATH girişindeki sahte winget/ollama
+    # seçilmez; winget tam yoluyla çalıştırılır.
+    for name in ("winget", "ollama"):
+        fake = tmp_path / name
+        fake.write_text("#!/bin/sh\nexit 0\n")
+        fake.chmod(0o755)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PATH", f".{os.pathsep}{os.pathsep}rel")
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    assert localmodels._ollama_exe() is None
+    assert localmodels._winget_install("Ollama.Ollama") == (1, "winget bulunamadı")
+    monkeypatch.setenv("LOCALAPPDATA", "rel")  # göreli kurulum yeri de kabul edilmez
+    assert localmodels._ollama_exe() is None
+    monkeypatch.setenv("PATH", str(tmp_path))
+    assert localmodels._ollama_exe() == str(tmp_path / "ollama")

@@ -264,3 +264,26 @@ test("sözlük: index.html'deki her ? düğmesinin balonu bir terim bulur", () =
 test("plainProgress: beceri önerisi düz Türkçe", () => {
   assert.equal(L.plainProgress("propose_skill", { name: "x" }), "Yeni bir beceri tasarlıyor");
 });
+
+test("plainApproval: başka programa iş verme düz Türkçe ve yazma izni açıkça belirtilir", () => {
+  const ro = L.plainApproval("delegate", { agent: "claude", task: "Bu klasörü özetle", write: false });
+  assert.match(ro.title, /"Claude Code" programından yardım/);
+  assert.match(ro.title, /yalnız okuyacak/);
+  assert.match(ro.title, /Bu klasörü özetle/);
+  assert.doesNotMatch(ro.warn, /DOSYA/);
+  const rw = L.plainApproval("delegate", { agent: "dsh", task: "x", write: true });
+  assert.match(rw.title, /DeepSeek Harness/);
+  assert.match(rw.title, /DOSYA YAZMA/);
+  assert.match(rw.warn, /dosyalarını değiştirebilir/);
+  assert.match(L.plainApproval("delegate", { agent: "bilinmeyen", task: "x" }).title, /bilinmeyen/);
+  assert.equal(L.plainProgress("delegate", {}), "Başka bir yapay zekâ programından yardım istiyor");
+  // diğer araçlar ve kaynak izi gerekçesi değişmedi
+  assert.match(L.plainApproval("write_file", { path: "a.txt" }, "hedef 'a.txt' okunan içerikte geçiyor").warn, /Emin değilsen Reddet/);
+});
+
+test("plainApproval: yazma isteği okunan içerikten sonra gelirse ayrıca uyarılır", () => {
+  const a = L.plainApproval("delegate", { agent: "claude", task: "x", write: true }, "yazma izni, Usta az önce başka bir içerik okuduktan sonra isteniyor (bu içerik isteği yönlendirmiş olabilir)");
+  assert.match(a.warn, /YAZMA isteği, Usta başka bir içerik okuduktan sonra geldi/);
+  assert.match(a.warn, /Reddet/);
+  assert.match(a.warn, /dosyalarını değiştirebilir/);  // programın genel uyarısı da durur
+});

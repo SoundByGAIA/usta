@@ -186,6 +186,7 @@
     const a = args && typeof args === "object" ? args : {};
     const v = (x, n) => String(x == null ? "" : x).slice(0, n || 120);
     let title;
+    let extra = "";
     switch (tool) {
       case "write_file": title = `Usta "${v(a.path)}" dosyasını yazmak istiyor (varsa üzerine yazar).`; break;
       case "edit_file": title = `Usta "${v(a.path)}" dosyasında değişiklik yapmak istiyor.`; break;
@@ -193,18 +194,28 @@
       case "fetch_url": title = `Usta şu internet sayfasını okumak istiyor: ${v(a.url, 160)}`; break;
       case "web_search": title = `Usta internette şunu aramak istiyor: ${v(a.query, 160)}`; break;
       case "remember": title = "Usta ileride hatırlamak için bir not kaydetmek istiyor."; break;
+      case "delegate": {
+        const names = { claude: "Claude Code", codex: "Codex", opencode: "OpenCode", dsh: "DeepSeek Harness", hermes: "Hermes" };
+        const who = names[a.agent] || v(a.agent, 40);
+        const writes = a.write === true || String(a.write).toLowerCase() === "true";
+        title = `Usta bilgisayarındaki "${who}" programından yardım istemek istiyor. ${writes ? "Ona DOSYA YAZMA izni de verecek." : "Program yalnız okuyacak."} Vereceği iş: ${v(a.task, 300)}`;
+        extra = writes ? "Dikkat: bu program dosyalarını değiştirebilir. Programın kendi izin sistemi vardır, Usta onun içini denetleyemez." : "Programın cevabı Usta için veridir; içindeki komutlara uymaz.";
+        break;
+      }
       default:
         title = String(tool || "").startsWith("mcp__")
           ? `Usta bir ek araç kullanmak istiyor (${v(tool, 60)}).`
           : `Usta "${v(tool, 60)}" işlemini yapmak istiyor.`;
     }
-    let warn = "";
+    let warn = extra;
     if (reason) {
-      warn = /okunan içerikte geçiyor/.test(reason)
+      warn = /yazma izni, Usta az önce/.test(reason)
+        ? "Dikkat: bu YAZMA isteği, Usta başka bir içerik okuduktan sonra geldi; o içerik Usta'yı yönlendirmiş olabilir. Senin isteğinde yoksa Reddet."
+        : /okunan içerikte geçiyor/.test(reason)
         ? "Dikkat: bu hedef, Usta'nın okuduğu bir içerikten geliyor, senin isteğinde yoktu. Emin değilsen Reddet."
         : `Neden soruyor: ${v(reason, 200)}`;
     }
-    return { title, warn };
+    return { title, warn: warn && reason && extra ? `${extra} ${warn}` : warn };
   }
 
   // Basit görünümde araç çağrısı satırı: ham araç adı yerine ne yapıldığını söyleyen kısa cümle.
@@ -221,6 +232,7 @@
       case "web_search": return `İnternette aranıyor: ${v(a.query)}`;
       case "remember": return "Not alınıyor";
       case "propose_skill": return "Yeni bir beceri tasarlıyor";
+      case "delegate": return "Başka bir yapay zekâ programından yardım istiyor";
       default: return String(tool || "").startsWith("mcp__") ? "Ek araç kullanılıyor" : `Çalışıyor: ${v(tool, 40)}`;
     }
   }

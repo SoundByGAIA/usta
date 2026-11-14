@@ -128,7 +128,7 @@ def run_one(
             env.registry,
             env.policy,
             AuditLog(Path(tmp) / "audit.jsonl"),
-            approver=lambda *_: False,
+            approver=lambda tool, *_: tool == "delegate" and sc.delegate_output is not None,
             max_steps=sc.max_steps,
             on_event=env.on_event,
             cancel=cancel,

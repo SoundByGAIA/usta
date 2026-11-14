@@ -10,7 +10,7 @@ import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from usta import compat, theme, thinking
+from usta import compat, harnesses, theme, thinking
 
 MODES = ("manual", "auto", "plan")
 VIEWS = ("simple", "advanced")
@@ -33,12 +33,22 @@ class Settings:
     portal: bool = True
     zoom: str = "auto"  # portal arayüz boyutu: auto ya da çarpan
     accent: str = "cini"  # portal vurgu rengi (bkz. ACCENTS)
+    delegates: tuple[
+        str, ...
+    ] = ()  # Usta'nın çağırabileceği başka programlar (harnesses.CATALOG); varsayılan hiçbiri
     guard: bool = (
         False  # koruma: doğrulama kapısı + devre kesici (varsayılan kapalı, ölçüm sonrası açılır)
     )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "theme", theme.resolve(self.theme))
+        if not isinstance(self.delegates, (list, tuple)):
+            raise TypeError("delegates liste olmalı")
+        object.__setattr__(self, "delegates", tuple(self.delegates))
+        if len(self.delegates) > len(harnesses.CATALOG) or any(
+            d not in harnesses.CATALOG for d in self.delegates
+        ):
+            raise ValueError("delegates yalnız katalogdaki programları içerebilir")
         if self.accent not in ACCENTS:
             raise ValueError(f"geçersiz renk: {self.accent!r}")
         if self.zoom not in ZOOMS:

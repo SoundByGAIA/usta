@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from pathlib import Path
 
-from usta import memory
+from usta import harnesses, memory
 from usta.fetch import validate_url
 from usta.proxy import host_allowed
 
@@ -48,7 +48,9 @@ class Policy:
         root: Path,
         allowed_hosts: set[str] | None = None,
         mcp_modes: dict[str, str] | None = None,
+        delegates: set[str] | None = None,
     ):
+        self.delegates = set(delegates or ())  # kullanıcının açtığı başka programlar
         self.root = Path(root).resolve()
         self.mcp_modes = dict(mcp_modes or {})
         self.allowed_hosts = {h.lower() for h in (allowed_hosts or set())}
@@ -99,6 +101,12 @@ class Policy:
         if tool == "remember":
             # kalıcı hafıza sonraki görevleri etkiler: komut/URL/gizli bilgi/onay iddiası içeren not kullanıcı onayı ister
             return Decision.ASK if memory.suspicious(args.get("text")) else Decision.ALLOW
+        if tool == "delegate":
+            # başka programa iş vermek: kataloğda ve kullanıcı tarafından AÇIK olmalı, sonra HER SEFERİNDE sorulur (asla ALLOW yok)
+            agent = args.get("agent")
+            if agent not in harnesses.CATALOG or agent not in self.delegates:
+                return Decision.DENY
+            return Decision.ASK
         if tool == "propose_skill":
             return (
                 Decision.ALLOW

@@ -984,6 +984,38 @@
     }) : [h("li", "wiz-note", "Henüz becerin yok. \"Usta'ya yeni bir iş öğret\"e basarak başla.")]));
   }
 
+  // --- yardımcı yapay zekâ programları (orkestra şefi): hepsi KAPALI başlar ---
+  async function loadHarnesses() {
+    const list = $("harness-list");
+    const r = await api("/harnesses");
+    if (!r.ok) { list.replaceChildren(h("li", "wiz-note", "Programları alamadım.")); return; }
+    const rows = (await r.json()).programlar || [];
+    list.replaceChildren(...rows.map((p) => {
+      const li = h("li");
+      const left = h("span");
+      left.append(h("strong", null, p.label));
+      left.append(h("span", "who", p.installed ? `  ${p.version || "kurulu"}` : "  bu bilgisayarda kurulu değil"));
+      const facts = [p.read_only ? "Yalnız okuma kipi var (varsayılan bu)." : (p.note ? "" : "Yalnız okuma kipi YOK: dosya yazabilir."), p.unsupported, p.note].filter(Boolean);  // not aynı şeyi söylüyorsa tekrar etme
+      if (p.installed) left.append(h("div", "wiz-note", facts.join(" ")));
+      const acts = h("span", "acts");
+      const id = `hn-${p.id}`;
+      const box = h("input"); box.type = "checkbox"; box.id = id; box.checked = !!p.enabled;
+      box.disabled = !p.installed || !!p.unsupported;
+      const lab = h("label"); lab.htmlFor = id; lab.textContent = " Usta çağırabilsin";
+      box.addEventListener("change", async () => {
+        box.disabled = true;
+        const res = await api(`/harnesses/${encodeURIComponent(p.id)}`, { method: "PUT", body: JSON.stringify({ enabled: box.checked }) });
+        const m = $("harness-msg");
+        if (!res.ok) { box.checked = !box.checked; m.textContent = await errorText(res); m.className = "wiz-note error"; }
+        else { m.textContent = box.checked ? `${p.label} açıldı. Usta onu çağırmadan önce her seferinde sana soracak.` : `${p.label} kapatıldı.`; m.className = "wiz-note ok"; }
+        box.disabled = false;
+      });
+      acts.append(box, lab);
+      li.append(left, acts);
+      return li;
+    }));
+  }
+
   async function loadPrograms() {
     const box = $("programs");
     let d = {};
@@ -1023,7 +1055,7 @@
     else if (name === "privacy") loadPrivacy();
     else if (name === "wizard") wizShow("wiz-start");
     else if (name === "tablet") loadTablet();
-    else if (name === "settings") { loadPrograms(); loadMySkills(); loadProfile().then(loadOrtak); }
+    else if (name === "settings") { loadPrograms(); loadMySkills(); loadHarnesses(); loadProfile().then(loadOrtak); }
     else if (name === "glossary") { $("gloss-q").value = ""; renderGlossary(); $("gloss-q").focus(); }
     else { apisMsg(""); loadApis(); }
   }

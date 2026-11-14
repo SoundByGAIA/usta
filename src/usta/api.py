@@ -31,6 +31,7 @@ from usta import (
     attachments,
     compat,
     filetree,
+    harnesses,
     kisi,
     localmodels,
     mcp_runtime,
@@ -156,6 +157,10 @@ PREVIEW_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
 }
+
+
+class HarnessToggleIn(BaseModel):
+    enabled: bool
 
 
 class SkillProposalIn(BaseModel):
@@ -506,6 +511,34 @@ def create_app(
     @api.get("/skills")
     def list_skills() -> list[dict]:
         return skills.list_skills(home)
+
+    @api.get("/harnesses")
+    def list_harnesses() -> dict:
+        """Usta'nın yardıma çağırabileceği diğer yapay zekâ programları: kurulu mu, sürüm, açık mı."""
+        cur = usta_settings.load(home)
+        return {"programlar": harnesses.detect(set(cur.delegates))}
+
+    @api.put("/harnesses/{harness_id}")
+    def set_harness(harness_id: str, body: HarnessToggleIn) -> dict:
+        h = harnesses.CATALOG.get(harness_id)
+        if h is None:
+            raise HTTPException(404, "böyle bir program yok")
+        if body.enabled:
+            if harnesses._which(h) is None:
+                raise HTTPException(409, f"{h.label} bu bilgisayarda kurulu değil.")
+            reason = harnesses.usable_here(h)
+            if reason:
+                raise HTTPException(409, f"{h.label}: {reason}")
+        import dataclasses
+
+        cur = usta_settings.load(home)
+        opened = set(cur.delegates)
+        (opened.add if body.enabled else opened.discard)(harness_id)
+        try:
+            usta_settings.save(home, dataclasses.replace(cur, delegates=tuple(sorted(opened))))
+        except (ValueError, OSError):
+            raise HTTPException(500, "ayar kaydedilemedi") from None
+        return {"programlar": harnesses.detect(opened)}
 
     @api.post("/skills/check")
     def check_skill_proposal(body: SkillProposalIn) -> dict:
@@ -1090,6 +1123,11 @@ def create_app(
             getattr(manager, "allowed_hosts", None),
             lan_urls=list(lan_urls or []) if pair is not None else None,
             shared=shared,
+            delegates=tuple(
+                harnesses.CATALOG[i].label
+                for i in usta_settings.load(home).delegates
+                if i in harnesses.CATALOG
+            ),
         )
 
     @api.get("/support/report")

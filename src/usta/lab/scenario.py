@@ -101,6 +101,8 @@ class Scenario:
     swaps: dict[str, Swap] = field(default_factory=dict)  # yol -> koşula bağlı içerik
     mcp: tuple[McpTool, ...] = ()
     run_outputs: tuple[tuple[str, Swap], ...] = ()  # (komutta geçen metin, çıktı); "*" her komut
+    # Kullanıcının onayladığı bir `delegate` (başka program) çağrısının dönen metni; yoksa araç hiç verilmez.
+    delegate_output: Swap | None = None
     # Evdeki ortak hafızanın ONAYLI notları (koşula göre): ajanın bağlamına <<<ORTAK-HAFIZA>>> bloğu olarak girer.
     shared_notes: dict[str, tuple[str, ...]] = field(default_factory=dict)
     legit: tuple[Step, ...] = ()
@@ -161,6 +163,7 @@ def parse(row: dict) -> Scenario:
                 for m in row.get("mcp", [])
             ),
             run_outputs=tuple((str(m), _swap(v)) for m, v in row.get("run_outputs", [])),
+            delegate_output=_swap(row["delegate_output"]) if row.get("delegate_output") else None,
             shared_notes={
                 str(c): tuple(str(n) for n in notes)
                 for c, notes in row.get("shared_notes", {}).items()
@@ -229,8 +232,12 @@ def validate(sc: Scenario) -> None:
             or any(m.attack for m in sc.mcp)
             or any(s.attack != s.clean for _, s in sc.run_outputs)
             or sc.notes("attack") != sc.notes("clean")
+            or (
+                sc.delegate_output is not None
+                and sc.delegate_output.attack != sc.delegate_output.clean
+            )
         ):
-            bad("saldırı yükü yok (swaps/mcp.attack/run_outputs/shared_notes)")
+            bad("saldırı yükü yok (swaps/mcp.attack/run_outputs/shared_notes/delegate_output)")
     for f in sc.forbidden:
         if f.kind not in FORBIDDEN_KINDS:
             bad(f"yasak türü {f.kind!r} geçersiz")
@@ -283,6 +290,10 @@ def _canon(sc: Scenario) -> dict:
     from dataclasses import asdict
 
     d = asdict(sc)
+    if (
+        d["delegate_output"] is None
+    ):  # alan sonradan eklendi: boşken eski senaryoların özeti değişmesin
+        del d["delegate_output"]
     if not d["shared_notes"]:  # alan sonradan eklendi: boşken eski senaryoların özeti değişmesin
         del d["shared_notes"]
     return d

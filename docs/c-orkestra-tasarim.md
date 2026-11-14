@@ -1,7 +1,7 @@
 # Usta'nın kendi becerisini yazması ve başka yapay zekâ programlarını yönetmesi (C): tasarım
 
-Durum: **uygulanıyor.** C1 (beceri tasarımcısı) 0.7.0, C2 (orkestra şefi) 0.8.0. Rust bu belgenin kapsamı dışındadır
-(ayrı proje).
+Durum: **uygulandı.** C1 (beceri tasarımcısı) 0.7.0, C2 (orkestra şefi) 0.8.0. Rust bu belgenin kapsamı dışındadır
+(ayrı proje: özel durumlu insanlar için Usta benzeri harness, TÜBİTAK 1005).
 
 ## Amaç
 
@@ -46,7 +46,8 @@ Beceri = `~/.usta/skills/<ad>.md` düz metin yönergesi (mevcut sistem; `/ad ek 
   güvenilmeyen kaynak): çıktıdan türeyen dosya/komut hedefi onay ister.
 - **Döngü yok:** çağrılan programa `USTA_DELEGATED=1` verilir; Usta bu değişkenle başlarsa `delegate` reddeder. Görev başına
   en çok 3 çağrı. Paralel çağrı yok (ilk sürüm sıralı).
-- **Denetim kaydı:** program, mod, görev uzunluğu ve özeti (içerik değil), çıkış kodu, süre. Anahtar içermez.
+- **Denetim kaydı:** her araç çağrısı gibi `delegate` çağrısı da (program, iş metni, `write`) ve sonucu denetim günlüğüne yazılır; anahtar içermez
+  (ortam süzülür, hata metinleri `audit.mask`'tan geçer).
 - **Dürüst sınır:** çağrılan program kullanıcının hesabıyla çalışır ve kendi izin sistemine sahiptir; Usta onun içini
   denetleyemez. Bu yüzden varsayılan yalnız okuma, her çağrıda onay ve çıktının veri sayılması şarttır.
 
@@ -75,3 +76,30 @@ Beceri = `~/.usta/skills/<ad>.md` düz metin yönergesi (mevcut sistem; `/ad ek 
 - Kod içeren eklenti yazma; becerinin izin ya da onay ayarını değiştirmesi; becerilerin kendiliğinden tetiklenmesi.
 - Serbest komut çalıştırma; çağrılan programa Usta'nın anahtarlarını vermek; oto modda delege etmek.
 - Paralel çok ajanlı yönetim (ilk sürüm sıralı; ölçümden sonra).
+
+## Uygulanan (0.8.0) ve gerçek denemelerden öğrenilenler
+
+Katalog bayrakları programların kendi `--help` çıktısından ve belgelerinden alındı:
+
+| Program | Yalnız okuma | Dosya yazabilen | İstem |
+|---|---|---|---|
+| Claude Code | `-p --permission-mode plan --no-session-persistence` | `... acceptEdits ...` | stdin |
+| Codex | `exec -s read-only --skip-git-repo-check --ephemeral --color never -` | `-s workspace-write` | stdin (`-`) |
+| OpenCode | `run --agent plan` | `run --agent build` | argüman (`Task: ` önekli) |
+| DeepSeek Harness | **yok** | `headless --permission-mode workspace-write --approval-policy never -` | stdin (`-`) |
+| Hermes | **yok** | `-z` | argüman (`Task: ` önekli) |
+
+Hiçbir satırda `--yolo`, `--dangerously-*`, `danger-full-access`, `bypassPermissions` ya da `--auto` yoktur (testle denetlenir).
+DSH ve Hermes yalnız okuma kipi sunmadığı için onay penceresi ve Ayarlar bunu açıkça söyler ve çağrı `write=true` ister.
+Argümanla istem alan programlar (OpenCode, Hermes) Windows'ta **desteklenmez**: `.cmd` sarmalayıcıları kabuk karakterlerini yorumlar.
+
+**Gerçek denemeler (14 Kasım 2026, Linux, bu bilgisayarda kurulu programlarla):**
+
+- **Claude Code:** yalnız okuma, 7 sn, dosyayı okuyup doğru cevabı verdi, hiçbir dosya değişmedi; cevap veri olarak sarıldı. **Uçtan uca çalıştı.**
+- **OpenCode (v2.3.0):** yerel Ollama'ya bağlı izole bir ayarla çalıştı (komut biçimi, argümanla istem, çıktı sarma, zaman aşımı sonrası süreç ağacının temizliği doğrulandı). Küçük yerel modelin cevabı kalitesizdi; bu Usta'nın konusu değil.
+- **Hermes (v0.19.0):** yerel Ollama'ya bağlı izole ayarla çalıştı ve **kendi uyarısını** döndürdü: araç kullanımı için en az 64K bağlam ister (8K'lık modelle çalışmaz). Usta cevabı doğru taşıdı.
+- **Codex (0.147):** komut biçimi doğru çalıştı ve API'ye ulaştı; kullanıcının kendi Codex ayarındaki model, ChatGPT hesabıyla desteklenmediği için hata verdi (Codex'in kendi yapılandırması, Usta'dan bağımsız).
+- **DeepSeek Harness (0.2.2-rc.1):** kuruldu ama **Node.js 24.9 ve üstünü ister** (`engines`); bu bilgisayarda 22.17 var ve program **hata vermeden sessizce çıkıyor.** Usta bunu artık önceden bilir: Ayarlar "Node.js 24.9 ya da daha yenisi gerekli (sende 22.17)" der ve açılmasına izin vermez. DeepSeek anahtarı olmadığı için gerçek cevap alınamadı; komut biçimi yalnız belgeden doğrulandı.
+- İlk kurulum notu: bu programlardan Hermes ve OpenCode'un kurulumu yavaş bağlantıda (saniyede ~100 KB) onlarca dakika sürdü.
+
+**Denenmedi:** Windows'ta herhangi bir delege; DSH ile gerçek cevap; yazma kipi (`write=true`) gerçek programlarla.

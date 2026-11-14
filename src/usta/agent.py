@@ -312,6 +312,10 @@ class Agent:
             if note:  # hedef güvenilmeyen içerikten türedi: onay şartı (oto modda reddedilir)
                 self.audit.record("taint", tool=call.name, reason=note)
                 decision = Decision.ASK
+        if decision is Decision.ASK and call.name == "delegate" and self._taint is not None:
+            note = self._taint.check(
+                call.name, call.arguments
+            )  # kaynak izi uyarısı yalnız bu araç için ASK'te de hesaplanır
         if decision is Decision.ASK:
             self.approval_note = note
             try:

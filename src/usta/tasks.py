@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import re
 import threading
 import time
@@ -11,7 +12,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from usta import attachments, mcpconfig, memory, ortak, projectcfg, projects
+from usta import attachments, harnesses, mcpconfig, memory, ortak, projectcfg, projects
+from usta import settings as usta_settings
 from usta.agent import SYSTEM_PROMPT, Agent
 from usta.audit import AuditLog
 from usta.breaker import CircuitBreaker
@@ -482,6 +484,13 @@ class TaskManager:
             # hedef güvenilmeyen içerikten türedi (kaynak izi kapısı): oto onay bunu kendiliğinden açmaz
             task.emit("denied", {"tool": tool, "reason": f"oto onay: {note}"})
             return False
+        if task.mode == "auto" and tool == "delegate":
+            # başka bir programa iş vermek yalnız kullanıcıya sorularak olur: oto onay bunu kendiliğinden açmaz
+            task.emit(
+                "denied",
+                {"tool": tool, "reason": "oto onay: başka programlar yalnız sorularak çağrılır"},
+            )
+            return False
         if task.mode == "auto" and tool == "fetch_url" and not self._fetch_allowed(args):
             # sorgu dizesiyle veri sızdırma yolu: oto onay bunu kendiliğinden açmaz (--allow-host gerekir)
             task.emit("denied", {"tool": tool, "reason": "oto onay: izinli olmayan alan adı"})
@@ -515,6 +524,22 @@ class TaskManager:
         if not task.cancel.is_set():
             task.set_status(previous)
         return ap.allow and ap.event.is_set() and not task.cancel.is_set()
+
+    def _open_delegates(self) -> tuple[str, ...]:
+        """Kullanıcının AÇTIĞI ve bu bilgisayarda kurulu/çağrılabilir başka programlar. Usta başka bir programdan çağrılmışsa boş."""
+        if os.environ.get(harnesses.DELEGATED_ENV):
+            return ()
+        try:
+            opened = usta_settings.load(self.home).delegates
+        except (OSError, ValueError):
+            return ()
+        return tuple(
+            i
+            for i in opened
+            if i in harnesses.CATALOG
+            and harnesses._which(harnesses.CATALOG[i])
+            and harnesses.usable_here(harnesses.CATALOG[i]) is None
+        )
 
     def _fetch_allowed(self, args: dict) -> bool:
         try:
@@ -566,6 +591,7 @@ class TaskManager:
                 for w in mcp.warnings:
                     task.emit("warning", {"message": w})
             plan = task.mode == "plan"
+            delegates = () if plan else self._open_delegates()
             registry = build_registry(
                 ToolContext(
                     root=task.root,
@@ -573,6 +599,7 @@ class TaskManager:
                     allowed_hosts=self.allowed_hosts,
                     task_id=task.id,
                     skill_design=task.design_skill,
+                    delegates=delegates,
                 ),
                 extra=mcp.tools if mcp else (),
             )
@@ -581,7 +608,12 @@ class TaskManager:
             agent = Agent(
                 self.model_factory(),
                 registry,
-                Policy(task.root, set(self.allowed_hosts), mcp_modes=mcp.modes if mcp else None),
+                Policy(
+                    task.root,
+                    set(self.allowed_hosts),
+                    mcp_modes=mcp.modes if mcp else None,
+                    delegates=set(delegates),
+                ),
                 audit,
                 approver=lambda t, a: self._approver(task, t, a, agent.approval_note),
                 max_steps=self.max_steps,

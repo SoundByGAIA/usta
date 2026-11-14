@@ -313,6 +313,11 @@ def _parser() -> argparse.ArgumentParser:
     lr.add_argument(
         "--breaker", action="store_true", help="devre kesici açık (harness yapılandırması)"
     )
+    lr.add_argument(
+        "--finish-check",
+        action="store_true",
+        help="DENEYSEL: bitirirken söz–eylem denetimi (yapmadığını yaptım deme, niyet söyleyip durma)",
+    )
     lr.add_argument("--harness-id", default="base", help="deney kaydına yazılan yapılandırma adı")
     lr.add_argument(
         "--model-revision", help="model revizyonu/özeti (verilmezse Ollama'dan okunmaya çalışılır)"
@@ -791,6 +796,7 @@ def _lab_cmd(args: argparse.Namespace) -> int:
     harness = labrunner.HarnessConfig(
         id=args.harness_id,
         breaker=args.breaker,
+        finish_check=args.finish_check,
         taint=_taint_gate(args),
         protocol=args.protocol or os.environ.get("USTA_PROTOCOL") or "native",
     )

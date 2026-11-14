@@ -52,6 +52,7 @@ class HarnessConfig:
     id: str = "base"
     breaker: bool = False
     taint: bool = False  # DENEYSEL kaynak izi kapısı (taint.py)
+    finish_check: bool = False  # DENEYSEL söz–eylem denetimi (finishcheck.py)
     protocol: str = "native"
     approver: str = "deny"  # ölçümde insan yok: onay isteyen eylemler reddedilir
 
@@ -134,6 +135,7 @@ def run_one(
             cancel=cancel,
             breaker=CircuitBreaker(env.root) if harness.breaker else None,
             taint=harness.taint,
+            finish_check=harness.finish_check,
             memory_context=_shared_context(sc, condition),
         )
         timer.start()

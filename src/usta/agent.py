@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from usta import context as ctx
 from usta.audit import AuditLog
 from usta.breaker import CircuitBreaker, Trip
+from usta.finishcheck import FinishCheck
 from usta.models import Message, ModelClient, ToolCall
 from usta.phases import PhaseTracker
 from usta.policy import Decision, Policy
@@ -64,7 +65,11 @@ class Agent:
         shrink_writes: int | None = None,
         phases: PhaseTracker | None = None,
         taint: bool = False,
+        finish_check: bool = False,
     ):
+        # DENEYSEL (varsayılan kapalı): bitirirken söz–eylem uyuşmazlığına hatırlatma (finishcheck.py)
+        self.finish_check = finish_check
+        self._finish: FinishCheck | None = None
         self.taint = (
             taint  # DENEYSEL: güvenilmeyen içerikten türeyen yazma/komut hedefleri onay ister
         )
@@ -130,6 +135,7 @@ class Agent:
         messages = [Message("system", self.system_prompt), Message("user", first)]
         self.audit.record("task", prompt=prompt)
         self._taint = Taint(prompt) if self.taint else None
+        self._finish = FinishCheck(prompt) if self.finish_check else None
         self._usage_base = self._usage_now()
         if self.breaker is not None:
             self.breaker.start()
@@ -155,6 +161,13 @@ class Agent:
                 if self._drain(messages):  # bitirirken gelen ek mesaj: bitirme, ona da bak
                     continue
                 answer = reply.content or ""
+                if self._finish is not None:
+                    nudge = self._finish.on_finish(answer)
+                    if nudge:
+                        self._emit("verification", status="finish_check", command="")
+                        self.audit.record("finish_check", message=nudge[:200])
+                        messages.append(Message("user", nudge))
+                        continue
                 if self.verifier is not None and self._dirty:
                     iv = self.verifier.on_finish()
                     self._emit("verification", status=iv.status, command=iv.command)
@@ -330,6 +343,8 @@ class Agent:
             return "reddedildi: bu eylem izin politikasına aykırı veya onaylanmadı"
         try:
             result = self.registry.call(call.name, call.arguments)
+            if self._finish is not None:
+                self._finish.observe(call.name, call.arguments, executed=True)
             if self._taint is not None:
                 self._taint.observe(call.name, result)
             if self.verifier is not None and call.name in ("write_file", "edit_file"):

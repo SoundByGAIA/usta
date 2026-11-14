@@ -1,5 +1,14 @@
 # Değişiklik günlüğü
 
+## 0.6.2 — açılış ekranı, "?" balonu, "Sayfaya dön"
+
+Model davranışı DEĞİŞMEDİ. Kullanıcı geri bildirimleri.
+
+- **Açılış ekranı sekmelerde kalmıyordu:** "Ne yapmamı istersin?" ve "Usta işi bitirdi" kartı Ofis, Geçmiş, Sonuç gibi diğer sekmelerde de görünüyordu. Artık yalnız Konuşma sekmesinde görünür; geri dönünce yerindedir.
+- **"?" düğmesi küçüldü ve balon açar:** üzerine gelince ya da klavyeyle odaklanınca açıklama bir balonda çıkar. Tıklayınca balon açık kalır (sayfadan ayrılmaz, yaptığın iş yarıda kalmaz); Esc ya da dışarı tıklama kapatır. Daha fazlası için balondaki "Sözlükte aç" düğmesi vardır.
+- **"Sayfaya dön":** bir bölüm (Sözlük, Ayarlar, Gizlilik...) açıkken menüdeki düğmesi "Sayfaya dön" olur ve **bir önceki yere** döndürür: ana ekrana ya da geldiğin bölüme (ör. Ayarlar → Sözlük → Sayfaya dön → Ayarlar).
+- Sözlükte `find` (tam eşleşme, Türkçe ı/i farkına dayanıklı); testler: her "?" düğmesinin balonu bir terim bulur.
+
 ## 0.6.1 — Windows'ta gerçek denemelerden düzeltmeler
 
 Model davranışı DEĞİŞMEDİ. 0.6.0 ve 0.5.x'in Windows'ta ilk gerçek denemesi (Windows 10, Python 3.14, yetkisiz kullanıcı).

@@ -3,7 +3,7 @@
   "use strict";
   const L = window.UstaLogic;
   const $ = (id) => document.getElementById(id);
-  const state = { token: "", ws: null, task: null, active: false, abort: null, approvals: {}, contextWindow: null, files: [], replay: false, openFile: null, openDirs: new Set(), selDir: "", defaultWs: null, zoom: "auto", fsMode: null };
+  const state = { token: "", ws: null, task: null, active: false, abort: null, approvals: {}, contextWindow: null, files: [], replay: false, openFile: null, openDirs: new Set(), selDir: "", defaultWs: null, zoom: "auto", fsMode: null, tab: "stream", resultOn: false, panelStack: [] };
   const STATUS = {
     running: "çalışıyor", awaiting_approval: "onay bekliyor", cancelling: "durduruluyor",
     done: "bitti", cancelled: "durduruldu", failed: "başarısız",
@@ -136,7 +136,7 @@
   function fillPrompt(text) { const p = $("prompt"); p.value = text; p.focus(); p.setSelectionRange(text.length, text.length); }
   function updateStarters() {
     const box = $("starters");
-    const show = !!state.ws && !state.active && !state.replay && $("stream").children.length === 0 && $("result-card").hidden;
+    const show = !!state.ws && !state.active && !state.replay && state.tab === "stream" && $("stream").children.length === 0 && !state.resultOn;
     box.hidden = !show;
     if (!show || box.dataset.ready) return;
     box.dataset.ready = "1";
@@ -150,11 +150,12 @@
     }
     box.replaceChildren(h("h3", null, "Ne yapmamı istersin?"), h("p", "tip", "Bir örneğe bas ya da aşağıya kendi cümlelerinle yaz. Ne kadar ayrıntı verirsen sonuç o kadar iyi olur."), grid);
   }
-  function hideResult() { $("result-card").hidden = true; }
+  function hideResult() { state.resultOn = false; $("result-card").hidden = true; }
   async function showResult() {
     if (!state.ws || state.replay) return;
     const card = $("result-card");
-    card.hidden = false;
+    state.resultOn = true;
+    card.hidden = state.tab !== "stream";  // başka sekmedeyken görünmez; Konuşma'ya dönünce yeniden görünür
     $("starters").hidden = true;
     let hasIndex = false;
     try {
@@ -306,6 +307,7 @@
     }
   }
   function showTab(name) {
+    state.tab = name;
     $("stream").hidden = name !== "stream";
     $("diff").hidden = name !== "diff";
     $("memory").hidden = name !== "memory";
@@ -317,6 +319,8 @@
     $("tab-file").hidden = !state.openFile && name !== "file";
     for (const t of ["stream", "diff", "memory", "history", "file", "preview", "office"]) $(`tab-${t}`).setAttribute("aria-selected", String(t === name));
     if (window.Office && typeof window.Office.setVisible === "function") window.Office.setVisible(name === "office");
+    $("result-card").hidden = !(state.resultOn && name === "stream");
+    updateStarters();
     if (name === "memory") loadMemory();
     if (name === "history") loadHistory();
     if (name === "preview") loadPreview();
@@ -923,14 +927,22 @@
       return card;
     }));
   }
-  function togglePanel(name) {
-    const open = $(name).hidden;
-    for (const p of ["tools", "apis", "privacy", "wizard", "tablet", "settings", "glossary"]) {
-      $(p).hidden = !(open && p === name);
-      $(`${p}-btn`).setAttribute("aria-pressed", String(open && p === name));
+  let tipFor = null, tipPinned = false, tipTimer = null;  // "?" balonu durumu (aşağıda)
+  const PANELS = ["tools", "apis", "privacy", "wizard", "tablet", "settings", "glossary"];
+  const openPanel = () => PANELS.find((p) => !$(p).hidden) || null;
+  // Açık bölümün düğmesi "Sayfaya dön" olur; basınca BİR ÖNCEKİ yere döner (ana ekran ya da geldiğin bölüm)
+  function showPanel(name) {
+    for (const p of PANELS) {
+      const on = p === name;
+      const btn = $(`${p}-btn`);
+      $(p).hidden = !on;
+      btn.setAttribute("aria-pressed", String(on));
+      if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+      btn.textContent = on ? "Sayfaya dön" : btn.dataset.label;
     }
-    document.querySelector("main").hidden = open;
-    if (!open) return;
+    document.querySelector("main").hidden = !!name;
+    hideGlossTip();
+    if (!name) return;
     if (name === "tools") { toolsMsg(""); loadTools(); loadSkills(); }
     else if (name === "privacy") loadPrivacy();
     else if (name === "wizard") wizShow("wiz-start");
@@ -939,6 +951,13 @@
     else if (name === "glossary") { $("gloss-q").value = ""; renderGlossary(); $("gloss-q").focus(); }
     else { apisMsg(""); loadApis(); }
   }
+  function togglePanel(name) {
+    const current = openPanel();
+    if (current === name) { showPanel(state.panelStack.pop() || null); return; }  // "Sayfaya dön"
+    if (current) state.panelStack.push(current); else state.panelStack = [];
+    showPanel(name);
+  }
+  function closePanels() { state.panelStack = []; showPanel(null); }
   const fmtBytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
   async function loadTablet() {
     const res = await api("/pair", { method: "POST" });
@@ -1448,7 +1467,7 @@
       const b = h("button", "card wiz-choice");
       b.type = "button";
       b.append(h("strong", null, t));
-      b.addEventListener("click", () => { togglePanel("wizard"); $("prompt").value = t; $("prompt").focus(); });
+      b.addEventListener("click", () => { closePanels(); $("prompt").value = t; $("prompt").focus(); });
       return b;
     }));
     box.hidden = false;
@@ -1739,13 +1758,58 @@
   $("wizard-btn").addEventListener("click", () => togglePanel("wizard"));
   $("tablet-btn").addEventListener("click", () => togglePanel("tablet"));
   $("glossary-btn").addEventListener("click", () => togglePanel("glossary"));
-  document.addEventListener("click", (ev) => {
-    const b = ev.target.closest && ev.target.closest("button.q[data-gloss]");
-    if (!b) return;
-    if ($("glossary").hidden) togglePanel("glossary");
-    $("gloss-q").value = b.dataset.gloss;
-    renderGlossary();
+  // --- "?" balonu: üzerine gelince ya da odaklanınca açıklama çıkar; tıklayınca açık kalır (sayfadan ayrılmaz) ---
+  const tipEl = () => $("gloss-tip");
+  function hideGlossTip() {
+    clearTimeout(tipTimer);
+    const el = tipEl();
+    if (el) el.hidden = true;
+    if (tipFor) tipFor.removeAttribute("aria-describedby");
+    tipFor = null; tipPinned = false;
+  }
+  function showGlossTip(btn, pin) {
+    const term = UstaGlossary.find(btn.dataset.gloss);
+    if (!term) return;
+    clearTimeout(tipTimer);
+    if (tipFor && tipFor !== btn) tipFor.removeAttribute("aria-describedby");
+    tipFor = btn; tipPinned = !!pin;
+    const el = tipEl();
+    const open = h("button", null, "Sözlükte aç");
+    open.type = "button";
+    open.addEventListener("click", () => {
+      const q = btn.dataset.gloss;
+      hideGlossTip();
+      if ($("glossary").hidden) togglePanel("glossary");
+      $("gloss-q").value = q; renderGlossary();
+    });
+    el.replaceChildren(h("strong", null, term.term), h("p", null, term.say), h("p", "wiz-note", `Benzetme: ${term.like}`), open);
+    el.hidden = false;
+    btn.setAttribute("aria-describedby", "gloss-tip");
+    const r = btn.getBoundingClientRect();
+    const w = Math.min(320, window.innerWidth - 24);
+    el.style.width = `${w}px`;
+    let left = Math.max(12, Math.min(window.scrollX + r.left + r.width / 2 - w / 2, window.scrollX + window.innerWidth - w - 12));
+    el.style.left = `${left}px`;
+    const below = r.bottom + 8;
+    const fitsBelow = below + el.offsetHeight < window.innerHeight - 8;
+    el.style.top = `${window.scrollY + (fitsBelow ? below : Math.max(8, r.top - 8 - el.offsetHeight))}px`;
+  }
+  const qBtn = (ev) => ev.target.closest && ev.target.closest("button.q[data-gloss]");
+  document.addEventListener("mouseover", (ev) => { const b = qBtn(ev); if (b && !tipPinned) showGlossTip(b, false); });
+  document.addEventListener("mouseout", (ev) => {
+    if (!qBtn(ev) || tipPinned) return;
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => { if (!tipPinned && !tipEl().matches(":hover")) hideGlossTip(); }, 250);  // balona geçmeye zaman tanır
   });
+  tipEl().addEventListener("mouseleave", () => { if (!tipPinned) tipTimer = setTimeout(hideGlossTip, 250); });
+  document.addEventListener("focusin", (ev) => { const b = qBtn(ev); if (b) showGlossTip(b, false); });
+  document.addEventListener("focusout", (ev) => { if (qBtn(ev) && !tipPinned) tipTimer = setTimeout(() => { if (!tipEl().contains(document.activeElement)) hideGlossTip(); }, 150); });
+  document.addEventListener("click", (ev) => {
+    const b = qBtn(ev);
+    if (b) { if (tipFor === b && tipPinned) hideGlossTip(); else showGlossTip(b, true); return; }
+    if (!tipEl().hidden && !tipEl().contains(ev.target)) hideGlossTip();  // dışarı tıklayınca kapanır
+  });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !tipEl().hidden) { const f = tipFor; hideGlossTip(); if (f) f.focus(); } });
   $("gloss-q").addEventListener("input", renderGlossary);
   $("settings-btn").addEventListener("click", () => togglePanel("settings"));
   $("tablet-renew").addEventListener("click", loadTablet);

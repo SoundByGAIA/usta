@@ -69,7 +69,16 @@
     return sorted.filter((t) => rank(t) < 9).sort((a, b) => rank(a) - rank(b));
   }
 
-  const api = { TERMS, search };
+  /** Adı (ya da takma adı) tam tutan terim; yoksa null. Balonlar bununla açıklama bulur. */
+  function find(name, terms) {
+    const fold = (s) => norm(s).replace(/ı/g, "i");  // "API" küçülünce "apı" olur; "api" yazan da bulsun
+    const q = fold(name);
+    if (!q) return null;
+    const list = terms || TERMS;
+    return list.find((t) => fold(t.term) === q) || list.find((t) => fold(t.aka).split(/\s+/).includes(q)) || null;
+  }
+
+  const api = { TERMS, search, find };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.UstaGlossary = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

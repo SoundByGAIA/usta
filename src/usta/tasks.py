@@ -132,6 +132,9 @@ class Task:
         )
         self.plan_of: str | None = None
         self.series: Series | None = None
+        self.design_skill = (
+            False  # kullanıcı "yeni bir iş öğret" dedi: propose_skill aracı bu görevde var
+        )
         self.blocked = False
         self.terminal = ""  # yürütme aşamaları terminal durumu (phases.TERMINALS)
         self.diff_failed = False
@@ -248,6 +251,7 @@ class TaskManager:
         phased: bool = False,
         series: Series | None = None,
         model_prompt: str | None = None,
+        design_skill: bool = False,
     ) -> Task:
         if mode not in MODES:
             raise ValueError(f"geçersiz mod: {mode!r} ({', '.join(MODES)})")
@@ -276,6 +280,9 @@ class TaskManager:
         )
         task.store = self.sessions
         task.model_prompt, task.plan_of, task.series = model_prompt, plan_task, series
+        task.design_skill = (
+            bool(design_skill) and mode != "plan"
+        )  # plan modunda hiçbir yazma/öneri aracı yok
         if not task.root.is_dir():
             raise NotADirectoryError(str(task.root))
         projects.check_root(
@@ -565,6 +572,7 @@ class TaskManager:
                     cancel=task.cancel,
                     allowed_hosts=self.allowed_hosts,
                     task_id=task.id,
+                    skill_design=task.design_skill,
                 ),
                 extra=mcp.tools if mcp else (),
             )

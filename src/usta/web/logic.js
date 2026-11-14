@@ -220,6 +220,7 @@
       case "fetch_url": return `Sayfa okunuyor: ${v(a.url)}`;
       case "web_search": return `İnternette aranıyor: ${v(a.query)}`;
       case "remember": return "Not alınıyor";
+      case "propose_skill": return "Yeni bir beceri tasarlıyor";
       default: return String(tool || "").startsWith("mcp__") ? "Ek araç kullanılıyor" : `Çalışıyor: ${v(tool, 40)}`;
     }
   }

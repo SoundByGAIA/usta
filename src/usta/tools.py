@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from usta import fetch, memory, outline, symbols
+from usta import fetch, memory, outline, skills, symbols
 from usta.models import BAD_ARGS_KEY
 from usta.policy import PathEscapeError, resolve_path
 from usta.sandbox import SandboxConfig, SandboxError, run_command
@@ -31,6 +31,9 @@ class ToolContext:
         False  # deneysel: find_symbol / symbol_context / related_files (Tree-sitter indeksi)
     )
     context_budget: int = 6000  # symbol_context çıktısı için karakter bütçesi (expand ile 3 kat)
+    skill_design: bool = (
+        False  # kullanıcı "yeni bir iş öğret" dedi: propose_skill aracı bu görevde var
+    )
 
 
 @dataclass(frozen=True)
@@ -275,6 +278,16 @@ def build_registry(ctx: ToolContext, extra: list[Tool] | tuple[Tool, ...] = ()) 
         except fetch.FetchError as e:
             raise ToolError(str(e)) from e
 
+    def propose_skill(a: dict) -> str:
+        try:  # yan etkisiz: yalnız doğrular; kaydı kullanıcı onaylar (portal öneri kartı)
+            d = skills.validate_proposal(a.get("name"), a.get("description"), a.get("instructions"))
+        except skills.SkillError as e:
+            raise ToolError(str(e)) from None
+        return (
+            f"Öneri kullanıcıya gösterildi: /{d['name']}. Kullanıcı okuyup onaylarsa kaydedilir; "
+            "sen bir şey kaydetmedin. Kullanıcıya önerinin ne işe yaradığını bir cümleyle anlat."
+        )
+
     def remember(a: dict) -> str:
         try:
             memory.add_note(
@@ -374,6 +387,24 @@ def build_registry(ctx: ToolContext, extra: list[Tool] | tuple[Tool, ...] = ()) 
                 "komutlar, kararlar, tercihler. Sonraki görevlerde veri olarak görünür.",
                 _schema(text="Not metni"),
                 remember,
+            ),
+            *(
+                [
+                    Tool(
+                        "propose_skill",
+                        "Kullanıcıya YENİ BİR BECERİ ÖNERİR. Hiçbir şey kaydetmez: kullanıcı metni okur ve kendisi onaylarsa kaydedilir. "
+                        "Beceri yalnız yazılı yönergedir (kod ya da izin değildir). Adı kısa ve küçük harfli olsun; yönerge düz, "
+                        "adım adım ve en çok 4000 karakter; bağlantı, komut, gizli bilgi ya da 'onay gerekmez' gibi ifadeler YAZMA.",
+                        _schema(
+                            name="Kısa ad (küçük harf/rakam/-/_)",
+                            description="Tek satırlık açıklama",
+                            instructions="Becerinin tam yönergesi (düz Türkçe, adım adım)",
+                        ),
+                        propose_skill,
+                    )
+                ]
+                if ctx.skill_design
+                else []
             ),
             Tool(
                 "run",

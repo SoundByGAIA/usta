@@ -194,6 +194,12 @@
       <div class="row"><button id="kisi-save" class="primary" type="button">Kaydet</button><button id="kisi-clear" type="button">Hepsini sil</button></div>
       <p id="kisi-msg" class="wiz-note" role="status"></p>
     </div>
+    <h3 class="set-group">Becerilerim</h3>
+    <div class="set-row" id="set-skills">
+      <p class="wiz-note">Beceri, Usta'ya öğrettiğin bir işin yazılı tarifidir (ör. "haftalık raporu hep şu düzende yaz"). Usta senin için bir tane tasarlayabilir; sen okuyup onaylamadan hiçbir şey kaydedilmez. Beceriler kendiliğinden çalışmaz: yalnız sen "Kullan"a basınca ya da <code>/beceri-adı</code> yazınca devreye girer.</p>
+      <ul id="my-skills" class="kisi-liste"></ul>
+      <div class="row"><button id="skill-design" class="primary" type="button">Usta'ya yeni bir iş öğret</button></div>
+    </div>
     <h3 class="set-group">Evdeki ortak hafıza</h3>
     <div class="set-row" id="set-ortak">
       <p class="wiz-note">Evde birden çok bilgisayarın varsa, "Seni tanıyayım" bilgilerin ve ortak notlar hepsinde aynı olur. Bir bilgisayar bunları tutar (ev sahibi), diğerleri ona bağlanır. Bağlantı yalnız evdeki ağda çalışır. İstekler imzalıdır ama şifrelenmez; yalnız güvendiğin ev ağında kullan. Ortak hafızaya yalnız sen yazarsın, Usta yazamaz.</p>
@@ -432,6 +438,7 @@
         <span id="replay-text"></span>
         <button id="replay-close" type="button">Yeni göreve dön</button>
       </div>
+      <p id="design-note" class="note design-note" hidden>Beceri tasarlama açık: Usta yazdığın isteğe göre bir beceri önerecek. Sen okuyup onaylamadan kaydedilmez. <button id="design-off" type="button">Vazgeç</button></p>
       <div id="starters" class="starters" hidden></div>
       <div id="stream" aria-live="polite"></div>
       <div id="result-card" class="card result-card" hidden>

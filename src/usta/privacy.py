@@ -16,6 +16,7 @@ LOCAL, LAN, INTERNET = "bu-bilgisayar", "yerel-ağ", "internet"
 FILES = {
     "config.json": "ayarların (tema, mod, model, düşünme, bağlam); sır içermez",
     "apis.json": "bağladığın API'ler ve anahtarları; yalnız sen okuyabilirsin",
+    "skills": "Usta'ya öğrettiğin beceriler (yazılı tarifler); senin onayınla kaydedilir, kendiliğinden çalışmaz",
     "kisi.json": "senin yazdığın tanışma bilgileri (ad, anlatım biçimi, notların); her görevde yapay zekâya gönderilir",
     "ortak": "evdeki ortak hafıza (ev sahibiysen): ortak notlar ve eşleşmiş bilgisayarların anahtarları",
     "ortak-baglanti.json": "bir ev sahibine bağlıysan: onun adresi ve ortak anahtarın; yalnız sen okuyabilirsin",

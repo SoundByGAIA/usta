@@ -260,3 +260,7 @@ test("sözlük: index.html'deki her ? düğmesinin balonu bir terim bulur", () =
   assert.ok(used.length > 3);
   for (const name of used) assert.ok(G.find(name), `balon açıklaması yok: ${name}`);
 });
+
+test("plainProgress: beceri önerisi düz Türkçe", () => {
+  assert.equal(L.plainProgress("propose_skill", { name: "x" }), "Yeni bir beceri tasarlıyor");
+});

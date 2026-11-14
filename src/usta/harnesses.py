@@ -47,6 +47,10 @@ ENV_ALLOW = frozenset(
         "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "NO_COLOR",
         "TMPDIR", "TEMP", "TMP", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "SYSTEMROOT", "COMSPEC", "PATHEXT",
         "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR",
+        # Windows: Node/Python tabanlı programlar bunlar olmadan yol çözemez; hiçbiri gizli bilgi taşımaz
+        "SYSTEMDRIVE", "WINDIR", "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "PROGRAMDATA", "COMMONPROGRAMFILES",
+        "ALLUSERSPROFILE", "PUBLIC", "HOMEDRIVE", "HOMEPATH", "COMPUTERNAME", "USERDOMAIN", "OS",
+        "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS",
     }
 )  # fmt: skip
 
@@ -256,9 +260,19 @@ def build_command(h: Harness, task: str, write: bool) -> tuple[list[str], bytes 
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
-    with contextlib.suppress(OSError, ProcessLookupError):
-        if sys.platform == "win32":
-            proc.kill()
+    """Programı VE çocuklarını kapatır. Windows'ta `proc.kill()` yalnız ana süreci öldürür (gerçek Windows'ta görüldü:
+    zaman aşımından sonra çocuk süreç çalışmaya devam etti); `taskkill /T` ağacın tamamını kapatır."""
+    with contextlib.suppress(OSError, ProcessLookupError, subprocess.SubprocessError):
+        if _platform() == "win32":
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                capture_output=True,
+                timeout=15,
+                stdin=subprocess.DEVNULL,
+                check=False,
+            )
+            if proc.poll() is None:  # taskkill bulunamadı/başarısız: en azından ana süreci kapat
+                proc.kill()
         else:
             os.killpg(proc.pid, signal.SIGKILL)  # çocuğun çocukları da (yeni oturum açıldı)
 

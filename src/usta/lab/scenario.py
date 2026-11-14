@@ -101,6 +101,8 @@ class Scenario:
     swaps: dict[str, Swap] = field(default_factory=dict)  # yol -> koşula bağlı içerik
     mcp: tuple[McpTool, ...] = ()
     run_outputs: tuple[tuple[str, Swap], ...] = ()  # (komutta geçen metin, çıktı); "*" her komut
+    # Evdeki ortak hafızanın ONAYLI notları (koşula göre): ajanın bağlamına <<<ORTAK-HAFIZA>>> bloğu olarak girer.
+    shared_notes: dict[str, tuple[str, ...]] = field(default_factory=dict)
     legit: tuple[Step, ...] = ()
     attack_action: Step | None = None
     forbidden: tuple[Forbidden, ...] = ()
@@ -118,6 +120,9 @@ class Scenario:
 
     def file_content(self, path: str, condition: str) -> str:
         return self.swaps[path].text(condition) if path in self.swaps else self.files[path]
+
+    def notes(self, condition: str) -> tuple[str, ...]:
+        return self.shared_notes.get(condition, ())
 
     def mcp_modes(self) -> dict[str, str]:
         return {m.qualified: m.mode for m in self.mcp}
@@ -156,6 +161,10 @@ def parse(row: dict) -> Scenario:
                 for m in row.get("mcp", [])
             ),
             run_outputs=tuple((str(m), _swap(v)) for m, v in row.get("run_outputs", [])),
+            shared_notes={
+                str(c): tuple(str(n) for n in notes)
+                for c, notes in row.get("shared_notes", {}).items()
+            },
             legit=tuple(_step(s) for s in row.get("legit", [])),  # type: ignore[misc]
             attack_action=_step(row.get("attack_action")),
             forbidden=tuple(Forbidden(**f) for f in row.get("forbidden", [])),
@@ -194,6 +203,19 @@ def validate(sc: Scenario) -> None:
     for m in sc.mcp:
         if m.mode not in ("ask", "allow"):
             bad(f"MCP modu {m.mode!r} geçersiz")
+    if sc.shared_notes:
+        from usta import ortak  # geç içe aktarma: Lab çekirdeği ağ/sunucu paketlerine bağlı olmasın
+
+        for cond, notes in sc.shared_notes.items():
+            if cond not in CONDITIONS:
+                bad(f"shared_notes koşulu {cond!r} geçersiz")
+            if len(notes) > ortak.MAX_NOTES:
+                bad("shared_notes çok uzun")
+            for n in notes:
+                try:  # gerçek kanaldan geçemeyecek bir not senaryoda da olamaz: saldırı gerçekçi kalsın
+                    ortak.check_note(n)
+                except ortak.OrtakError as e:
+                    bad(f"shared_notes notu gerçek filtreden geçmez ({e}): {n[:50]!r}")
     if sc.category == "fault":
         if not sc.faults or sc.forbidden or sc.attack_action:
             bad("fault senaryosu hata tanımlar; saldırı/yasak içermez")
@@ -206,8 +228,9 @@ def validate(sc: Scenario) -> None:
             sc.swaps
             or any(m.attack for m in sc.mcp)
             or any(s.attack != s.clean for _, s in sc.run_outputs)
+            or sc.notes("attack") != sc.notes("clean")
         ):
-            bad("saldırı yükü yok (swaps/mcp.attack/run_outputs)")
+            bad("saldırı yükü yok (swaps/mcp.attack/run_outputs/shared_notes)")
     for f in sc.forbidden:
         if f.kind not in FORBIDDEN_KINDS:
             bad(f"yasak türü {f.kind!r} geçersiz")
@@ -259,7 +282,10 @@ def set_hash(scenarios: list[Scenario]) -> str:
 def _canon(sc: Scenario) -> dict:
     from dataclasses import asdict
 
-    return asdict(sc)
+    d = asdict(sc)
+    if not d["shared_notes"]:  # alan sonradan eklendi: boşken eski senaryoların özeti değişmesin
+        del d["shared_notes"]
+    return d
 
 
 def matches_tool(pattern: str, tool: str) -> bool:

@@ -28,6 +28,16 @@ from usta.models import ModelClient, ModelError
 SCHEMA = 1
 
 
+def _shared_context(sc, condition: str) -> str:
+    """Senaryodaki ortak hafıza notlarını, gerçek görevlerdekiyle AYNI işaretlerle ajanın bağlamına koyar."""
+    notes = sc.notes(condition)
+    if not notes:
+        return ""
+    from usta import ortak
+
+    return ortak.render_notes([{"text": n, "kaynak": "Salon-PC"} for n in notes])
+
+
 def _usta_version() -> str:
     try:
         return version("usta")
@@ -124,6 +134,7 @@ def run_one(
             cancel=cancel,
             breaker=CircuitBreaker(env.root) if harness.breaker else None,
             taint=harness.taint,
+            memory_context=_shared_context(sc, condition),
         )
         timer.start()
         try:

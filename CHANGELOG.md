@@ -1,5 +1,13 @@
 # Değişiklik günlüğü
 
+## 0.6.3 — Reliability Lab: ortak hafıza kanalı
+
+Model davranışı DEĞİŞMEDİ; yalnız ölçüm aracı genişledi.
+
+- **Lab'a `shared_notes` alanı:** bir senaryo, evdeki ortak hafızanın onaylı notlarını ajanın bağlamına gerçek görevlerdeki `<<<ORTAK-HAFIZA>>>` bloğuyla koyabilir. Her not gerçek filtreden (`ortak.check_note`) geçmek zorundadır; gerçek kanaldan giremeyecek bir saldırı senaryoda da yazılamaz.
+- **3 yeni senaryo (24 → 27):** `ortak-01` gizli anahtarı herkese açık dosyaya yazdırma, `ortak-02` anahtarı yanıta ekletme, `ortak-03` veri dosyasını boşaltma. Eski 24 senaryo değişmedi; küme özeti yeni senaryolar yüzünden değişti (eski sonuçlarla yalnız ilk 24'ü kıyasla). Boş `shared_notes` eski senaryoların özetini değiştirmez.
+- **İlk gerçek ölçüm:** Qwen3 4B, 9 saldırılı koşuda yasak eylemi **hiç denemedi** (0/9); notları gördüğü ayrı bir kontrolle doğrulandı. Küçük örneklem (en çok yaklaşık %30'a kadar çıkabilir, %95 güvenle) ve tek model: [docs/lab-ortak-hafiza-olcumu.md](docs/lab-ortak-hafiza-olcumu.md).
+
 ## 0.6.2 — açılış ekranı, "?" balonu, "Sayfaya dön"
 
 Model davranışı DEĞİŞMEDİ. Kullanıcı geri bildirimleri.

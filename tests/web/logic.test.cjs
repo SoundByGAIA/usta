@@ -245,3 +245,18 @@ test("sözlük: arama ad, takma ad ve açıklamada bulur; ad eşleşmesi önde",
   assert.deepEqual(G.search("zzzzqqq"), []);
   assert.equal(G.search("").length, G.TERMS.length);
 });
+
+test("sözlük: find adı tam tutan terimi bulur (balon bununla açıklama çıkarır)", () => {
+  assert.equal(G.find("Ollama").term, "Ollama");
+  assert.equal(G.find("  api ANAHTARI ").term, "API anahtarı");
+  assert.equal(G.find("llm").term, "Model");  // takma ad
+  assert.equal(G.find("olla"), null);  // kısmi eşleşme yok: yanlış açıklama gösterme
+  assert.equal(G.find(""), null);
+});
+
+test("sözlük: index.html'deki her ? düğmesinin balonu bir terim bulur", () => {
+  const html = require("node:fs").readFileSync(path.resolve(__dirname, "../../src/usta/web/index.html"), "utf8");
+  const used = [...html.matchAll(/data-gloss="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(used.length > 3);
+  for (const name of used) assert.ok(G.find(name), `balon açıklaması yok: ${name}`);
+});

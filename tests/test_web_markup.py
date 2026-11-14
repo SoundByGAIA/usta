@@ -65,3 +65,13 @@ def test_jargon_is_hidden_in_the_simple_view():
     html = INDEX.read_text(encoding="utf-8")
     for jargon in ('id="tokens" class="tokens adv"', 'id="ws-title" class="adv"'):
         assert jargon in html
+
+
+def test_glossary_balloon_and_back_button_markup():
+    html = INDEX.read_text(encoding="utf-8")
+    assert 'id="gloss-tip"' in html and 'role="tooltip"' in html  # "?" balonu
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    assert '"Sayfaya dön"' in js  # açık bölümün düğmesi geri dönüş düğmesi olur
+    # "?" artık sözlük sayfasına atlamaz: balon açar, sayfa değişmez (sözlüğe ancak balondaki düğmeyle gidilir)
+    click = js[js.index("const b = qBtn(ev);") :][:200]
+    assert "showGlossTip" in click and 'togglePanel("glossary")' not in click

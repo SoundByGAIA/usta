@@ -205,7 +205,13 @@ def run_one(
         "artifact_refs": [f"traces/{run_id}.json"],
     }
     trace = mask_deep(
-        {"run_id": run_id, "answer": answer[:2000], "calls": calls, "detail": outcome.detail}
+        {
+            "run_id": run_id,
+            "answer": answer[:2000],
+            "calls": calls,
+            "detail": outcome.detail,
+            "finish_check": list(agent._finish.fired) if agent._finish is not None else [],
+        }
     )
     if out_dir is not None:
         d = Path(out_dir) / "traces"

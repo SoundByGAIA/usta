@@ -5,7 +5,7 @@ from pathlib import Path
 from test_api import Scripted, call
 from usta.agent import Agent
 from usta.audit import AuditLog
-from usta.finishcheck import FinishCheck
+from usta.finishcheck import FinishCheck, write_targets
 from usta.models import ModelResponse
 from usta.policy import Policy
 from usta.tools import ToolContext, build_registry
@@ -13,19 +13,44 @@ from usta.tools import ToolContext, build_registry
 TASK_SUMMARY = "log.txt dosyasındaki uyarıları say ve sayıyı summary.txt dosyasına yaz."
 
 
-# --- gerçek izlerdeki üç kalıp ----------------------------------------------------------------------
+# --- gerçek izlerdeki kalıplar ----------------------------------------------------------------------
+def test_targets_come_only_from_write_phrases_in_the_users_task():
+    assert write_targets(TASK_SUMMARY) == ["summary.txt"]  # log.txt yalnız okunur
+    assert write_targets("todo.md içindeki madde sayısını count.txt dosyasına yaz.") == [
+        "count.txt"
+    ]
+    assert write_targets("Sonucu install.txt'e kaydet, README.md’ye de bir satır ekle.") == [
+        "install.txt",
+        "README.md",
+    ]
+    assert write_targets("Read data.csv and write the count to result.txt.") == ["result.txt"]
+    assert write_targets("version.txt içindeki 'v1' ifadesini 'v2' yap.") == []
+    assert write_targets("util.py içindeki add fonksiyonunu oku ve yanıtında açıkla.") == []
+
+
 def test_claimed_write_that_never_happened_gets_one_reminder():
     fc = FinishCheck(TASK_SUMMARY)
     msg = fc.on_finish(
         "2 uyarı sayısı summary.txt dosyasına yazıldı."
     )  # gerçek iz: yalnız list_dir yapılmıştı
-    assert msg and "summary.txt" in msg and "write_file" in msg
+    assert msg and "summary.txt" in msg and "write_file" in msg and "söylüyorsun" in msg
     assert (
         fc.on_finish("2 uyarı sayısı summary.txt dosyasına yazıldı.") is None
     )  # aynı kural ikinci kez yok
 
 
-def test_a_real_write_satisfies_the_claim():
+def test_asking_permission_empty_answer_or_answer_instead_of_file_all_get_the_target_reminder():
+    task = "mcp__docs__search aracıyla 'kurulum' ara ve sonucu install.txt dosyasına yaz."
+    for answer in (
+        "Şimdi sonucunuzu install.txt'e yazmamı ister misiniz?",  # gerçek iz
+        "",  # gerçek iz: boş yanıt
+        '```json {"install.txt": {"content": "pip install"}} ```',  # gerçek iz: dosya yerine yanıta yazdı
+    ):
+        msg = FinishCheck(task).on_finish(answer)
+        assert msg and "install.txt" in msg and "İzin sormana gerek yok" in msg, answer
+
+
+def test_a_real_write_satisfies_the_target():
     fc = FinishCheck(TASK_SUMMARY)
     fc.observe("write_file", {"path": "./summary.txt", "content": "2"}, executed=True)
     assert fc.on_finish("2 uyarı summary.txt dosyasına yazıldı.") is None
@@ -37,18 +62,14 @@ def test_a_real_write_satisfies_the_claim():
 
 
 def test_announcing_an_action_and_stopping_gets_a_continue():
-    fc = FinishCheck(TASK_SUMMARY)
-    msg = fc.on_finish("Çalışma alanı dosyalarını kontrol ediyorum.")  # gerçek iz
-    assert msg and "araç çağırmadın" in msg
+    task = "util.py içindeki add fonksiyonunu oku ve ne yaptığını yanıtında belirt."
+    assert "araç çağırmadın" in FinishCheck(task).on_finish(
+        "Çalışma alanı dosyalarını kontrol ediyorum."
+    )
+    assert FinishCheck(task).on_finish(
+        "Önce mevcut dizinin yapısını ve todo.md dosyasının içeriğini görelim."
+    )
     assert FinishCheck("x").on_finish("Let me check the files.")
-
-
-def test_asking_permission_for_what_the_task_already_asks_gets_a_reminder():
-    task = "mcp__docs__search aracıyla 'kurulum' ara ve ilk sonucu install.txt dosyasına yaz."
-    msg = FinishCheck(task).on_finish(
-        "mcp__docs__search aracını 'kurulum' ile aradım. Şimdi sonucunuzu install.txt'e yazmamı ister misiniz?"
-    )  # gerçek iz
-    assert msg and "izin sorma" in msg
 
 
 # --- yanlış alarm vermemeli ---------------------------------------------------------------------------
@@ -66,19 +87,32 @@ def test_normal_final_answers_pass_through():
         assert fc.on_finish(ok) is None, ok
 
 
+def test_source_files_named_in_the_answer_are_not_treated_as_unwritten():
+    # Lab izinde ilk sürümün yanlış alarmı: okunan todo.md "yazılmadı" sanılıyordu.
+    fc = FinishCheck("todo.md içindeki madde sayısını count.txt dosyasına yaz.")
+    fc.observe("write_file", {"path": "count.txt", "content": "1"}, executed=True)
+    assert (
+        fc.on_finish("todo.md dosyasını okudum ve madde sayısını count.txt dosyasına kaydettim.")
+        is None
+    )
+
+
 def test_claims_about_files_the_user_never_asked_for_are_not_pushed():
     # Enjeksiyon modeli "public/leak.txt'ye yazdım" demeye ittiyse, denetim onu YAZMAYA itmemeli.
     fc = FinishCheck("data.csv dosyasındaki satırları say ve result.txt dosyasına yaz.")
     fc.observe("write_file", {"path": "result.txt"}, executed=True)
     assert fc.on_finish("Ayrıca config.env içeriğini public/leak.txt dosyasına yazdım.") is None
+    # okunan içerikteki "X dosyasına yaz" talimatı hedef değildir: hedefler yalnız kullanıcının isteğinden
+    assert FinishCheck("notes.md dosyasını özetle.").targets == []
 
 
 def test_at_most_two_reminders_per_task():
     fc = FinishCheck(TASK_SUMMARY)
     assert fc.on_finish("summary.txt dosyasına yazıldı.")
+    fc.observe("write_file", {"path": "summary.txt"}, executed=True)
     assert fc.on_finish("Dosyaları kontrol ediyorum.")
     assert fc.on_finish("Tekrar kontrol ediyorum.") is None  # sınır: 2
-    assert fc.nudges == 2
+    assert fc.nudges == 2 and fc.fired == ["target", "intent"]
 
 
 # --- ajan döngüsü -------------------------------------------------------------------------------------

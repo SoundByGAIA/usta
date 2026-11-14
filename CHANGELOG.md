@@ -1,5 +1,14 @@
 # Değişiklik günlüğü
 
+## 0.8.1 — Windows'ta orkestra şefi: süreç ağacı düzeltmesi
+
+Model davranışı DEĞİŞMEDİ. 0.8.0'ın başka programları çağırma özelliğinin ilk gerçek Windows denemesi (Windows 10, Python 3.14, yetkisiz kullanıcının kendi oturumu; programlar yerine sahte `.cmd` sarmalayıcılar).
+
+- **Düzeltilen hata:** Windows'ta zaman aşımı/iptal/çıktı sınırında yalnız ana program kapanıyordu, **çocuk süreçleri çalışmaya devam ediyordu** (Linux'ta süreç grubu öldürülüyordu, Windows kolunda yalnız `proc.kill()` vardı). Artık `taskkill /T /F` ile ağacın tamamı kapatılır; `taskkill` yoksa ana süreç kapatılır ve hata dışarı sızmaz. Gerçek Windows'ta doğrulandı (çocuk süreç 4,8 sn'de öldü).
+- **Ortam izin listesi:** Windows programlarının yol çözmek için ihtiyaç duyduğu, gizli bilgi taşımayan değişkenler eklendi (`WINDIR`, `PROGRAMFILES`, `PROGRAMDATA`, `HOMEDRIVE`, `COMPUTERNAME` vb.); testle "anahtar/jeton/USTA içeren ad yok" denetlenir.
+- **Windows'ta doğrulananlar:** `.cmd` sarmalayıcı üzerinden istemin stdin ile aynen gitmesi (Türkçe karakterler ve `& | < > " % ^ !` dahil), yalnız okuma bayrakları, çalışma klasörü, Usta'nın anahtarlarının çocuğa geçmemesi, `USTA_DELEGATED`, büyük çıktının kesilmesi, hata kodu ve anahtar maskeleme, argümanla istem alan programların (OpenCode, Hermes) reddi.
+- **Denenmedi:** Windows'ta gerçek bir harness (orada kurulu değil; girişleri yapılamadı).
+
 ## 0.8.0 — Usta orkestra şefi: başka yapay zekâ programlarını yardıma çağırır (sen onaylarsan)
 
 Model davranışı DEĞİŞMEDİ (araç yalnız sen bir programı AÇTIYSAN göreve eklenir). Tasarım, tehdit tablosu ve gerçek denemeler: [docs/c-orkestra-tasarim.md](docs/c-orkestra-tasarim.md).

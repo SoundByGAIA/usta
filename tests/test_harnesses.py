@@ -523,3 +523,79 @@ def test_agent_passes_that_warning_to_the_approver_only_for_a_write_delegate(pat
     agent.run("dosyayı oku")
     assert [(a[0], a[1]) for a in asked] == [("delegate", False), ("delegate", True)]
     assert asked[0][2] == "" and "yazma izni" in asked[1][2]
+
+
+# --- Windows: süreç ağacı (gerçek Windows'ta bulunan hata) ------------------------------------------------
+def test_windows_kills_the_whole_process_tree_with_taskkill(monkeypatch):
+    calls = []
+
+    class FakeProc:
+        pid = 4242
+
+        def poll(self):
+            return 0  # taskkill işini yaptı: ek kill gerekmez
+
+        def kill(self):
+            calls.append("proc.kill")
+
+    monkeypatch.setattr(harnesses, "_platform", lambda: "win32")
+    monkeypatch.setattr(harnesses.subprocess, "run", lambda argv, **kw: calls.append(argv))
+    harnesses._kill_tree(FakeProc())
+    assert calls == [
+        ["taskkill", "/PID", "4242", "/T", "/F"]
+    ]  # /T: çocuklar da, /F: zorla; yalnız sayısal pid
+
+
+def test_windows_falls_back_to_killing_the_parent_when_the_process_survives_taskkill(monkeypatch):
+    calls = []
+
+    class FakeProc:
+        pid = 7
+
+        def poll(self):
+            return None  # taskkill döndü ama süreç hâlâ yaşıyor
+
+        def kill(self):
+            calls.append("proc.kill")
+
+    monkeypatch.setattr(harnesses, "_platform", lambda: "win32")
+    monkeypatch.setattr(harnesses.subprocess, "run", lambda argv, **kw: calls.append("taskkill"))
+    harnesses._kill_tree(FakeProc())
+    assert calls == ["taskkill", "proc.kill"]
+
+
+def test_a_missing_taskkill_never_leaks_an_error(monkeypatch):
+    class FakeProc:
+        pid = 7
+
+        def poll(self):
+            return None
+
+        def kill(self):
+            raise AssertionError("taskkill hatası sonrası buraya gelinmez: hata bastırılır")
+
+    def boom(argv, **kw):
+        raise OSError("taskkill yok")
+
+    monkeypatch.setattr(harnesses, "_platform", lambda: "win32")
+    monkeypatch.setattr(harnesses.subprocess, "run", boom)
+    harnesses._kill_tree(FakeProc())  # istisna dışarı sızmaz
+
+
+def test_env_allowlist_has_the_windows_basics_and_no_secrets():
+    for need in (
+        "SYSTEMROOT",
+        "COMSPEC",
+        "PATHEXT",
+        "WINDIR",
+        "PROGRAMFILES",
+        "USERPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
+    ):
+        assert need in harnesses.ENV_ALLOW
+    assert not any(
+        bad in k
+        for k in harnesses.ENV_ALLOW
+        for bad in ("KEY", "TOKEN", "SECRET", "PASSWORD", "AUTH", "USTA")
+    )

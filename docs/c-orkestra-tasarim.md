@@ -102,4 +102,6 @@ Argümanla istem alan programlar (OpenCode, Hermes) Windows'ta **desteklenmez**:
 - **DeepSeek Harness (0.2.2-rc.1):** kuruldu ama **Node.js 24.9 ve üstünü ister** (`engines`); bu bilgisayarda 22.17 var ve program **hata vermeden sessizce çıkıyor.** Usta bunu artık önceden bilir: Ayarlar "Node.js 24.9 ya da daha yenisi gerekli (sende 22.17)" der ve açılmasına izin vermez. DeepSeek anahtarı olmadığı için gerçek cevap alınamadı; komut biçimi yalnız belgeden doğrulandı.
 - İlk kurulum notu: bu programlardan Hermes ve OpenCode'un kurulumu yavaş bağlantıda (saniyede ~100 KB) onlarca dakika sürdü.
 
-**Denenmedi:** Windows'ta herhangi bir delege; DSH ile gerçek cevap; yazma kipi (`write=true`) gerçek programlarla.
+**Windows (0.8.1):** sahte `.cmd` programlarla gerçek Windows 10'da denendi (stdin/Türkçe/ortam/cwd/zaman aşımı/çıktı sınırı/hata); **bulunan hata:** zaman aşımında çocuk süreçler kalıyordu, `taskkill /T` ile düzeltildi.
+
+**Denenmedi:** Windows'ta gerçek bir harness; DSH ile gerçek cevap; yazma kipi (`write=true`) gerçek programlarla.

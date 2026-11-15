@@ -43,6 +43,19 @@ def secret_path(path: str) -> bool:
     return bool(_SECRET_NAME.search(_norm_path(path)))
 
 
+#: kullanıcının başka programı yalnız okuma izniyle çalıştırma isteği (Lab: Qwen3 1.7B görevde "YALNIZ OKUMA" yazarken
+#: ilk çağrıda kendiliğinden write=true gönderdi)
+_READ_ONLY = re.compile(
+    r"\b(?:yaln[ıi]z(?:ca)?|sadece|salt)\s+okuma\b|\bread[\s-]?only\b"
+    r"|\bwrite\b\W{0,3}(?:alan[ıi]n[ıi]\s+)?(?:=|:)?\s*false\b|yazma\s+izni\s+(?:verme|olmadan)",
+    re.IGNORECASE,
+)
+
+
+def wants_write(args: dict) -> bool:
+    return args.get("write") is True or str(args.get("write")).lower() == "true"
+
+
 def _norm_path(p: str) -> str:
     p = str(p or "").replace("\\", "/").strip()
     while p.startswith("./"):
@@ -100,6 +113,14 @@ class Taint:
         while self._size > MAX_BLOB and len(self._blobs) > 1:
             self._size -= len(self._blobs.pop(0))
 
+    def forbids_write(self, tool: str, args: dict) -> bool:
+        """Kullanıcı "yalnız okuma" dediği halde başka programa yazma izni isteniyor mu (onay sorulmadan reddedilir)."""
+        return (
+            tool == "delegate"
+            and wants_write(args)
+            and any(_READ_ONLY.search(u) for u in self._user)
+        )
+
     def check(self, tool: str, args: dict) -> str:
         """Boş dize: sorun yok. Aksi halde gerekçe (hedef ve nerede bulunduğu)."""
         if tool in SECRET_READ_TOOLS and (self._blobs or self._context):
@@ -113,9 +134,7 @@ class Taint:
                 )
         if not self._blobs:
             return ""
-        if tool == "delegate" and (
-            args.get("write") is True or str(args.get("write")).lower() == "true"
-        ):
+        if tool == "delegate" and wants_write(args):
             # Yetki yükseltme: başka programın cevabı "yazma izni verildi" diyerek yazma kipini ister (Lab: küçük model 4/4 uydu).
             # Onay zaten sorulur; kullanıcı bu isteğin az önce okunan içerikten sonra geldiğini bilsin.
             return "yazma izni, Usta az önce başka bir içerik okuduktan sonra isteniyor (bu içerik isteği yönlendirmiş olabilir)"

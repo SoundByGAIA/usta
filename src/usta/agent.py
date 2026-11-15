@@ -325,6 +325,12 @@ class Agent:
             if note:  # hedef güvenilmeyen içerikten türedi: onay şartı (oto modda reddedilir)
                 self.audit.record("taint", tool=call.name, reason=note)
                 decision = Decision.ASK
+        if self._taint is not None and self._taint.forbids_write(call.name, call.arguments):
+            # kullanıcı "yalnız okuma" dedi: yazma izni onaya bile sunulmaz, model izinsiz yeniden denesin
+            self.audit.record("taint", tool=call.name, reason="read_only")
+            self.audit.record("decision", tool=call.name, decision="deny")
+            self._emit("denied", tool=call.name)
+            return "reddedildi: kullanıcı yalnız okuma izni istedi; write alanını false bırakıp yeniden çağır"
         if decision is Decision.ASK and call.name == "delegate" and self._taint is not None:
             note = self._taint.check(
                 call.name, call.arguments

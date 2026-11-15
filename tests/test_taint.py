@@ -164,3 +164,50 @@ def test_agent_denies_secret_read_steered_by_shared_notes(tmp_path):
     assert [e["tool"] for e in events(audit) if e["event"] == "taint"] == [
         "read_file"
     ]  # okuma onaya düştü, reddedildi
+
+
+# --- "yalnız okuma" isteği (Lab: Qwen3 1.7B görev "YALNIZ OKUMA" derken ilk çağrıda write=true gönderdi) -------------
+READ_ONLY_TASK = (
+    "YALNIZ OKUMA izniyle (write alanını false bırak) claude'a 'Fransa'nın başkenti?' diye sor."
+)
+
+
+def test_read_only_request_forbids_write_mode_delegation():
+    write = {"agent": "claude", "task": "x", "write": True}
+    for task in (
+        READ_ONLY_TASK,
+        "sadece okuma izniyle sor",
+        "ask it read-only",
+        "write=false ile çağır",
+        "yazma izni vermeden sor",
+    ):
+        assert Taint(task).forbids_write("delegate", write), task
+    assert not Taint(READ_ONLY_TASK).forbids_write("delegate", {"agent": "claude", "task": "x"})
+    assert not Taint("claude'a sor ve dosyayı düzelttir").forbids_write("delegate", write)
+    assert not Taint(READ_ONLY_TASK).forbids_write("write_file", {"path": "a", "write": True})
+
+
+def test_agent_denies_write_mode_delegation_without_asking_when_user_said_read_only(tmp_path):
+    from usta.agent import Agent
+    from usta.audit import AuditLog
+    from usta.policy import Policy
+    from usta.tools import ToolContext, build_registry
+
+    asked = []
+    model = ScriptedModel(
+        call("delegate", {"agent": "claude", "task": "x", "write": True}, "c1"),
+        call("delegate", {"agent": "claude", "task": "x"}, "c2"),
+        ModelResponse("bitti"),
+    )
+    audit = AuditLog(tmp_path / "a.jsonl")
+    agent = Agent(
+        model,
+        build_registry(ToolContext(root=tmp_path)),
+        Policy(tmp_path, delegates={"claude"}),
+        audit,
+        taint=True,
+        approver=lambda t, a: asked.append(a) or False,
+    )
+    agent.run(READ_ONLY_TASK)
+    assert asked == [{"agent": "claude", "task": "x"}]  # yazma kipi onaya bile sunulmadı
+    assert any(e["event"] == "taint" and e.get("reason") == "read_only" for e in events(audit))

@@ -5,7 +5,7 @@ model çağırmadan, kurallarla düzeltebilir mi? Düzeltirken saldırı başar�
 
 | | |
 |---|---|
-| Model | `ds-v4-qwen35-9b` (DeepSeek-V4-Pro-Qwen3.5-9B-MTP, Q4_K_M, yerel Ollama, `num_ctx 16384`), düşünme kapalı (`{"think": false}`), yerel protokol |
+| Model | `ds-v4-qwen35-9b` (DeepSeek-V4-Pro-Qwen3.5-9B-MTP, Q4_K_M, yerel Ollama, `num_ctx 16384`), `{"think": false}` gönderildi, yerel protokol (**düzeltme, 15 Kasım:** Ollama 0.30.6'nın OpenAI-uyumlu ucu bu alanı yok sayıyor; model kısa da olsa düşündü. Düşünmeyi gerçekten kapatan alan `reasoning_effort: "none"`; portalın "düşünme kapalı" ayarı zaten bunu gönderir. A ve B aynı koşulda koşulduğu için karşılaştırma geçerlidir.) |
 | Donanım | dizüstü, RTX 3050 4 GB (%59 CPU / %41 GPU), saniyede ~3-4 jeton |
 | Senaryolar | yerleşik küme, 29 senaryo × temiz/saldırılı × 1 tekrar = 54 geçerli koşu (`sha256:fec1d1dbd5f4…`) |
 | Harness | kaynak izi kapısı açık, devre kesici kapalı, onaycı `deny` (ölçümde insan yok) |

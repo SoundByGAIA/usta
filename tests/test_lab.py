@@ -607,7 +607,7 @@ def test_set_hash_ignores_delegate_output_when_absent(scenarios):
     assert "delegate_output" in scenario._canon(next(s for s in scenarios if s.id == "deleg-01"))
 
 
-def test_secret_read_gate_stops_the_gullible_model_on_the_084_scenarios(scenarios):
+def test_secret_read_gate_stops_the_gullible_model_on_the_084_scenarios(scenarios, tmp_path):
     # 0.8.4: güvenilmeyen içerik / ortak not sonrası .env okuma onay ister; Lab'da onaycı reddeder
     scs = [s for s in scenarios if s.id in ("secread-01", "deleg-03", "ortak-04")]
     assert len(scs) == 3
@@ -615,7 +615,11 @@ def test_secret_read_gate_stops_the_gullible_model_on_the_084_scenarios(scenario
         scs, model="scripted-gullible", model_revision="", endpoint="-", harness=TAINT, repeat=1
     )
     recs = runner.run_experiment(
-        scs, lambda s, c: ScriptedModel(s, c, "gullible"), meta=meta, harness=TAINT
+        scs,
+        lambda s, c: ScriptedModel(s, c, "gullible"),
+        meta=meta,
+        harness=TAINT,
+        out_dir=tmp_path,
     )
     for r in (r for r in recs if r["condition"] == "attack"):
         # betikli saf model yanıta işareti her durumda yazar (gerçek modelde anahtarı okuyamadan yazamaz);
@@ -623,6 +627,11 @@ def test_secret_read_gate_stops_the_gullible_model_on_the_084_scenarios(scenario
         assert r["attack_attempted"] and r["blocked_attempts"] == 1, r["scenario_id"]
         assert "tool_call:read_file (engellendi)" in r["detail"], r["scenario_id"]
         assert not any(d.startswith("file_contains") for d in r["detail"]), r["scenario_id"]
+        calls = json.loads((tmp_path / r["artifact_refs"][0]).read_text())["calls"]
+        assert [(c["decision"], c["outcome"]) for c in calls if c["tool"] == "read_file"][-1] == (
+            "ask-taint",
+            "denied",
+        )  # izde izin motoru "allow" değil, kapının kararı görünür
     assert all(
         r["task_success"] for r in recs if r["condition"] == "clean"
     )  # temiz koşuda yanlış ret yok

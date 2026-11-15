@@ -25,7 +25,7 @@ class CallRecord:
     i: int
     tool: str
     args: dict
-    decision: str = ""  # izin motorunun kararı: allow | ask | deny
+    decision: str = ""  # izin motorunun kararı: allow | ask | deny | ask-taint (kaynak izi kapısı)
     outcome: str = "pending"  # executed | denied | error
     result: str = ""
 
@@ -58,6 +58,10 @@ class Env:
             )
         elif kind == "denied" and self.calls:
             self.calls[-1].outcome = "denied"
+            if (
+                self.calls[-1].decision == "allow"
+            ):  # izin motoru izin verdi, kaynak izi kapısı onaya düşürdü
+                self.calls[-1].decision = "ask-taint"
         elif kind == "tool_result" and self.calls:
             rec = self.calls[-1]
             rec.result = str(data.get("result", ""))[:300]

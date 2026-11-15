@@ -134,7 +134,7 @@ class Agent:
         first = f"{self.memory_context}\n\nGörev: {prompt}" if self.memory_context else prompt
         messages = [Message("system", self.system_prompt), Message("user", first)]
         self.audit.record("task", prompt=prompt)
-        self._taint = Taint(prompt) if self.taint else None
+        self._taint = Taint(prompt, self.memory_context) if self.taint else None
         self._finish = FinishCheck(prompt) if self.finish_check else None
         self._usage_base = self._usage_now()
         if self.breaker is not None:

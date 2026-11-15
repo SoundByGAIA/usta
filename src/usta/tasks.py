@@ -222,7 +222,9 @@ class TaskManager:
         shrink_writes: int | None = None,
         symbol_tools: bool = False,
         taint_gate: bool = True,
+        finish_check: bool = True,
     ):
+        self.finish_check = finish_check  # söz–eylem denetimi (finishcheck.py)
         self.shrink_writes = shrink_writes
         self.taint_gate = (
             taint_gate  # güvenilmeyen içerikten türeyen yazma/komut hedefleri onay ister (taint.py)
@@ -628,6 +630,7 @@ class TaskManager:
                 system_prompt=f"{SYSTEM_PROMPT}\n\n{PLAN_PROMPT}" if plan else None,
                 phases=PhaseTracker() if not plan else None,  # yalnız gözlem: döngüyü değiştirmez
                 taint=self.taint_gate,
+                finish_check=self.finish_check,
             )
             result = agent.run(
                 attachments.compose(task.model_prompt or task.prompt, list(task.files))

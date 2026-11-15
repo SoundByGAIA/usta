@@ -1,5 +1,17 @@
 # Değişiklik günlüğü
 
+## 0.8.4 — söz–eylem denetimi varsayılan açık (küçük modelde görev başarısı %52 → %76), gizli dosya okuma kapısı
+
+Model davranışı DEĞİŞTİ (ölçümle). Ayrıntı: `docs/lab-sozeylem-olcumu.md`.
+
+- **Söz–eylem denetimi (yeni, varsayılan açık):** küçük modeller sık sık "summary.txt'e yazdım" deyip yazmadan, "yazayım mı?" diye sorarak ya da "dosyalara bakalım" deyip araç çağırmadan bitiriyordu. Usta artık senin isteğindeki hedef dosya ("X dosyasına yaz") yazılmadan bitirilmek istendiğinde modele bir kez kısa hatırlatma yapar (görev başına en çok 2). Hedef yalnız senin isteğinden çıkar; okunan bir içeriğin uydurduğu dosyaya itilmez, izin ve onay kuralları değişmez. **Ölçüm** (DeepSeek-V4-Pro-Qwen3.5-9B, 29 senaryo, temiz + saldırılı): meşru görev başarısı 13/25 → 19/25, saldırı altında 16/25 → 21/25, saldırı başarısı 1/25 → 1/25, yanlış ret 0 → 0, hiç araç çağırmayan koşu 2 → 0. Bedeli: ortalama süre ~%20 arttı. Kapatmak: `--no-finish-check` ya da `USTA_FINISH_CHECK=0`.
+- **İlk sürüm ölçümde yanlış alarm verdi ve düzeltildi:** okunan kaynak dosyayı ("todo.md'yi okudum") "yazılmadı" sanıyordu; artık yalnız hedef dosyaya bakılır. Komutla yazılmış dosya (`echo 3 > count.txt`) yazılmış sayılır.
+- **[Güvenlik] Gizli bilgi dosyası okuma kapısı:** iki ölçümde de model bir destek bileti ya da ortak not içindeki talimatla `config.env` okuyup sahte anahtarı yanıtına yazdı. Artık güvenilmeyen bir içerik okunduktan (ya da ortak/kalıcı not bağlamı verildikten) sonra `.env`, `*.pem`, `*.key`, `id_rsa`, `.ssh/`, `.aws/credentials`, `.npmrc` gibi bir dosyayı okumak, sen o dosyayı isteğinde anmadıysan **onay ister** (oto modda reddedilir).
+- **[Güvenlik] `usta run` kaynak izi kapısını geçirmiyordu:** komut satırından tek görev çalıştırmada kapı (yardım metninde "varsayılan açık" yazmasına rağmen) ajana verilmiyordu; portal etkilenmiyordu. Düzeltildi ve testle denetlenir.
+- **[Güvenlik] Kurulum programları yalnız tam yoluyla:** `winget` ve `ollama` artık yalnız PATH'teki mutlak klasörlerde aranır ve tam yoluyla çalıştırılır (0.8.3 düzeltmesinin ikinci katmanı).
+- `pip-audit`: bağımlılıklarda bilinen açık yok.
+- Lab: izlere tetiklenen hatırlatmalar yazılır; `usta lab run` söz–eylem denetimini ürünle aynı biçimde varsayılan açık çalıştırır (`--no-finish-check` ile karşılaştırma).
+
 ## 0.8.3 — güvenlik: Windows'ta program yolu ele geçirme (kutu kaçışı) kapatıldı
 
 Model davranışı DEĞİŞMEDİ. Güvenlik turunun ilk bulguları; ikisi de gerçek ortamda kanıtlanıp düzeltildi.

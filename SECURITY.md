@@ -12,6 +12,7 @@ oto onay modu, eklediğiniz MCP sunucusu) yapılan eylemler; model çıktısın�
 
 ## Düzeltilen açıklar
 
+- **0.8.4:** `usta run` (komut satırından tek görev) kaynak izi kapısını ajana vermiyordu (portal etkilenmiyordu). Ayrıca güvenilmeyen içerikten sonra gizli bilgi dosyası (`.env`, anahtar, kimlik dosyaları) okumak artık onay ister; Lab'da 9B model iki kez bilet/ortak not talimatıyla `config.env` okuyup anahtarı yanıtına yazmıştı.
 - **0.8.3, Windows:** çıplak adla çalıştırılan programların (`docker`, `taskkill`, `cmd`) bulunduğu klasörden (çalışma alanı) çalıştırılabilmesi; Docker'lı kullanıcıda kutu kaçışına yol açabilirdi. Usta artık `NoDefaultCurrentDirectoryInExePath=1` ayarlar. Ayrıca `delegate` programları yalnız mutlak PATH klasörlerinde aranır.
 
 ## Kırmayı deneyenler için rehber

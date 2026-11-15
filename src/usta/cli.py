@@ -185,6 +185,13 @@ def _add_model_args(p: argparse.ArgumentParser) -> None:
         "oto modda reddedilir; kapatmak için --no-taint-gate ya da USTA_TAINT_GATE=0",
     )
     p.add_argument(
+        "--finish-check",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="söz–eylem denetimi (varsayılan AÇIK): istenen dosyayı yazmadan bitirmek isteyen modele kısa hatırlatma; "
+        "kapatmak için --no-finish-check ya da USTA_FINISH_CHECK=0",
+    )
+    p.add_argument(
         "--protocol",
         choices=(*PROTOCOLS, "auto"),
         help="native: yerel araç çağrısı; json: şemayla kısıtlı JSON; text: JSON-metin yedek protokolü; "
@@ -198,6 +205,14 @@ def _taint_gate(args: argparse.Namespace) -> bool:
     if flag is not None:
         return bool(flag)
     return os.environ.get("USTA_TAINT_GATE") != "0"
+
+
+def _finish_check(args: argparse.Namespace) -> bool:
+    """Söz–eylem denetimi: varsayılan açık (Lab, 9B: görev başarısı %52 → %76); --no-finish-check ya da USTA_FINISH_CHECK=0."""
+    flag = getattr(args, "finish_check", None)
+    if flag is not None:
+        return bool(flag)
+    return os.environ.get("USTA_FINISH_CHECK") != "0"
 
 
 def _symbol_tools(args: argparse.Namespace) -> bool:
@@ -312,11 +327,6 @@ def _parser() -> argparse.ArgumentParser:
     lr.add_argument("--time-limit", type=float, default=300.0, help="koşu başına saniye")
     lr.add_argument(
         "--breaker", action="store_true", help="devre kesici açık (harness yapılandırması)"
-    )
-    lr.add_argument(
-        "--finish-check",
-        action="store_true",
-        help="DENEYSEL: bitirirken söz–eylem denetimi (yapmadığını yaptım deme, niyet söyleyip durma)",
     )
     lr.add_argument("--harness-id", default="base", help="deney kaydına yazılan yapılandırma adı")
     lr.add_argument(
@@ -796,7 +806,7 @@ def _lab_cmd(args: argparse.Namespace) -> int:
     harness = labrunner.HarnessConfig(
         id=args.harness_id,
         breaker=args.breaker,
-        finish_check=args.finish_check,
+        finish_check=_finish_check(args),
         taint=_taint_gate(args),
         protocol=args.protocol or os.environ.get("USTA_PROTOCOL") or "native",
     )
@@ -1049,6 +1059,7 @@ def _serve_cmd(args: argparse.Namespace) -> int:
         allowed_hosts=hosts,
         symbol_tools=_symbol_tools(args),
         taint_gate=_taint_gate(args),
+        finish_check=_finish_check(args),
         mcp_servers=lambda: (
             _mcp_servers(home) or []
         ),  # panelden eklenenler yeniden başlatmadan gelir
@@ -1404,6 +1415,7 @@ def _chat_cmd(args: argparse.Namespace) -> int:
         model_control=control,
         symbol_tools=_symbol_tools(args),
         taint_gate=_taint_gate(args),
+        finish_check=_finish_check(args),
         mcp_servers=lambda: _mcp_servers(home) or [],
     )
     interactive = compat.is_tty()
@@ -1608,6 +1620,8 @@ def _main(argv: list[str] | None = None) -> int:
             memory_context="\n\n".join(
                 c for c in (ortak.context(_home()), memory.render_context(root)) if c
             ),
+            taint=_taint_gate(args),
+            finish_check=_finish_check(args),
         )
         try:
             result = agent.run(args.prompt)

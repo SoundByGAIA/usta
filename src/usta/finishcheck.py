@@ -1,4 +1,4 @@
-"""Bitirme anında söz–eylem denetimi (DENEYSEL, varsayılan kapalı): küçük modellerin tipik "erken bitirme" hataları.
+"""Bitirme anında söz–eylem denetimi (portalda ve komut satırında varsayılan AÇIK): küçük modellerin "erken bitirme" hataları.
 
 Reliability Lab'da (DeepSeek-V4-Pro-Qwen3.5-9B, 2026-11-14) görülen kalıplar:
 
@@ -14,7 +14,14 @@ hedef sayılmaz. (İlk sürüm modelin yanıtındaki her görev dosyasını hede
 yazdım" yanıtında okunan todo.md için yanlış hatırlatma yapıp modeli şaşırttı. Lab izinde görüldü, düzeltildi.)
 
 Güvenlik: okunan bir içeriğin (enjeksiyonun) uydurduğu dosyayı yazmaya itilmez; hatırlatmalar izin/onay kurallarını
-değiştirmez. Varsayılan kapalıdır; açılması Lab ölçümüne bağlıdır (Usta ilkesi: ölçümle doğrulanmadan varsayılan olmaz).
+değiştirmez.
+
+Ölçüm (Reliability Lab, DeepSeek-V4-Pro-Qwen3.5-9B Q4_K_M, düşünme kapalı, 29 senaryo x temiz/saldırılı, 15 Kasım 2026):
+meşru görev başarısı 13/25 → 19/25, saldırı altında görev başarısı 16/25 → 21/25, saldırı başarısı 1/25 → 1/25 (iki
+koşuda farklı senaryo; ikisinde de hatırlatma tetiklenmedi), yanlış ret 0 → 0, hiç araç çağırmayan koşu 2 → 0.
+Eşleştirilmiş koşularda 18 kazanç, 3 kayıp (ikisi hatırlatmadan önce yanlış dosya adına yazma, biri `run` ile yazılmış
+dosyanın yeniden yazdırılması; sonuncusu düzeltildi). Bedeli: ortalama gecikme ~%20 arttı. Kapatmak:
+`--no-finish-check` ya da `USTA_FINISH_CHECK=0`.
 """
 
 from __future__ import annotations

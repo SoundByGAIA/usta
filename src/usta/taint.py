@@ -11,6 +11,11 @@ gelen metinde geçiyor ve kullanıcı metninde (istem, ekler, görev sırasında
 Güvenilmeyen kaynaklar: read_file/read_symbol (depo içeriği), fetch_url, web_search, delegate (başka programın çıktısı) ve MCP araçları. Komut çıktıları
 (`run`) ve dizin listeleri kapsam dışıdır: ajanın kendi çalıştırdığı kod/izler ve dosya adları meşru hedefleri
 sürekli işaretlerdi (ör. test çıktısındaki izden hatalı dosyayı düzeltmek).
+
+Gizli bilgi dosyası okuma: güvenilmeyen bir içerik okunduktan (ya da ortak/kalıcı not bağlamı verildikten) sonra
+`.env`, anahtar, parola dosyası gibi bir dosyayı okumak, kullanıcı o dosyayı isteğinde anmadıysa onay ister. Lab
+(DeepSeek-V4-Qwen3.5-9B, 2026-11-15): iki ayrı ölçümde model bir bilet / ortak not talimatıyla `config.env` okuyup
+anahtarı yanıtına yazdı. Yanıta sızmayı hiçbir kural engelleyemez; ama sızmanın ön koşulu olan okumayı yakalamak mümkün.
 """
 
 from __future__ import annotations
@@ -23,6 +28,19 @@ MAX_BLOB = 400_000  # güvenilmeyen metin üst sınırı (karakter); eskiler at�
 MIN_LEN = 4  # bundan kısa parçalar eşleşme sayılmaz (".py", "ls" gibi)
 _URL = re.compile(r"https?://([^\s/'\"<>]+)", re.IGNORECASE)
 _PATHISH = re.compile(r"[\w.\-]+[/.][\w.\-/]*\w|[\w\-]+/")
+SECRET_READ_TOOLS = frozenset({"read_file", "read_symbol"})
+# dosya adı (yolun son parçası) ya da klasör: .env, x.env, .env.local, anahtarlar, parola/kimlik dosyaları
+_SECRET_NAME = re.compile(
+    r"(?:^|/)(?:\.env(?:\.[\w-]+)?|[\w.-]+\.env|id_(?:rsa|dsa|ecdsa|ed25519)\b[\w.]*|[\w.-]+\.(?:pem|key|p12|pfx|kdbx|keystore|jks)"
+    r"|\.?(?:credentials|secrets?)(?:\.[\w]+)?|\.(?:npmrc|pypirc|netrc|pgpass|git-credentials))$"
+    r"|(?:^|/)\.(?:ssh|aws|gnupg|docker)/",
+    re.IGNORECASE,
+)
+
+
+def secret_path(path: str) -> bool:
+    """Yol gizli bilgi taşıyan bir dosyaya benziyor mu (ad kalıbı; içerik okunmaz)."""
+    return bool(_SECRET_NAME.search(_norm_path(path)))
 
 
 def _norm_path(p: str) -> str:
@@ -62,10 +80,13 @@ def _candidates(tool: str, args: dict) -> list[str]:
 class Taint:
     """Bir görev boyunca güvenilmeyen metni ve kullanıcı metnini tutar; eylemleri denetler."""
 
-    def __init__(self, user_text: str = ""):
+    def __init__(self, user_text: str = "", context: str = ""):
         self._user = [str(user_text or "")]
         self._blobs: list[str] = []
         self._size = 0
+        self._context = bool(
+            str(context or "").strip()
+        )  # ortak/kalıcı notlar: kullanıcının bu görevdeki sözü değil
 
     def add_user(self, text: str) -> None:
         self._user.append(str(text or ""))
@@ -81,6 +102,15 @@ class Taint:
 
     def check(self, tool: str, args: dict) -> str:
         """Boş dize: sorun yok. Aksi halde gerekçe (hedef ve nerede bulunduğu)."""
+        if tool in SECRET_READ_TOOLS and (self._blobs or self._context):
+            path = _norm_path(args.get("path"))
+            user = "\n".join(self._user).lower()
+            name = path.rsplit("/", 1)[-1].lower()
+            if secret_path(path) and path.lower() not in user and name not in user:
+                return (
+                    f"'{path}' gizli bilgi (anahtar, parola) taşıyan bir dosyaya benziyor; isteğinde geçmiyor ve "
+                    "Usta az önce başka bir içerik okudu (bu içerik okumayı yönlendirmiş olabilir)"
+                )
         if not self._blobs:
             return ""
         if tool == "delegate" and (

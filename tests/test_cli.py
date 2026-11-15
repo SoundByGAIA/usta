@@ -553,3 +553,33 @@ def test_verify_set_errors(tmp_path, capsys, home):
     assert "komut" in capsys.readouterr().err
     assert main(["verify", "set", "-w", str(tmp_path), "--image", "kötü;imaj", "--", "make"]) == 2
     assert main(["verify", "show", "-w", str(tmp_path / "yok")]) == 2
+
+
+def test_run_turns_on_taint_gate_and_finish_check_by_default(tmp_path, monkeypatch, home):
+    # 0.8.4: `usta run` kaynak izi kapısını hiç geçirmiyordu; söz–eylem denetimi Lab ölçümüyle varsayılan oldu
+    from usta import cli
+
+    seen = []
+
+    class Stop(Exception):
+        pass
+
+    def fake_agent(*a, **kw):
+        seen.append(kw)
+        raise Stop
+
+    monkeypatch.setattr(cli, "Agent", fake_agent)
+    for argv, env, want in (
+        ([], None, (True, True)),
+        (["--no-finish-check", "--no-taint-gate"], None, (False, False)),
+        ([], "0", (True, False)),
+    ):
+        if env is None:
+            monkeypatch.delenv("USTA_FINISH_CHECK", raising=False)
+        else:
+            monkeypatch.setenv("USTA_FINISH_CHECK", env)
+        try:
+            cli.main(["run", "x", "-w", str(tmp_path), "--model", "m", *argv])
+        except Stop:
+            pass
+        assert (seen[-1]["taint"], seen[-1]["finish_check"]) == want, argv

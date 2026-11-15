@@ -59,17 +59,19 @@ class McpIsolationError(McpError):
 
 def docker_problem() -> str | None:
     """Docker kullanılabilir değilse nedenini, kullanılabilirse None döner."""
-    if shutil.which("docker") is None:
+    if compat.safe_which("docker") is None:
         return "Docker bulunamadı"
     p = subprocess.run(
-        ["docker", "version", "-f", "{{.Server.Version}}"], capture_output=True, check=False
+        [compat.program("docker"), "version", "-f", "{{.Server.Version}}"],
+        capture_output=True,
+        check=False,
     )
     return None if p.returncode == 0 else "Docker hizmetine erişilemiyor"
 
 
 def image_id(image: str) -> str | None:
     p = subprocess.run(
-        ["docker", "image", "inspect", "-f", "{{.Id}}", image],
+        [compat.program("docker"), "image", "inspect", "-f", "{{.Id}}", image],
         capture_output=True,
         encoding="utf-8",
         errors="replace",
@@ -118,7 +120,7 @@ def build_run_args(
     """`docker run` argümanları. Değerler argv'ye yazılmaz: `-e ADI` değeri istemci ortamından alır."""
     if srv.isolation != "container" or not srv.image:
         raise McpIsolationError("konteyner izolasyonu için imaj gerekli (usta mcp add --image ...)")
-    args = ["docker", "run", "--rm", "--pull", "never", "--name", name, "--init"]
+    args = [compat.program("docker"), "run", "--rm", "--pull", "never", "--name", name, "--init"]
     if interactive:
         args.append("-i")
     args += ["--network", network or "none", "--read-only"]
@@ -174,7 +176,7 @@ class Handle:
 
 
 def _rm(name: str) -> None:
-    subprocess.run(["docker", "rm", "-f", name], capture_output=True, check=False)
+    subprocess.run([compat.program("docker"), "rm", "-f", name], capture_output=True, check=False)
 
 
 def _no_image_msg(name: str) -> str:

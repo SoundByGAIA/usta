@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from probe_mcp_src import SRC
-from usta import mcp_runtime, mcpconfig
+from usta import compat, mcp_runtime, mcpconfig
 from usta.audit import AuditLog
 from usta.mcp import McpError
 from usta.mcp_runtime import McpIsolationError
@@ -70,7 +70,7 @@ def test_run_args_are_hardened_and_never_carry_secret_values(tmp_path):
     )
     pre = args[: args.index(IMAGE)]  # docker seçenekleri (sunucu komutu/kaynağı hariç)
     joined = " ".join(pre)
-    assert args[:3] == ["docker", "run", "--rm"] and "--init" in args
+    assert args[:3] == [compat.program("docker"), "run", "--rm"] and "--init" in args
     for flag in ("--read-only", "--cap-drop", "no-new-privileges", "--pids-limit", "--memory"):
         assert flag in joined
     assert args[args.index("--network") + 1] == "none"  # ağ varsayılan kapalı

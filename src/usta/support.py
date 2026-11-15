@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import platform
 import re
-import shutil
 import sys
 import time
 from collections import deque
@@ -18,7 +17,7 @@ from importlib import metadata
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from usta import localmodels
+from usta import compat, localmodels
 from usta.audit import mask
 
 _URL_TAIL = re.compile(r"(https?://[^\s#?\"']+)[#?][^\s\"']*")
@@ -119,8 +118,8 @@ def report(
         f"Python: {platform.python_version()}",
         f"İşletim sistemi: {platform.platform()} ({sys.platform})",
         f"Bellek: {'bilinmiyor' if ram is None else f'{ram:.0f} GB'}",
-        f"Docker: {'kurulu' if shutil.which('docker') else 'kurulu değil'}",
-        f"Ollama: {'kurulu' if shutil.which('ollama') else 'kurulu değil'}",
+        f"Docker: {'kurulu' if compat.safe_which('docker') else 'kurulu değil'}",
+        f"Ollama: {'kurulu' if compat.safe_which('ollama') else 'kurulu değil'}",
         f"Çalışma şekli: {'arka planda (masaüstü simgesi)' if background else 'pencerede'}"
         + (", tablet bağlantısı açık" if lan else ""),
         f"Yapay zekâ: {model or 'seçilmedi'}"

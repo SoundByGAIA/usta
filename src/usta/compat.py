@@ -61,6 +61,44 @@ def harden_exe_search(windows: bool | None = None) -> None:
         os.environ[EXE_SEARCH_ENV] = "1"
 
 
+def safe_which(name: str, windows: bool | None = None) -> str | None:
+    """Programı YALNIZ PATH'teki MUTLAK klasörlerde arar (`harden_exe_search`'ün ikinci katmanı).
+
+    `shutil.which` Windows'ta önce bulunduğu klasöre bakar; boş ya da göreli PATH girişleri de bulunduğu klasör demektir.
+    Usta bir proje klasöründe açıldıysa o klasördeki kötü niyetli bir `docker.exe` ya da `claude.cmd` gerçeğinin yerine
+    çalışabilirdi. Burada boş/göreli girişler ve bulunduğu klasör HİÇ aranmaz.
+    """
+    win = (sys.platform == "win32") if windows is None else windows
+    exts = [""]
+    if win:
+        exts = [
+            e.lower()
+            for e in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")
+            if e.strip()
+        ]
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        d = d.strip().strip('"')
+        if not d or not os.path.isabs(d):
+            continue  # boş ya da göreli giriş = bulunduğu klasör: atla
+        for ext in exts:
+            cand = os.path.join(d, name + ext)
+            if os.path.isfile(cand) and (win or os.access(cand, os.X_OK)):
+                return cand
+    return None
+
+
+def program(name: str) -> str:
+    """Çalıştırılacak programın tam yolu; mutlak bir PATH klasöründe yoksa çıplak ad (çağıran önce varlığını denetler)."""
+    return safe_which(name) or name
+
+
+def taskkill() -> str:
+    """Windows'un kendi `taskkill.exe`'si (SystemRoot\\System32); bulunamazsa çıplak ad."""
+    root = os.environ.get("SystemRoot") or os.environ.get("SYSTEMROOT") or ""
+    cand = os.path.join(root, "System32", "taskkill.exe") if os.path.isabs(root) else ""
+    return cand if cand and os.path.isfile(cand) else "taskkill"
+
+
 def kill_group(pid: int) -> None:
     """Süreci ve alt süreçlerini sonlandırır; zaten yoksa sessizce geçer."""
     killpg, sigkill = getattr(os, "killpg", None), getattr(signal, "SIGKILL", None)
@@ -72,7 +110,7 @@ def kill_group(pid: int) -> None:
         return
     try:  # Windows: süreç ağacını sonlandır
         subprocess.run(
-            ["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, timeout=5, check=False
+            [taskkill(), "/PID", str(pid), "/T", "/F"], capture_output=True, timeout=5, check=False
         )
     except (OSError, subprocess.SubprocessError):
         pass

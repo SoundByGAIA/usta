@@ -138,11 +138,9 @@ def test_mount_path_check_allows_only_drive_colon_on_windows():
 
 
 def test_run_without_docker_gives_plain_explanation(monkeypatch, tmp_path):
-    import shutil
-
     from usta.sandbox import SandboxError, run_command
 
-    monkeypatch.setattr(shutil, "which", lambda name: None)
+    monkeypatch.setenv("PATH", "")  # docker hiçbir mutlak klasörde yok
     with pytest.raises(SandboxError, match="Docker bu bilgisayarda kurulu değil"):
         run_command(SandboxConfig(workdir=tmp_path), ["sh", "-c", "echo x"])
 
@@ -287,3 +285,27 @@ def test_register_creates_workspace_link_without_symlink_privilege(monkeypatch, 
     wid = projects.register(home, proj)
     assert (home / "workspaces" / wid).resolve() == proj.resolve()
     assert projects.register(home, proj) == wid  # ikinci kayıt aynı kimliği döndürür
+
+
+def test_docker_and_taskkill_never_resolve_from_the_current_folder(tmp_path, monkeypatch):
+    # 0.8.3 kutu kaçışının ikinci katmanı: kutudan çalışma alanına bırakılan sahte `docker` seçilmez
+    from usta import compat
+    from usta.sandbox import SandboxError, run_command
+
+    fake = tmp_path / "docker"
+    fake.write_text("#!/bin/sh\necho SAHTE\n")
+    fake.chmod(0o755)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PATH", f".{os.pathsep}{os.pathsep}rel")
+    assert compat.safe_which("docker") is None and compat.program("docker") == "docker"
+    with pytest.raises(SandboxError, match="kurulu değil"):
+        run_command(SandboxConfig(workdir=tmp_path), ["sh", "-c", "echo x"])
+    monkeypatch.setenv("PATH", str(tmp_path))
+    assert compat.program("docker") == str(fake)  # mutlak klasördeki gerçek yol
+    monkeypatch.setenv("SystemRoot", "rel")
+    assert compat.taskkill() == "taskkill"
+    sysdir = tmp_path / "Windows" / "System32"
+    sysdir.mkdir(parents=True)
+    (sysdir / "taskkill.exe").write_text("")
+    monkeypatch.setenv("SystemRoot", str(tmp_path / "Windows"))
+    assert compat.taskkill() == str(sysdir / "taskkill.exe")

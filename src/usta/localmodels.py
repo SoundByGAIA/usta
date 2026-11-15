@@ -23,9 +23,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from usta.harnesses import (
-    safe_which as _which,
-)  # yalnız mutlak PATH girişleri: bulunulan klasördeki sahte program seçilmez
+# yalnız mutlak PATH girişleri: bulunulan klasördeki sahte program seçilmez
+from usta.compat import safe_which as _which
 
 HOST = "127.0.0.1"
 COMMON_PORTS = {11434: "Ollama", 1234: "LM Studio", 8080: "llama.cpp", 8000: "vLLM"}

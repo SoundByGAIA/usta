@@ -3,12 +3,13 @@ import subprocess
 
 import pytest
 
+from usta import compat
 from usta.sandbox import SandboxConfig, build_docker_args, run_command
 
 
 def test_args_are_locked_down_by_default(tmp_path):
     args = build_docker_args(SandboxConfig(workdir=tmp_path), ["echo", "hi"])
-    assert args[:2] == ["docker", "run"]
+    assert args[:2] == [compat.program("docker"), "run"]
     assert "--rm" in args
     assert args[args.index("--network") + 1] == "none"
     assert "--read-only" in args

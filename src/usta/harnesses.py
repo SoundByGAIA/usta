@@ -29,6 +29,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from usta import compat
 from usta.audit import mask
 from usta.fetch import wrap_external
 
@@ -124,29 +125,8 @@ CATALOG: dict[str, Harness] = {
 
 
 def safe_which(name: str) -> str | None:
-    """Programı YALNIZ PATH'teki MUTLAK klasörlerde arar.
-
-    `shutil.which` Windows'ta önce bulunduğu klasöre bakar; boş ya da göreli PATH girişleri de bulunduğu klasör demektir.
-    Usta bir proje klasöründe açıldıysa o klasördeki kötü niyetli bir `claude.cmd`, kullanıcı "Claude Code'u çağır"ı
-    onayladığında onun yerine çalışabilirdi. Burada boş/göreli girişler ve bulunduğu klasör HİÇ aranmaz.
-    """
-    win = _platform() == "win32"
-    exts = [""]
-    if win:
-        exts = [
-            e.lower()
-            for e in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")
-            if e.strip()
-        ]
-    for d in os.environ.get("PATH", "").split(os.pathsep):
-        d = d.strip().strip('"')
-        if not d or not os.path.isabs(d):
-            continue  # boş ya da göreli giriş = bulunduğu klasör: atla
-        for ext in exts:
-            cand = os.path.join(d, name + ext)
-            if os.path.isfile(cand) and (win or os.access(cand, os.X_OK)):
-                return cand
-    return None
+    """Programı YALNIZ PATH'teki MUTLAK klasörlerde arar (`compat.safe_which`; testler `_platform`'u değiştirir)."""
+    return compat.safe_which(name, windows=_platform() == "win32")
 
 
 def _which(h: Harness) -> str | None:
@@ -299,7 +279,7 @@ def _kill_tree(proc: subprocess.Popen) -> None:
     with contextlib.suppress(OSError, ProcessLookupError, subprocess.SubprocessError):
         if _platform() == "win32":
             subprocess.run(
-                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                [compat.taskkill(), "/PID", str(proc.pid), "/T", "/F"],
                 capture_output=True,
                 timeout=15,
                 stdin=subprocess.DEVNULL,

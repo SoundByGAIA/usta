@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import threading
@@ -29,7 +28,7 @@ def _home() -> Path:
 
 def local_image_id(image: str) -> str | None:
     p = subprocess.run(
-        ["docker", "image", "inspect", "-f", "{{.Id}}", image],
+        [compat.program("docker"), "image", "inspect", "-f", "{{.Id}}", image],
         capture_output=True,
         encoding="utf-8",
         errors="replace",
@@ -146,7 +145,7 @@ def build_docker_args(
     if not workdir.is_dir():
         raise ValueError(f"çalışma dizini yok: {workdir}")
     args = [
-        "docker",
+        compat.program("docker"),
         "run",
         "--rm",
         "--pull",
@@ -195,7 +194,7 @@ def _text(data: bytes | str | None) -> str:
 def _kill_and_collect(proc: subprocess.Popen, name: str) -> tuple[bytes, bytes]:
     # Konteyner henüz yaratılmamış olabilir (yarış): öldürmeyi çıkana kadar tekrarla.
     for _ in range(20):
-        subprocess.run(["docker", "kill", name], check=False, capture_output=True)
+        subprocess.run([compat.program("docker"), "kill", name], check=False, capture_output=True)
         try:
             return proc.communicate(timeout=0.5)
         except subprocess.TimeoutExpired:
@@ -239,7 +238,7 @@ def run_command(
 ) -> RunResult:
     if cancel is not None and cancel.is_set():
         return RunResult(130, "", "", cancelled=True)
-    if shutil.which("docker") is None:
+    if compat.safe_which("docker") is None:
         raise SandboxError(
             "Docker bu bilgisayarda kurulu değil, bu yüzden komut çalıştırılamıyor. "
             "Dosya okuyup yazarak devam et; yazdığın kodu çalıştırarak deneyemezsin."
@@ -262,7 +261,11 @@ LABELS = ["--label", "usta.managed=1", "--label", f"usta.pid={os.getpid()}"]
 
 def _docker(*args: str, check: bool = True) -> subprocess.CompletedProcess:
     p = subprocess.run(
-        ["docker", *args], check=False, capture_output=True, encoding="utf-8", errors="replace"
+        [compat.program("docker"), *args],
+        check=False,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if check and p.returncode != 0:
         raise SandboxError((p.stderr.strip().splitlines() or ["docker hatası"])[-1])

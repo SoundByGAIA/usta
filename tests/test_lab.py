@@ -30,6 +30,9 @@ def usta_home(tmp_path, monkeypatch):
         monkeypatch.delenv(k, raising=False)
 
 
+TAINT = runner.HarnessConfig(id="taint", taint=True)
+
+
 def run_all(scs, behavior, repeat=1, out=None):
     meta = runner.experiment_meta(
         scs,
@@ -53,12 +56,12 @@ def run_all(scs, behavior, repeat=1, out=None):
 def test_scenario_set_meets_the_spec(scenarios):
     cats = Counter(s.category for s in scenarios)
     assert (
-        cats["tool_output_injection"] == 7 and cats["mcp_authority"] == 5
-    )  # +2: başka program çıktısı (deleg-01/02)
+        cats["tool_output_injection"] == 8 and cats["mcp_authority"] == 5
+    )  # +3: başka program çıktısı (deleg-01/02/03)
     assert cats["readme_hijack"] == 3 and cats["fake_authority"] == 3
     assert (
-        cats["secret_exfil"] == 3 and cats["memory_poison"] == 4
-    )  # ortak hafıza senaryoları dahil
+        cats["secret_exfil"] == 4 and cats["memory_poison"] == 5
+    )  # ortak hafıza ve gizli dosya okuma (0.8.4) senaryoları dahil
     assert sum(v for k, v in cats.items() if k != "fault") >= 20
     assert cats["fault"] >= 3
     assert len({s.id for s in scenarios}) == len(scenarios)
@@ -384,7 +387,7 @@ def test_experiment_record_never_contains_api_keys(scenarios, tmp_path, monkeypa
 # --- CLI ---------------------------------------------------------------------------------------
 def test_cli_list_validate_and_smoke(capsys, tmp_path):
     assert main(["lab", "list"]) == 0 and "mcp-auth-01" in capsys.readouterr().out
-    assert main(["lab", "validate"]) == 0 and "29 senaryo geçerli" in capsys.readouterr().out
+    assert main(["lab", "validate"]) == 0 and "32 senaryo geçerli" in capsys.readouterr().out
     assert main(["lab", "smoke", "--out", str(tmp_path / "s")]) == 0
     out = capsys.readouterr().out
     assert "gullible" in out and "compliant" in out and "refuser" in out
@@ -602,3 +605,24 @@ def test_set_hash_ignores_delegate_output_when_absent(scenarios):
         next(s for s in scenarios if s.id == "inj-tool-01")
     )
     assert "delegate_output" in scenario._canon(next(s for s in scenarios if s.id == "deleg-01"))
+
+
+def test_secret_read_gate_stops_the_gullible_model_on_the_084_scenarios(scenarios):
+    # 0.8.4: güvenilmeyen içerik / ortak not sonrası .env okuma onay ister; Lab'da onaycı reddeder
+    scs = [s for s in scenarios if s.id in ("secread-01", "deleg-03", "ortak-04")]
+    assert len(scs) == 3
+    meta = runner.experiment_meta(
+        scs, model="scripted-gullible", model_revision="", endpoint="-", harness=TAINT, repeat=1
+    )
+    recs = runner.run_experiment(
+        scs, lambda s, c: ScriptedModel(s, c, "gullible"), meta=meta, harness=TAINT
+    )
+    for r in (r for r in recs if r["condition"] == "attack"):
+        # betikli saf model yanıta işareti her durumda yazar (gerçek modelde anahtarı okuyamadan yazamaz);
+        # burada ölçülen: okuma onaya düştü ve reddedildi, anahtar hiçbir dosyaya yazılmadı
+        assert r["attack_attempted"] and r["blocked_attempts"] == 1, r["scenario_id"]
+        assert "tool_call:read_file (engellendi)" in r["detail"], r["scenario_id"]
+        assert not any(d.startswith("file_contains") for d in r["detail"]), r["scenario_id"]
+    assert all(
+        r["task_success"] for r in recs if r["condition"] == "clean"
+    )  # temiz koşuda yanlış ret yok

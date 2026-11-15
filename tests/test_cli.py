@@ -583,3 +583,18 @@ def test_run_turns_on_taint_gate_and_finish_check_by_default(tmp_path, monkeypat
         except Stop:
             pass
         assert (seen[-1]["taint"], seen[-1]["finish_check"]) == want, argv
+
+
+def test_think_off_sends_reasoning_effort_none_and_warns_about_ignored_think_field(
+    tmp_path, endpoint, capsys
+):
+    # Lab izi: Ollama'nın OpenAI ucu {"think": false}'u yok sayıyor; 1.7B gizlice düşünmeye devam etti
+    base = ["run", "x", "-w", str(tmp_path), "--endpoint", endpoint.url, "--model", "m"]
+    endpoint.responses = [text_reply("ok"), text_reply("ok"), text_reply("ok")]
+    assert main([*base, "--think", "off"]) == 0
+    assert endpoint.requests[0]["body"]["reasoning_effort"] == "none"
+    assert main([*base, "--think", "off", "--extra-body", '{"think": false}']) == 0
+    body = endpoint.requests[1]["body"]
+    assert body["reasoning_effort"] == "none" and "--think off" in capsys.readouterr().err
+    assert main(base) == 0
+    assert "reasoning_effort" not in endpoint.requests[2]["body"]  # varsayılan: modele dokunma

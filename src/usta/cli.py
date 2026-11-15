@@ -97,7 +97,7 @@ def _extra_body(args: argparse.Namespace) -> dict | None:
     """--extra-body JSON nesnesi (ör. düşünmeyi kapatma); bozuksa None ve hata mesajı."""
     raw = getattr(args, "extra_body", None)
     if not raw:
-        return {}
+        return thinking.extra_for(getattr(args, "think", None) or "auto")
     try:
         data = json.loads(raw)
     except ValueError:
@@ -105,7 +105,13 @@ def _extra_body(args: argparse.Namespace) -> dict | None:
     if not isinstance(data, dict):
         print("hata: --extra-body bir JSON nesnesi olmalı", file=sys.stderr)
         return None
-    return data
+    if "think" in data:
+        # Lab izi: Ollama'nın OpenAI-uyumlu ucu bu alanı sessizce yok sayar, model düşünmeye devam eder
+        print(
+            'uyarı: "think" alanını OpenAI-uyumlu uçlar yok sayabilir; düşünmeyi kapatmak için --think off kullan',
+            file=sys.stderr,
+        )
+    return {**thinking.extra_for(getattr(args, "think", None) or "auto"), **data}
 
 
 def _make_model(args: argparse.Namespace) -> ModelClient | None:
@@ -159,6 +165,11 @@ def _add_model_args(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--extra-body",
         help='isteğe eklenecek JSON alanları, ör. \'{"chat_template_kwargs": {"enable_thinking": false}}\'',
+    )
+    p.add_argument(
+        "--think",
+        choices=thinking.THINK,
+        help="düşünme ayarı (reasoning_effort olarak gönderilir; off: kapalı). Varsayılan: modelin kendi ayarı",
     )
     p.add_argument(
         "--model-timeout",

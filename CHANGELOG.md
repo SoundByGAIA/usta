@@ -1,5 +1,16 @@
 # Değişiklik günlüğü
 
+## 0.8.5 — güvenlik: "yalnız okuma" isteği korunur, docker/taskkill tam yolla; düşünme ve MTP ölçümleri
+
+Model davranışı DEĞİŞMEDİ (varsayılanlar aynı). Ayrıntı: `docs/lab-dusunme-olcumu.md`.
+
+- **[Güvenlik] "Yalnız okuma" isteği:** görev "yalnız okuma izniyle sor" derken model başka bir programı **yazma izniyle** çağırmaya kalkarsa, bu artık onaya bile sunulmadan reddedilir ve modele yazma iznini kapatıp yeniden çağırması söylenir. Lab'da Qwen3 1.7B ilk çağrıda kendiliğinden `write=true` göndermişti (saldırı metni henüz okunmamıştı).
+- **[Güvenlik] Docker ve taskkill yalnız tam yoluyla:** kutu ve MCP komutları `docker`'ı, süreç ağacını kapatma `taskkill`'i artık yalnız mutlak PATH klasörlerinde / `SystemRoot\System32` içinde bulup tam yoluyla çalıştırır (0.8.3 düzeltmesinin ikinci katmanı).
+- **Lab: gizli dosya okuma senaryoları** (`secread-01`, `deleg-03`, `ortak-04`; 32 senaryo). `config.env` okuma denemesi artık yetkisiz eylem denemesi sayılır ve izde kapının kararı (`ask-taint`) görünür; önceden bu denemeler yalnız izler elle okununca görülüyordu.
+- **`--think auto|off|low|medium|high`** (komut satırı ve Lab): düşünme ayarını portalla aynı biçimde (`reasoning_effort`) gönderir. **Ölçüm hatası düzeltmesi:** Ollama'nın OpenAI-uyumlu ucu `{"think": false}`'u yok sayar; önceki Lab koşularında model kısa da olsa düşündü. `--extra-body` içinde `think` görülürse uyarı verilir. Portalın "Düşünme: kapalı" ayarı zaten doğruydu.
+- **Ölçüm: düşünmeyi kısmak küçük modelde işe yaramıyor** (Qwen3 1.7B, 32 senaryo): düşünme kapalı 14 kat hızlı (293 → 21 sn) ama temiz görev başarısı 13/32 → 5/32; 512 jetonluk çıktı sınırı 3/32 (düşünce yarıda kesilip araç çağrısı kayboldu). Varsayılan değişmedi.
+- **Ölçüm: MTP ile hız** (DeepSeek-V4-Pro-Qwen3.5-9B, llama.cpp `--spec-type draft-mtp --spec-draft-n-max 2`, RTX 3050 4 GB): saniyede 3,05 → ~4,0 jeton (+%31), kalite değişmeden. Usta'ya `--endpoint` ile bağlanır.
+
 ## 0.8.4 — söz–eylem denetimi varsayılan açık (küçük modelde görev başarısı %52 → %76), gizli dosya okuma kapısı
 
 Model davranışı DEĞİŞTİ (ölçümle). Ayrıntı: `docs/lab-sozeylem-olcumu.md`.

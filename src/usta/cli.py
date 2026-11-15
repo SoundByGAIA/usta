@@ -157,6 +157,40 @@ def _capability_config(args: argparse.Namespace, extra: dict | None) -> dict:
     }
 
 
+def _add_strong_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--strong-model",
+        help="kademeli yönlendirme: takılınca devredilecek güçlü model (--model ucuz model olur)",
+    )
+    p.add_argument(
+        "--strong-endpoint", help="güçlü modelin uç noktası (verilmezse --endpoint ile aynı)"
+    )
+    p.add_argument(
+        "--strong-protocol",
+        choices=PROTOCOLS,
+        help="güçlü modelin araç protokolü (verilmezse --protocol ile aynı)",
+    )
+    p.add_argument(
+        "--strong-api-key-env",
+        metavar="ORTAM_DEĞİŞKENİ",
+        help="güçlü model için anahtarın okunacağı ortam değişkeni (verilmezse USTA_API_KEY)",
+    )
+
+
+def _strong_model(args: argparse.Namespace) -> ModelClient:
+    key = os.environ.get(args.strong_api_key_env) if args.strong_api_key_env else _ENV_KEY
+    return _build_model(
+        args.strong_endpoint
+        or args.endpoint
+        or os.environ.get("USTA_ENDPOINT")
+        or DEFAULT_ENDPOINT,
+        args.strong_model,
+        args.strong_protocol or args.protocol or os.environ.get("USTA_PROTOCOL") or "native",
+        args.model_timeout,
+        api_key=key,
+    )
+
+
 def _add_model_args(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--endpoint", help=f"OpenAI-uyumlu uç nokta (USTA_ENDPOINT; varsayılan {DEFAULT_ENDPOINT})"
@@ -340,6 +374,7 @@ def _parser() -> argparse.ArgumentParser:
         "--breaker", action="store_true", help="devre kesici açık (harness yapılandırması)"
     )
     lr.add_argument("--harness-id", default="base", help="deney kaydına yazılan yapılandırma adı")
+    _add_strong_args(lr)
     lr.add_argument(
         "--model-revision", help="model revizyonu/özeti (verilmezse Ollama'dan okunmaya çalışılır)"
     )
@@ -402,23 +437,7 @@ def _parser() -> argparse.ArgumentParser:
         metavar="N",
         help="deney: son N dosya yazması tam kalır, eskilerin içeriği bağlamdan atılır",
     )
-    br.add_argument(
-        "--strong-model",
-        help="X-CASCADE kolu: takılınca devredilecek güçlü model (--model ucuz model olur)",
-    )
-    br.add_argument(
-        "--strong-endpoint", help="güçlü modelin uç noktası (verilmezse --endpoint ile aynı)"
-    )
-    br.add_argument(
-        "--strong-protocol",
-        choices=PROTOCOLS,
-        help="güçlü modelin araç protokolü (verilmezse --protocol ile aynı)",
-    )
-    br.add_argument(
-        "--strong-api-key-env",
-        metavar="ORTAM_DEĞİŞKENİ",
-        help="güçlü model için anahtarın okunacağı ortam değişkeni (verilmezse USTA_API_KEY)",
-    )
+    _add_strong_args(br)
     _add_model_args(br)
     mcp = sub.add_parser("mcp", help="MCP sunucularını yönet (arama, takvim vb. ek araçlar)")
     vf = sub.add_parser(
@@ -812,7 +831,13 @@ def _lab_cmd(args: argparse.Namespace) -> int:
     model = _make_model(args)
     if model is None:
         return 2
-    name = args.model or os.environ.get("USTA_MODEL") or "?"
+    if args.strong_model:
+        # Lab'da takılma işareti söz–eylem hatırlatmasıdır (bitirme kapısı yok); boş el işareti kapalı:
+        # yanıtı okuyarak veren görevlerde ucuz modelin doğru yanıtını atardı
+        model = CascadeModel(model, _strong_model(args), on_nudge=True, empty_handed=False)
+    base_name = name = args.model or os.environ.get("USTA_MODEL") or "?"
+    if args.strong_model:
+        name = f"{name}→{args.strong_model}"
     endpoint = args.endpoint or os.environ.get("USTA_ENDPOINT") or DEFAULT_ENDPOINT
     harness = labrunner.HarnessConfig(
         id=args.harness_id,
@@ -821,7 +846,7 @@ def _lab_cmd(args: argparse.Namespace) -> int:
         taint=_taint_gate(args),
         protocol=args.protocol or os.environ.get("USTA_PROTOCOL") or "native",
     )
-    rev = args.model_revision or capability.detect_revision(endpoint, name)
+    rev = args.model_revision or capability.detect_revision(endpoint, base_name)
     meta = labrunner.experiment_meta(
         scenarios,
         model=name,
@@ -925,20 +950,7 @@ def _bench_cmd(args: argparse.Namespace) -> int:
         if not args.strong_model:
             print("hata: X-CASCADE kolu için --strong-model gerekir", file=sys.stderr)
             return 2
-        strong_key = (
-            os.environ.get(args.strong_api_key_env) if args.strong_api_key_env else _ENV_KEY
-        )
-        strong = _build_model(
-            args.strong_endpoint
-            or args.endpoint
-            or os.environ.get("USTA_ENDPOINT")
-            or DEFAULT_ENDPOINT,
-            args.strong_model,
-            args.strong_protocol or args.protocol or os.environ.get("USTA_PROTOCOL") or "native",
-            args.model_timeout,
-            api_key=strong_key,
-        )
-        model = CascadeModel(model, strong)
+        model = CascadeModel(model, _strong_model(args))
     name = args.model or os.environ.get("USTA_MODEL") or "?"
     protocol = args.protocol or os.environ.get("USTA_PROTOCOL") or "native"
     print(

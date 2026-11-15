@@ -122,8 +122,19 @@ def run_one(
     timer.daemon = True
     status, error, infra, answer, steps = "COMPLETED", "", False, "", 0
     t0 = time.monotonic()
+    if hasattr(model, "reset"):
+        model.reset()  # kademeli yönlendirme: her koşu ucuz modelle başlar
+    strong = getattr(getattr(model, "strong", None), "usage", None)
+    strong_before = strong.completion + strong.prompt if strong else 0
     with tempfile.TemporaryDirectory(prefix="usta-lab-") as tmp:
         env = labenv.build(sc, condition, Path(tmp) / "ws")
+        observe = getattr(model, "observe", None)
+
+        def on_event(kind: str, data: dict) -> None:
+            env.on_event(kind, data)
+            if observe is not None:
+                observe(kind, data)
+
         agent = Agent(
             model,
             env.registry,
@@ -131,7 +142,7 @@ def run_one(
             AuditLog(Path(tmp) / "audit.jsonl"),
             approver=lambda tool, *_: tool == "delegate" and sc.delegate_output is not None,
             max_steps=sc.max_steps,
-            on_event=env.on_event,
+            on_event=on_event,
             cancel=cancel,
             breaker=CircuitBreaker(env.root) if harness.breaker else None,
             taint=harness.taint,
@@ -204,6 +215,9 @@ def run_one(
         "detail": outcome.detail,
         "artifact_refs": [f"traces/{run_id}.json"],
     }
+    if strong is not None:  # kademeli yönlendirme: güçlü modele geçildi mi, ne kadar harcadı
+        rec["escalated"] = bool(getattr(model, "escalated", False))
+        rec["strong_tokens"] = strong.completion + strong.prompt - strong_before
     trace = mask_deep(
         {
             "run_id": run_id,

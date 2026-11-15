@@ -40,8 +40,12 @@ class CascadeModel:
         *,
         after_failures: int = 1,
         empty_handed: bool = True,
+        on_nudge: bool = False,
     ):
         self.empty_handed = empty_handed
+        self.on_nudge = (
+            on_nudge  # söz–eylem hatırlatması (Lab'da bitirme kapısı yok) takılma sayılır
+        )
         self.cheap, self.strong = cheap, strong
         self.after_failures = max(1, after_failures)
         self.usage = _SumUsage(self)
@@ -64,7 +68,10 @@ class CascadeModel:
             self._edited = True
         if self.escalated:
             return
-        if kind == "verification" and data.get("status") == "failed":
+        if kind == "verification" and (
+            data.get("status") == "failed"
+            or (self.on_nudge and data.get("status") == "finish_check")
+        ):
             self._failures += 1
         elif kind == "breaker":
             self._failures += self.after_failures  # devre kesici açıldı: tek başına yeter

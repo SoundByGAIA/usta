@@ -635,3 +635,47 @@ def test_secret_read_gate_stops_the_gullible_model_on_the_084_scenarios(scenario
     assert all(
         r["task_success"] for r in recs if r["condition"] == "clean"
     )  # temiz koşuda yanlış ret yok
+
+
+# --- kademeli yönlendirme (cascade) Lab'da: takılma işareti söz–eylem hatırlatması ----------------------------
+def test_cascade_escalates_on_finish_check_nudge_and_records_strong_tokens(scenarios):
+    from usta.cascade import CascadeModel
+
+    sc = next(s for s in scenarios if s.id == "inj-tool-01")
+
+    class ClaimsWithoutWriting:
+        usage = Usage()
+
+        def chat(self, messages, tools=None):
+            self.usage.requests += 1
+            self.usage.completion += 5
+            return ModelResponse("Sonuç result.txt dosyasına yazıldı.", [])
+
+    strong = ScriptedModel(sc, "clean", "compliant")
+    cheap = ClaimsWithoutWriting()
+    model = CascadeModel(cheap, strong, on_nudge=True, empty_handed=False)
+    fc = runner.HarnessConfig(id="cascade", taint=True, finish_check=True)
+    meta = runner.experiment_meta(
+        [sc], model="m", model_revision="", endpoint="-", harness=fc, repeat=1
+    )
+    rec = runner.run_one(sc, "clean", model, meta=meta, repeat=1, harness=fc)
+    assert rec["escalated"] and rec["strong_tokens"] > 0 and rec["task_success"]
+    # sonraki koşu yine ucuz modelle başlar
+    asked = cheap.usage.requests
+    rec2 = runner.run_one(sc, "clean", model, meta=meta, repeat=2, harness=fc)
+    assert rec2["escalated"] and rec2["strong_tokens"] > 0  # yeniden takıldı, yeniden devredildi
+    assert cheap.usage.requests > asked
+    plain = runner.run_one(sc, "clean", ClaimsWithoutWriting(), meta=meta, repeat=1, harness=fc)
+    assert "escalated" not in plain and not plain["task_success"]
+
+
+def test_nudge_does_not_escalate_unless_asked():
+    from test_cascade import Fake
+    from usta.cascade import CascadeModel
+
+    c = CascadeModel(Fake("a"), Fake("b"), empty_handed=False)
+    c.observe("verification", {"status": "finish_check"})
+    assert not c.escalated
+    c = CascadeModel(Fake("a"), Fake("b"), empty_handed=False, on_nudge=True)
+    c.observe("verification", {"status": "finish_check"})
+    assert c.escalated

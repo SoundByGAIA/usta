@@ -36,8 +36,14 @@ DEFAULT_PLAN = [
     "İçerik - kullanıcının verdiği bilgiler",
     "İletişim",
 ]
-_SCRIPT_WANTED = re.compile(
-    r"sayaç|geri\s*sayım|countdown|kaç\s+gün|animasyon|buton|düğme", re.IGNORECASE
+_SCRIPT_WANTED = re.compile(r"animasyon|buton|düğme", re.IGNORECASE)
+_COUNTDOWN = re.compile(r"sayaç|geri\s*sayım|countdown|kaç\s+gün", re.IGNORECASE)
+# Sayfa düzeni Usta'nındır: modelin CSS'i renk ve yazıyı seçer, düzeni bozamaz (16 Kasım, 4B: body'yi flex yapıp
+# bölümleri yan yana dizdi)
+LAYOUT_CSS = (
+    "body{display:block;margin:0;padding:0}"
+    "header,section,footer{display:block;box-sizing:border-box;max-width:760px;margin:16px auto;padding:16px}"
+    "header{text-align:center}img{max-width:100%}"
 )
 _FENCE = re.compile(r"```[\w-]*\n?(.*?)```", re.DOTALL)
 _SECTION = re.compile(r"<section\b.*</section>", re.DOTALL | re.IGNORECASE)
@@ -207,8 +213,34 @@ def problems(task: str, fragment: str) -> list[str]:
     return out
 
 
-def assemble(title: str, css: str, sections: list[str]) -> str:
-    body = "\n\n".join([f"<header>\n<h1>{html.escape(title)}</h1>\n</header>", *sections])
+def countdown(task: str) -> str:
+    """İstekte sayaç ve tarih varsa Usta'nın hazır sayaç bölümü (16 Kasım: 9B'nin sayacı üç turda da bozuktu, 4B
+    "bugünü" 2024 diye sabit yazdı). Tarih kullanıcının isteğinden gelir; model betik yazmaz."""
+    m = sitecheck._DATE.search(task or "")
+    if not _COUNTDOWN.search(task or "") or not m:
+        return ""
+    d, mon, y = (
+        int(m.group(1)),
+        sitecheck._MONTHS.index(sitecheck._fold(m.group(2))) % 12 + 1,
+        int(m.group(3)),
+    )
+    label = html.escape(f"{m.group(1)} {m.group(2)} {m.group(3)}")
+    return (
+        '<section id="sayac">\n<h2>Kaç gün kaldı?</h2>\n'
+        f'<p>{label} tarihine <strong id="sayac-gun">…</strong> gün kaldı.</p>\n'
+        "<script>\n(function () {\n"
+        f"  var hedef = new Date({y}, {mon - 1}, {d});\n"
+        "  var bugun = new Date(); bugun.setHours(0, 0, 0, 0);\n"
+        "  var gun = Math.round((hedef - bugun) / 86400000);\n"
+        '  document.getElementById("sayac-gun").textContent = gun > 0 ? gun : 0;\n'
+        "})();\n</script>\n</section>"
+    )
+
+
+def assemble(title: str, css: str, sections: list[str], tail: str = "") -> str:
+    parts = [f"<header>\n<h1>{html.escape(title)}</h1>\n</header>", *sections]
+    body = "\n\n".join([*parts, tail] if tail else parts)
+    css = f"{css}\n{LAYOUT_CSS}"
     return (
         '<!doctype html>\n<html lang="tr">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -277,11 +309,6 @@ class SiteBuilder:
             "Bu bölüm bir sayaç ya da etkileşim gerektiriyorsa kısa bir <script> ekleyebilirsin; betik yalnız bu "
             "bölümdeki öğelere id ile erişsin.\n"
             if _SCRIPT_WANTED.search(item)
-            or (
-                _SCRIPT_WANTED.search(self.task)
-                and idx == len(plan) - 1
-                and not any(_SCRIPT_WANTED.search(p) for p in plan)
-            )
             else "Betik (script) yazma.\n"
         )
         prompt = (
@@ -327,9 +354,12 @@ class SiteBuilder:
         kept: list[
             tuple[int, str]
         ] = []  # yazılan bölümlerin plandaki sırası ve adı (tekrarlar çıkarılır)
+        tail = countdown(self.task)
         for i, item in enumerate(plan):
             if self.cancelled():
                 return "(görev durduruldu)", False
+            if tail and _COUNTDOWN.search(item):
+                continue  # sayaç bölümünü Usta hazır parçayla koyar
             frag = self._section(i, item, plan)
             issues = problems(self.task, frag)
             if issues:
@@ -347,7 +377,9 @@ class SiteBuilder:
             )
             sections.append(frag)
             kept.append((i, item))
-        page = assemble(title, css, sections)
+        if tail:
+            self._step("✓ Gün sayacı (Usta'nın hazır parçası)")
+        page = assemble(title, css, sections, tail)
         lack = sitecheck.missing(self.task, [page])
         if lack and sections and not self.cancelled():
             # eksik bilgi, kullanıcının bilgilerinden en çoğunu zaten taşıyan bölüme eklenir (menüde eksik kalan
@@ -372,7 +404,7 @@ class SiteBuilder:
             )
             if not problems(self.task, frag):
                 sections[target] = frag
-                page = assemble(title, css, sections)
+                page = assemble(title, css, sections, tail)
                 lack = sitecheck.missing(self.task, [page])
         self._step(
             "✓ Bilgilerin hepsi sayfada"

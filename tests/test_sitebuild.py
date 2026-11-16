@@ -66,7 +66,9 @@ def test_section_checks_catch_invented_prices_times_phones_and_broken_scripts():
             )
         )
         assert (
-            sitebuild.problems(PASTANE, "<section><p>Sayaç</p><script>let a = 1;</script></section>")
+            sitebuild.problems(
+                PASTANE, "<section><p>Sayaç</p><script>let a = 1;</script></section>"
+            )
             == []
         )
 
@@ -122,3 +124,50 @@ def test_site_steps_off_or_existing_site_uses_the_normal_loop(tmp_path):
     agent, ws = _agent(tmp_path, model, site_steps=True)
     (ws / "index.html").write_text("<h1>eski</h1>")
     assert agent.run("Sitemin rengini maviye çevir.").answer == "tamam"
+
+
+DAVETIYE = (
+    "Düğünümüz için bir davetiye sitesi istiyorum: Ali ve Zeynep evleniyor, 14 Haziran 2027, Bursa. "
+    "Düğüne kaç gün kaldığını gösteren bir sayaç olsun."
+)
+
+
+def test_countdown_part_uses_the_users_date_and_todays_clock():
+    assert sitebuild.countdown(PASTANE) == ""
+    assert sitebuild.countdown("Bir sayaç olsun.") == ""  # tarih yok
+    part = sitebuild.countdown(DAVETIYE)
+    assert "new Date(2027, 5, 14)" in part and "new Date();" in part and "14 Haziran 2027" in part
+    assert sitebuild.problems(DAVETIYE, part) == []
+    node = sitebuild.shutil.which("node")
+    if node:
+        js = sitebuild._SCRIPT.search(part).group(1)
+        fake = (
+            "const RealDate = Date; global.Date = class extends RealDate {"
+            " constructor(...a) { super(...(a.length ? a : [2026, 10, 16, 15, 0])); } };"
+            "const el = {}; global.document = { getElementById: () => el };"
+        )
+        out = sitebuild.subprocess.run(
+            [node, "-e", fake + js + ";console.log(el.textContent)"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+        ).stdout.strip()
+        assert out == "210"  # 16 Kasım 2026 → 14 Haziran 2027
+
+
+def test_countdown_section_is_not_written_by_the_model_and_layout_is_fixed(tmp_path):
+    model = Scripted(
+        ModelResponse("1. Davet - Ali ve Zeynep\n2. Gün Sayacı - kaç gün kaldı"),
+        ModelResponse("Ali ve Zeynep Evleniyor"),
+        ModelResponse("body { display: flex }"),
+        ModelResponse(
+            "<section><h2>Davet</h2><p>Ali ve Zeynep 14 Haziran 2027'de Bursa'da evleniyor.</p></section>"
+        ),
+    )
+    agent, ws = _agent(tmp_path, model, site_steps=True)
+    result = agent.run(DAVETIYE)
+    page = (ws / "index.html").read_text()
+    assert page.count('id="sayac-gun"') == 1 and "Usta'nın hazır parçası" in result.answer
+    assert page.index("body { display: flex }") < page.index(sitebuild.LAYOUT_CSS)
+    assert not model.responses

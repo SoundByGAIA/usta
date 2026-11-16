@@ -186,4 +186,9 @@ def test_invented_places_are_caught_but_single_capitalized_words_are_not():
         "<ul><li>Baklava: 120 TL – Klasik ve taze.</li><li>Tarih: 14.06.2027</li></ul></section>"
     )
     assert sitebuild.problems(DAVETIYE + " baklava 120 TL", ok) == []
-    assert sitebuild.invented_names(PASTANE, "<p>Hoş geldiniz, Tatlı Köşe'ye! Biz Nilüfer Bursa'dayız.</p>") == []
+    assert (
+        sitebuild.invented_names(
+            PASTANE, "<p>Hoş geldiniz, Tatlı Köşe'ye! Biz Nilüfer Bursa'dayız.</p>"
+        )
+        == []
+    )

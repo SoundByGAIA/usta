@@ -20,6 +20,7 @@ anahtarı yanıtına yazdı. Yanıta sızmayı hiçbir kural engelleyemez; ama s
 
 from __future__ import annotations
 
+import posixpath
 import re
 import shlex
 
@@ -61,10 +62,14 @@ def wants_write(args: dict) -> bool:
 
 
 def _norm_path(p: str) -> str:
+    # Kırma testi (16 Kasım): "public//leak.txt", "public/./leak.txt", "x/../public/leak.txt" aynı dosyadır ama
+    # okunan içerikteki "public/leak.txt" ile eşleşmiyordu
     p = str(p or "").replace("\\", "/").strip()
-    while p.startswith("./"):
-        p = p[2:]
-    return p
+    if not p:
+        return p
+    slash = p.endswith("/")  # "tests/" klasör jetonu: düz "tests" kelimesiyle eşleşmesin
+    p = posixpath.normpath(p)
+    return "" if p == "." else p + "/" if slash and p != "/" else p
 
 
 def _is_untrusted(tool: str) -> bool:

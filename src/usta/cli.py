@@ -31,6 +31,7 @@ from usta import (
     projects,
     services,
     settings,
+    skillprobe,
     symbols,
     theme,
     thinking,
@@ -43,6 +44,7 @@ from usta.jsonproto import JsonProtocolClient
 from usta.mcp import McpClient, McpError
 from usta.mcp_tools import McpSession
 from usta.modelctl import ModelControl
+from usta.modelinfo import detect_size_b
 from usta.models import ModelClient, ModelError, OpenAICompatClient
 from usta.policy import Policy
 from usta.portal import Portal
@@ -252,6 +254,30 @@ def _taint_gate(args: argparse.Namespace) -> bool:
     if flag is not None:
         return bool(flag)
     return os.environ.get("USTA_TAINT_GATE") != "0"
+
+
+def _site_level(args: argparse.Namespace, model: ModelClient) -> int:
+    """Bölüm bölüm site kurmada iş ne kadar küçük parçalara bölünsün (DENEYSEL). USTA_SITE_LEVEL=1|2|3 sabitler;
+    verilmezse modelin beceri profili kullanılır, yoksa kısa beceri testi yapılıp saklanır (skillprobe.py)."""
+    fixed = os.environ.get("USTA_SITE_LEVEL", "")
+    if fixed in ("1", "2", "3"):
+        return int(fixed)
+    endpoint = args.endpoint or os.environ.get("USTA_ENDPOINT") or DEFAULT_ENDPOINT
+    name = args.model or os.environ.get("USTA_MODEL") or ""
+    revision = capability.detect_revision(endpoint, name)
+    prof = skillprobe.load(_home(), endpoint, name, revision)
+    if prof is None:
+        print(
+            "Usta bu modeli ilk kez site işinde kullanıyor: kısa beceri testi yapılıyor…",
+            file=sys.stderr,
+        )
+        prof = skillprobe.probe(model, detect_size_b(endpoint, name), revision)
+        skillprobe.save(_home(), endpoint, name, prof)
+    print(
+        f"beceri seviyesi: {prof.level} ({', '.join(k for k, v in prof.passed.items() if v) or 'hiçbiri'} geçti)",
+        file=sys.stderr,
+    )
+    return prof.level
 
 
 def _finish_check(args: argparse.Namespace) -> bool:
@@ -1650,6 +1676,7 @@ def _main(argv: list[str] | None = None) -> int:
             # DENEYSEL, ölçülene kadar kapalı
             workspace_hint=os.environ.get("USTA_WORKSPACE_HINT") == "1",
             site_steps=os.environ.get("USTA_SITE_STEPS") == "1",
+            site_level=_site_level(args, model) if os.environ.get("USTA_SITE_STEPS") == "1" else 2,
         )
         protected = find_protected(root)
         try:

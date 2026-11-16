@@ -70,9 +70,13 @@ class Agent:
         finish_check: bool = False,
         workspace_hint: bool = False,
         site_steps: bool = False,
+        site_level: int = 2,
     ):
         # DENEYSEL: yeni site isteği bölüm bölüm kurulur, her bölüm denetlenir (sitebuild.py)
         self.site_steps = site_steps
+        self.site_level = (
+            site_level  # 3: tek seferde (olağan döngü), 2: bölüm bölüm, 1: en küçük parçalar
+        )
         # DENEYSEL: görev başında çalışma klasöründeki dosyaların adları modele söylenir (16 Kasım: 9B "sitemin rengini
         # değiştir" isteğinde klasördeki index.html'e bakmadan "hangi dosya?" diye sordu)
         self.workspace_hint = workspace_hint
@@ -156,7 +160,7 @@ class Agent:
         if self.breaker is not None:
             self.breaker.start()
         root = getattr(self.policy, "root", None)
-        if self.site_steps and sitebuild.applies(prompt, root):
+        if self.site_steps and self.site_level < 3 and sitebuild.applies(prompt, root):
             return self._build_site(prompt, messages)
         tools = self.registry.schemas()
         for step in range(1, self.max_steps + 1):
@@ -245,6 +249,7 @@ class Agent:
             write,
             progress=lambda line: self._emit("message", content=line),
             cancelled=self._cancelled,
+            level=self.site_level,
         )
         answer, _ok = builder.run()
         self._emit_usage()

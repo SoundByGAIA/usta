@@ -56,7 +56,7 @@ def test_section_checks_catch_invented_prices_times_phones_and_broken_scripts():
     )
     assert any("saat" in p for p in hours) and any("telefon" in p for p in hours)
     assert sitebuild.problems(PASTANE, "<section><h2></h2></section>") == [
-        "bölümde görünen metin yok"
+        "bölümde başlık dışında metin yok"
     ]
     if sitebuild.shutil.which("node"):
         assert any(

@@ -213,6 +213,14 @@ def invented_names(task: str, fragment: str) -> list[str]:
     return list(dict.fromkeys(out))
 
 
+_HEADING = re.compile(r"<h[1-6]\b.*?</h[1-6]>", re.DOTALL | re.IGNORECASE)
+
+
+def body_text(fragment: str) -> str:
+    """Başlıklar dışındaki görünen metin (uydurma satırları silinince yalnız başlık kalan bölüm boş sayılır)."""
+    return visible_text(_HEADING.sub(" ", fragment))
+
+
 def visible_text(fragment: str) -> str:
     p = _Text()
     p.feed(fragment)
@@ -288,8 +296,8 @@ def scrub(task: str, fragment: str) -> tuple[str, int]:
 
 def problems(task: str, fragment: str) -> list[str]:
     out = []
-    if len(visible_text(fragment)) < 3:
-        out.append("bölümde görünen metin yok")
+    if len(body_text(fragment)) < 3:
+        out.append("bölümde başlık dışında metin yok")
     extra = invented_prices(task, fragment)
     if extra:
         out.append(f"kullanıcının vermediği fiyatlar var ({', '.join(extra[:4])}); bunları çıkar")
@@ -370,6 +378,67 @@ def duplicate(fragment: str, earlier: list[str]) -> bool:
     return bool(w) and any(same_head(e) or len(w & _words(e)) >= 0.7 * len(w) for e in earlier)
 
 
+_TAGS = re.compile(r"<[^>]+>")
+
+
+def _clean_piece(s: str) -> str:
+    text = _TAGS.sub(" ", _unfence(s))
+    text = " ".join(text.replace("**", "").split()).strip("\"'“” ")
+    return text[:400]
+
+
+def piece_problems(task: str, text: str) -> list[str]:
+    if len(text) < 3:
+        return ["metin yok"]
+    out = []
+    if re.search(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]", text):
+        out.append("Türkçe olmayan harfler var")
+    if len(re.findall(r"[.!?]+(?:\s|$)", text + " ")) > 3:
+        out.append("çok uzun, en çok iki cümle yaz")
+    return out + problems(task, f"<section><p>{html.escape(text, quote=False)}</p></section>")
+
+
+def _cap(word: str) -> str:
+    return ("İ" if word[:1] == "i" else word[:1].upper()) + word[1:]
+
+
+def fact_rows(task: str, only: list[str] | None = None) -> list[str]:
+    """Kullanıcının bilgileri, Usta'nın yazdığı satırlar olarak ("Baklava - 120 TL", "Tarih: 14 Haziran 2027").
+    `only` verilirse yalnız o etiketlerden birini taşıyan satırlar."""
+    rows: list[tuple[str, set[str]]] = []
+    for m in sitecheck._PRICE.finditer(task):
+        item, num = m.group(1), m.group(2)
+        word = item.split()[-1] if item else ""
+        if word and sitecheck._fold(word) not in sitecheck._SKIP_ITEM:
+            rows.append((f"{html.escape(_cap(word))} - {num} TL", {word, f"{num} TL"}))
+        else:
+            rows.append((f"{num} TL", {f"{num} TL"}))
+    for d, mon, y in sitecheck._DATE.findall(task):
+        rows.append((f"Tarih: {d} {mon} {y}", {f"{d} {mon} {y}"}))
+    for e in sitecheck._EMAIL.findall(task):
+        rows.append((f'E-posta: <a href="mailto:{html.escape(e)}">{html.escape(e)}</a>', {e}))
+    used = {lab for _, labs in rows for lab in labs}
+    names = [n for n in sitecheck._names(task) if n not in used]
+    if names:
+        rows.append((html.escape(", ".join(names)), set(names)))
+    if only is None:
+        return [r for r, _ in rows]
+    return [r for r, labs in rows if labs & set(only)]
+
+
+def fact_sections(task: str) -> list[str]:
+    """Seviye 1 için bilgi bölümleri: fiyatlar → Menü, diğerleri → Bilgiler."""
+    rows = fact_rows(task)
+    menu = [r for r in rows if r.endswith(" TL") and not r.startswith(("Tarih", "E-posta"))]
+    rest = [r for r in rows if r not in menu]
+    out = []
+    for title, items in (("Menü", menu), ("Bilgiler", rest)):
+        if items:
+            lis = "\n".join(f"<li>{r}</li>" for r in items)
+            out.append(f"<section>\n<h2>{title}</h2>\n<ul>\n{lis}\n</ul>\n</section>")
+    return out
+
+
 class SiteBuilder:
     def __init__(
         self,
@@ -378,7 +447,9 @@ class SiteBuilder:
         write: Callable[[str, str], str],
         progress: Callable[[str], None] | None = None,
         cancelled: Callable[[], bool] | None = None,
+        level: int = 2,
     ):
+        self.level = level  # 2: bölüm bölüm, 1: en küçük parçalar (skillprobe.py)
         self.model, self.task, self.write = model, task, write
         self.progress = progress or (lambda _m: None)
         self.cancelled = cancelled or (lambda: False)
@@ -418,9 +489,33 @@ class SiteBuilder:
         )
         return parse_section(self._ask(prompt), idx)
 
-    def run(self) -> tuple[str, bool]:
-        """(kullanıcıya yanıt, sayfa yazıldı mı)."""
-        plan = parse_plan(
+    def _piece(self, what: str) -> str:
+        """En küçük birim: kısa düz metin (HTML yok), denetlenir; olmazsa boş (modelin sağlıklı
+        yapabildiği en küçük parçaya böl)."""
+        fix = ""
+        for _ in range(2):
+            text = _clean_piece(
+                self._ask(
+                    f"Kullanıcının isteği: {self.task}\n{self._facts_note()}"
+                    f"{what} En çok iki kısa, düz Türkçe cümle yaz. HTML yazma, liste yapma. Kullanıcının vermediği "
+                    f"bilgi ekleme.\n{fix}"
+                )
+            )
+            issues = piece_problems(self.task, text)
+            if not issues:
+                return text
+            fix = "Önceki denemede sorun vardı: " + "; ".join(issues) + "."
+        return ""
+
+    def _small_section(self, name: str) -> str:
+        """Bölümü en küçük parçalarla kurar: başlığı Usta koyar, model yalnız kısa metni yazar."""
+        text = self._piece(f'Sitenin "{name}" bölümü için kısa bir metin yaz.')
+        if not text:
+            return ""
+        return f"<section>\n<h2>{html.escape(name)}</h2>\n<p>{html.escape(text, quote=False)}</p>\n</section>"
+
+    def _plan(self) -> list[str]:
+        return parse_plan(
             self._ask(
                 f"Kullanıcının isteği: {self.task}\n{self._facts_note()}"
                 f"Bu tek sayfalık site için 2 ile {MAX_SECTIONS - 1} arası bölüm planla. Her satıra bir bölüm yaz: kısa ad - "
@@ -428,15 +523,16 @@ class SiteBuilder:
                 "kullanıcının verdiği bilgilere dayan. Başka bir şey yazma."
             )
         )
-        self._step("Plan: " + " → ".join(plan_name(p) for p in plan))
-        title = _title(
+
+    def _title(self) -> str:
+        return _title(
             self.task,
             self._ask(
                 f"Kullanıcının isteği: {self.task}\nBu site için en çok 6 kelimelik bir başlık yaz. Yalnız başlığı yaz."
             ),
         )
-        if self.cancelled():
-            return "(görev durduruldu)", False
+
+    def _css(self, plan: list[str]) -> str:
         css = parse_css(
             self._ask(
                 f"Kullanıcının isteği: {self.task}\nBölümler: {'; '.join(plan)}.\n"
@@ -449,17 +545,22 @@ class SiteBuilder:
             if css
             else "• Tasarım yazılamadı, Usta'nın hazır görünümü kullanıldı"
         )
-        css = css or DEFAULT_CSS
+        return css or DEFAULT_CSS
+
+    def _sections_level2(
+        self, plan: list[str], tail: str
+    ) -> tuple[list[str], list[tuple[int, str]]]:
         sections: list[str] = []
         kept: list[
             tuple[int, str]
         ] = []  # yazılan bölümlerin plandaki sırası ve adı (tekrarlar çıkarılır)
-        tail = countdown(self.task)
         for i, item in enumerate(plan):
             if self.cancelled():
-                return "(görev durduruldu)", False
+                break
             if tail and _COUNTDOWN.search(item):
                 continue  # sayaç bölümünü Usta hazır parçayla koyar
+            name = plan_name(item)
+            smaller = False
             frag = self._section(i, item, plan)
             issues = problems(self.task, frag)
             if issues:
@@ -470,23 +571,48 @@ class SiteBuilder:
                     frag, issues = frag2, problems(self.task, frag2)
             if issues:
                 cleaned, n = scrub(self.task, frag)
-                if n and len(visible_text(cleaned)) >= 3:
+                if n and len(body_text(cleaned)) >= 3:
                     frag, issues = cleaned, problems(self.task, cleaned)
-                    self._step(f"• {plan_name(item)}: uydurma bilgi taşıyan {n} satırı Usta sildi")
-            name = plan_name(item)
+                    self._step(f"• {name}: uydurma bilgi taşıyan {n} satırı Usta sildi")
+            if issues:
+                # iki denemede olmadı: bir basamak aşağı, daha küçük parçalarla
+                small = self._small_section(name)
+                self._step(
+                    f"↓ {name}: daha küçük parçalarla yeniden yapıldı"
+                    if small
+                    else f"• {name} çıkarıldı (sağlıklı yazılamadı)"
+                )
+                if not small:
+                    continue
+                frag, issues, smaller = small, [], True
             if duplicate(frag, sections):
                 self._step(f"• {name} çıkarıldı (önceki bir bölümün tekrarı)")
                 continue
-            self._step(
-                f"✓ {name}" if not issues else f"• {name} (sorun kaldı: {'; '.join(issues)})"
-            )
+            if not smaller:
+                self._step(f"✓ {name}")
             sections.append(frag)
             kept.append((i, item))
-        if tail:
-            self._step("✓ Gün sayacı (Usta'nın hazır parçası)")
-        page = assemble(title, css, sections, tail)
-        lack = sitecheck.missing(self.task, [page])
-        if lack and sections and not self.cancelled():
+        return sections, kept
+
+    def _sections_level1(self) -> list[str]:
+        """Seviye 1: iskelet ve bilgiler Usta'dan; model yalnız kısa bir tanıtım yazar."""
+        sections = []
+        intro = self._piece("Bu site için kısa bir tanıtım yaz.")
+        if intro:
+            sections.append(
+                f"<section>\n<h2>Hoş geldiniz</h2>\n<p>{html.escape(intro, quote=False)}</p>\n</section>"
+            )
+            self._step("✓ Tanıtım (kısa metin)")
+        else:
+            self._step("• Tanıtım yazılamadı, yalnız bilgiler kondu")
+        sections.extend(fact_sections(self.task))
+        self._step("✓ Bilgiler (Usta yerleştirdi)")
+        return sections
+
+    def _repair(self, plan, sections, kept, page_of) -> list[str]:
+        """Eksik bilgiyi modele ekletir; olmazsa Usta kendisi bir bilgi bölümü ekler."""
+        lack = sitecheck.missing(self.task, [page_of(sections)])
+        if lack and kept and not self.cancelled():
             # eksik bilgi, kullanıcının bilgilerinden en çoğunu zaten taşıyan bölüme eklenir (menüde eksik kalan
             # tatlı menüye; planda adı geçiyorsa o bölüme)
             total = len(self.facts)
@@ -508,20 +634,53 @@ class SiteBuilder:
                 fix=f"Şu bilgiler sayfada eksik, bu bölüme aynen ekle: {', '.join(lack)}.\n",
             )
             if not problems(self.task, frag):
-                sections[target] = frag
-                page = assemble(title, css, sections, tail)
-                lack = sitecheck.missing(self.task, [page])
+                sections = [*sections[:target], frag, *sections[target + 1 :]]
+                lack = sitecheck.missing(self.task, [page_of(sections)])
+        if lack:
+            rows = fact_rows(self.task, only=lack)
+            if rows:
+                items = "\n".join(f"<li>{r}</li>" for r in rows)
+                sections = [
+                    *sections,
+                    f"<section>\n<h2>Bilgiler</h2>\n<ul>\n{items}\n</ul>\n</section>",
+                ]
+                self._step(f"✓ Eksik bilgileri Usta ekledi: {', '.join(lack)}")
+                lack = sitecheck.missing(self.task, [page_of(sections)])
         self._step(
             "✓ Bilgilerin hepsi sayfada"
             if not lack
             else f"• Sayfada eksik bilgi: {', '.join(lack)}"
         )
+        return sections
+
+    def run(self) -> tuple[str, bool]:
+        """(kullanıcıya yanıt, sayfa yazıldı mı)."""
+        tail = countdown(self.task)
+        if self.level <= 1:
+            self._step("Plan: tanıtım → bilgiler" + (" → gün sayacı" if tail else ""))
+            title, plan, kept = self._title(), [], []
+            css = DEFAULT_CSS
+            sections = self._sections_level1()
+        else:
+            plan = self._plan()
+            self._step("Plan: " + " → ".join(plan_name(p) for p in plan))
+            title = self._title()
+            if self.cancelled():
+                return "(görev durduruldu)", False
+            css = self._css(plan)
+            sections, kept = self._sections_level2(plan, tail)
+        if self.cancelled():
+            return "(görev durduruldu)", False
+        if tail:
+            self._step("✓ Gün sayacı (Usta'nın hazır parçası)")
+        sections = self._repair(plan, sections, kept, lambda secs: assemble(title, css, secs, tail))
+        page = assemble(title, css, sections, tail)
         result = self.write("index.html", page)
         ok = not result.startswith(("reddedildi", "hata"))
         self._step("✓ index.html yazıldı" if ok else f"• index.html yazılamadı: {result[:120]}")
-        tail = (
+        end = (
             "Sayfanız hazır: index.html dosyasını çift tıklayarak tarayıcıda açabilirsiniz."
             if ok
             else "Sayfayı yazamadım."
         )
-        return "Yapılanlar:\n" + "\n".join(self.log) + "\n\n" + tail, ok
+        return "Yapılanlar:\n" + "\n".join(self.log) + "\n\n" + end, ok

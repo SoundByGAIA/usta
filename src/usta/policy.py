@@ -19,6 +19,27 @@ SYMBOL_TOOLS = {
 # Ajanın yazamayacağı yollar: .git (hook/config ile kullanıcı git çalıştırınca ana makinede kod çalışır),
 # .usta (proje hafızası yalnız `remember` aracıyla ve temizlenerek yazılır).
 PROTECTED_DIRS = frozenset({".git", ".usta"})
+# Kullanıcının bilgisayarında KENDİLİĞİNDEN çalışan dosyalar (kutunun dışında): klasör açılınca (VS Code görevleri,
+# devcontainer), commit'te (husky/pre-commit kancaları), klasöre girince (direnv) ya da push'ta (CI, gizli anahtarlarla).
+# Yazmak yasak değil (meşru iş olabilir) ama her seferinde sorulur; oto modda reddedilir. (Kırma testi, 16 Kasım)
+HOST_AUTORUN_DIRS = frozenset({".vscode", ".idea", ".husky", ".githooks", ".devcontainer"})
+HOST_AUTORUN_FILES = frozenset({".envrc", ".pre-commit-config.yaml", ".gitlab-ci.yml"})
+
+
+def _part(name: str) -> str:
+    # Windows ad sonundaki nokta ve boşluğu siler: ".git." ve ".git " aslında ".git"
+    return name.rstrip(". ").casefold()
+
+
+def host_autorun(parts: set[str]) -> bool:
+    return (
+        bool(HOST_AUTORUN_DIRS & parts or HOST_AUTORUN_FILES & parts)
+        or {
+            ".github",
+            "workflows",
+        }
+        <= parts
+    )
 
 
 class Decision(Enum):
@@ -82,13 +103,13 @@ class Policy:
                 return Decision.DENY
             if tool in WRITE_TOOLS:
                 parts = {
-                    p.casefold()
+                    _part(p)
                     for p in (*full.relative_to(self.root).parts, *Path(args["path"]).parts)
                 }
                 if PROTECTED_DIRS & parts:
-                    return (
-                        Decision.DENY
-                    )  # .git / .usta'ya yazılamaz (okuma serbest); `.GIT` ve bağ biçimleri dahil
+                    return Decision.DENY  # .git / .usta'ya yazılamaz (okuma serbest); `.GIT`, `.git.` ve bağ biçimleri dahil
+                if host_autorun(parts):
+                    return Decision.ASK
             return Decision.ALLOW
         if tool == "run":
             return Decision.ALLOW  # sandbox içinde: ağ kapalı, yalnız çalışma alanı bağlı

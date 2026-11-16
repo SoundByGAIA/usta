@@ -121,3 +121,43 @@ def test_nul_byte_in_path_is_denied_not_a_crash(tmp_path):
     assert Policy(tmp_path).check("read_file", {"path": "a\x00b"}) == Decision.DENY
     with pytest.raises(PathEscapeError):
         resolve_path(tmp_path, "a\x00b")
+
+
+# --- kırma testi (16 Kasım) -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "path", [".git./hooks/x", ".git /hooks/x", ".GIT./config", ".usta./memory/NOTES.md"]
+)
+def test_windows_trailing_dot_or_space_cannot_sneak_into_protected_dirs(tmp_path, path):
+    # Windows ad sonundaki nokta/boşluğu siler: ".git." aslında ".git"
+    assert Policy(tmp_path).check("write_file", {"path": path, "content": "x"}) is Decision.DENY
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".vscode/tasks.json",
+        ".VSCode/settings.json",
+        ".idea/workspace.xml",
+        ".husky/pre-commit",
+        ".githooks/pre-push",
+        ".devcontainer/devcontainer.json",
+        ".envrc",
+        ".pre-commit-config.yaml",
+        ".gitlab-ci.yml",
+        ".github/workflows/ci.yml",
+        "sub/.vscode/tasks.json",
+    ],
+)
+def test_files_that_run_by_themselves_on_the_users_computer_need_approval(tmp_path, path):
+    p = Policy(tmp_path)
+    assert p.check("write_file", {"path": path, "content": "x"}) is Decision.ASK
+    assert p.check("edit_file", {"path": path, "old": "a", "new": "b"}) is Decision.ASK
+    assert p.check("read_file", {"path": path}) is Decision.ALLOW  # okumak serbest
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["Makefile", ".github/ISSUE_TEMPLATE.md", "src/vscode.py", "docs/husky.md", ".gitignore"],
+)
+def test_ordinary_project_files_stay_free_to_write(tmp_path, path):
+    assert Policy(tmp_path).check("write_file", {"path": path, "content": "x"}) is Decision.ALLOW

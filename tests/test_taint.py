@@ -211,3 +211,37 @@ def test_agent_denies_write_mode_delegation_without_asking_when_user_said_read_o
     agent.run(READ_ONLY_TASK)
     assert asked == [{"agent": "claude", "task": "x"}]  # yazma kipi onaya bile sunulmadı
     assert any(e["event"] == "taint" and e.get("reason") == "read_only" for e in events(audit))
+
+
+# --- kırma testi (16 Kasım): kaçan gizli dosya adları ve kod dosyalarında yanlış alarm --------------------
+def test_secret_names_found_in_crush_test_are_caught_without_flagging_code_files():
+    from usta.taint import secret_path
+
+    for p in (
+        "prod.env.bak",
+        ".env~",
+        "kubeconfig",
+        ".kube/config",
+        "token.txt",
+        "api_key.txt",
+        "terraform.tfstate",
+        ".htpasswd",
+        "service-account.json",
+        "gcloud/application_default_credentials.json",
+        ".config/gh/hosts.yml",
+        ".bash_history",
+        "prod-secrets.yaml",
+    ):
+        assert secret_path(p), p
+    for p in (
+        "src/token_parser.py",
+        "tokenizer.json",
+        "tokens.py",
+        "docs/secret-sharing.md",
+        "secrets.md",
+        "environment.py",
+        "envelope.txt",
+        ".envrc",
+        "hosts.txt",
+    ):
+        assert not secret_path(p), p

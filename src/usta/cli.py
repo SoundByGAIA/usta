@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 import webbrowser
 from pathlib import Path
 
@@ -51,6 +52,7 @@ from usta.sandbox import cleanup_orphans
 from usta.tasks import TaskManager
 from usta.textproto import TextProtocolClient
 from usta.tools import ToolContext, build_registry
+from usta.workspace import find_protected, remove_new_protected
 
 DEFAULT_ENDPOINT = "http://localhost:11434/v1"  # Ollama
 PROTOCOLS = ("native", "json", "text")
@@ -1646,11 +1648,23 @@ def _main(argv: list[str] | None = None) -> int:
             taint=_taint_gate(args),
             finish_check=_finish_check(args),
         )
+        protected = find_protected(root)
         try:
             result = agent.run(args.prompt)
         except ModelError as e:
             print(f"hata: {e}", file=sys.stderr)
             return 1
+        finally:
+            # portaldaki gibi: görevde oluşturulan .git/çıplak depo (hook/config ile ana makinede kod çalıştırma
+            # yolu) çalışma alanından karantinaya alınır (kırma testi, 16 Kasım: `usta run`'da eksikti)
+            quarantine = _home() / "quarantine" / f"run-{time.strftime('%Y%m%d-%H%M%S')}"
+            gone = remove_new_protected(root, protected, quarantine)
+            if gone:
+                audit.record("protected_quarantined", paths=gone)
+                print(
+                    f"uyarı: görevde oluşturulan {', '.join(gone[:5])} karantinaya alındı ({quarantine})",
+                    file=sys.stderr,
+                )
     print(result.answer)
     return 1 if result.truncated else 0
 

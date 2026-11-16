@@ -94,6 +94,9 @@ def is_public_ip(ip: str) -> bool:
         or addr.is_unspecified
         or addr.is_loopback
         or addr.is_link_local
+        or getattr(
+            addr, "is_site_local", False
+        )  # fec0::/10 (eski IPv6 yerel ağ; Python genel sayıyor)
     )
 
 

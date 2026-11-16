@@ -169,6 +169,11 @@ def build_docker_args(
     if unsafe_mount_path(str(workdir)):  # -v sözdizimini bozar / seçenek enjekte eder
         raise ValueError(f"çalışma klasörü adında ':' ya da ',' olamaz: {workdir}")
     args += ["-v", f"{workdir}:/workspace:rw"]
+    usta_dir = Path(workdir) / ".usta"
+    if not usta_dir.exists() and not usta_dir.is_symlink():
+        # Kırma testi (16 Kasım): ilk görevde .usta henüz yoksa kutudaki komut .usta/memory/NOTES.md yazıp kalıcı
+        # hafızaya "kullanıcı notu" gibi görünen talimat ekleyebiliyordu. Klasör önceden açılır, salt okunur bağlanır.
+        usta_dir.mkdir()
     protected = {".git", ".usta"} | find_protected(
         Path(workdir)
     )  # her derinlikteki .git, iç içe .usta, çıplak depo

@@ -598,3 +598,28 @@ def test_think_off_sends_reasoning_effort_none_and_warns_about_ignored_think_fie
     assert body["reasoning_effort"] == "none" and "--think off" in capsys.readouterr().err
     assert main(base) == 0
     assert "reasoning_effort" not in endpoint.requests[2]["body"]  # varsayılan: modele dokunma
+
+
+def test_run_quarantines_git_dirs_created_during_the_task(tmp_path, monkeypatch, home, capsys):
+    # Kırma testi (16 Kasım): portal görev sonunda yeni .git'i karantinaya alıyordu, `usta run` almıyordu.
+    # Kutudaki komutun yazdığı .git/config (core.fsmonitor) kullanıcı git çalıştırınca ana makinede kod çalıştırır.
+    from usta import cli
+    from usta.agent import AgentResult
+
+    ws = tmp_path / "ws"
+    (ws / "eski" / ".git").mkdir(parents=True)  # görevden önce vardı: dokunulmaz
+
+    class PlantsGit:
+        def __init__(self, *a, **kw):
+            pass
+
+        def run(self, prompt):
+            (ws / ".git").mkdir()
+            (ws / ".git" / "config").write_text("[core]\n\tfsmonitor = touch /tmp/pwned\n")
+            return AgentResult("bitti", 1, False, [])
+
+    monkeypatch.setattr(cli, "Agent", PlantsGit)
+    assert cli.main(["run", "x", "-w", str(ws), "--model", "m"]) == 0
+    assert not (ws / ".git").exists() and (ws / "eski" / ".git").is_dir()
+    assert "karantinaya alındı" in capsys.readouterr().err
+    assert list((home / "quarantine").glob("run-*/.git/config"))

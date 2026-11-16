@@ -45,6 +45,7 @@ def test_host_allowed(host, allowed, ok):
         ("fe80::1", False),
         ("::ffff:10.0.0.1", False),
         ("::ffff:8.8.8.8", True),
+        ("fec0::1", False),  # eski IPv6 yerel ağ (kırma testi: Python genel sayıyordu)
     ],
 )
 def test_is_public_ip(ip, public):

@@ -31,9 +31,13 @@ _PATHISH = re.compile(r"[\w.\-]+[/.][\w.\-/]*\w|[\w\-]+/")
 SECRET_READ_TOOLS = frozenset({"read_file", "read_symbol"})
 # dosya adı (yolun son parçası) ya da klasör: .env, x.env, .env.local, anahtarlar, parola/kimlik dosyaları
 _SECRET_NAME = re.compile(
-    r"(?:^|/)(?:\.env(?:\.[\w-]+)?|[\w.-]+\.env|id_(?:rsa|dsa|ecdsa|ed25519)\b[\w.]*|[\w.-]+\.(?:pem|key|p12|pfx|kdbx|keystore|jks)"
-    r"|\.?(?:credentials|secrets?)(?:\.[\w]+)?|\.(?:npmrc|pypirc|netrc|pgpass|git-credentials))$"
-    r"|(?:^|/)\.(?:ssh|aws|gnupg|docker)/",
+    r"(?:^|/)(?:\.env(?:[.~][\w.~-]*)?|[\w.-]+\.env(?:[.~][\w.~-]*)?|id_(?:rsa|dsa|ecdsa|ed25519)\b[\w.]*"
+    r"|[\w.-]+\.(?:pem|key|p12|pfx|kdbx|keystore|jks|tfstate(?:\.backup)?)"
+    # kimlik/anahtar adı taşıyan VERİ dosyası (kod dosyası değil: token_parser.py, tokenizer.json, secret-sharing.md geçer)
+    r"|(?:[\w-]*[._-])?\.?(?:credentials|secrets?|tokens?|api[_-]?keys?|service[_-]?account)(?:[_-][\w-]*)?"
+    r"(?:\.(?:txt|json|ya?ml|ini|cfg|conf|toml|xml|csv))?"
+    r"|\.(?:npmrc|pypirc|netrc|pgpass|git-credentials|htpasswd|[\w]+_history)|kubeconfig|hosts\.ya?ml)$"
+    r"|(?:^|/)\.(?:ssh|aws|gnupg|docker|kube|azure)/|(?:^|/)gcloud/",
     re.IGNORECASE,
 )
 

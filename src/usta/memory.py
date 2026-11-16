@@ -82,6 +82,9 @@ _SUSPICIOUS = (
     (re.compile(r"\|\s*\w|&&|\$\(|>\s*/dev/", re.IGNORECASE), "kabuk işareti içeriyor"),
     (re.compile(r"\b[A-Z][A-Z0-9_]*(KEY|TOKEN|SECRET|PASSWORD|PASS)\s*[=:]|\bsk-[A-Za-z0-9_-]{16,}|\bBearer\s+\S{16,}", re.IGNORECASE), "gizli bilgi benzeri"),
     (re.compile(r"önceden onay|onaylandı|onay(ı)? gerekmez|izin verildi|pre-?approved|auto-?approved|always allow|no need to ask", re.IGNORECASE), "onay/izin iddiası"),
+    (re.compile(r"onay verdi|izin verdi|(izin|onay) (sorma|isteme)|(izin|onay) (sormadan|istemeden)|sormadan|without asking|do(n'?t| not) ask|approved", re.IGNORECASE), "onay/izin iddiası"),
+    (re.compile(r"(?<![\w])\.env\b|\w\.env\b|\bid_(rsa|dsa|ecdsa|ed25519)\b|\.ssh\b|\.aws\b|\bcredentials\b|\.pem\b|\bkubeconfig\b|\.npmrc\b|\.netrc\b|\bsecrets?\.(json|ya?ml)\b", re.IGNORECASE), "gizli dosya anıyor"),
+    (re.compile(r"test(ler)?(i|leri)? (atla|çalıştırma)|skip(ping)? (the )?tests|doğrulama(yı)? atla|bitti de\b|say (it'?s )?done", re.IGNORECASE), "doğrulamayı atlatma"),
     (re.compile(r"(önceki|önceki tüm|previous|all prior) (talimat|instruction|kural|rule)|ignore (all )?(previous|prior)|sistem istemi|system prompt|yeni talimat", re.IGNORECASE), "talimat geçersiz kılma"),
 )  # fmt: skip
 

@@ -85,6 +85,53 @@ def test_announcing_an_action_and_stopping_gets_a_continue():
     assert FinishCheck("x").on_finish("Let me check the files.")
 
 
+PASTANE = (
+    "Yeni bir pastane açtım, adı Tatlı Köşe. Menümü gösteren bir sayfa istiyorum: baklava 120 TL, sütlaç 80 TL, "
+    "kazandibi 90 TL. Adresimiz Nilüfer, Bursa."
+)
+
+
+def test_site_request_without_a_file_name_answered_with_code_gets_a_reminder():
+    # 16 Kasım ölçümü (9B): HTML yanıta döküldü, "Menüleriniz artık webde mevcut!" dendi, dosya yazılmadı
+    msg = FinishCheck(PASTANE).on_finish(
+        "```html\n<!DOCTYPE html>\n<html>...</html>\n```\nMenüleriniz artık webde mevcut!"
+    )
+    assert msg and "write_file" in msg and "index.html" in msg
+    assert FinishCheck("Bana bir web sitesi yap, adım Ayşe.").on_finish("Siteniz oluşturuldu!")
+    assert FinishCheck("Make me a landing page for my bakery.").on_finish(
+        "<html><body>Hi</body></html>"
+    )
+
+
+def test_site_request_is_satisfied_by_any_written_file():
+    for tool, args in (
+        ("write_file", {"path": "menu.html"}),
+        ("edit_file", {"path": "index.html"}),
+        ("run", {"command": "cat > index.html"}),
+    ):
+        fc = FinishCheck(PASTANE)
+        fc.observe(tool, args, executed=True)
+        assert fc.on_finish("Sayfanız oluşturuldu: ```html <html>``` ") is None, tool
+    denied = FinishCheck(PASTANE)
+    denied.observe("write_file", {"path": "index.html"}, executed=False)
+    assert denied.on_finish("Sayfanız oluşturuldu.")
+
+
+def test_site_word_without_code_or_claim_is_left_alone():
+    # soru soran ya da yalnız açıklayan yanıt itilmez; "site" geçmeyen kod isteği de
+    assert FinishCheck(PASTANE).on_finish("Sayfada hangi renkleri istersiniz?") is None
+    assert (
+        FinishCheck("README sayfasını özetle.").on_finish("Kurulum ve kullanım anlatılıyor.")
+        is None
+    )
+    assert (
+        FinishCheck("Bana bir toplama fonksiyonu göster.").on_finish(
+            "```py\ndef add(a, b): ...\n```"
+        )
+        is None
+    )
+
+
 # --- yanlış alarm vermemeli ---------------------------------------------------------------------------
 def test_normal_final_answers_pass_through():
     fc = FinishCheck(TASK_SUMMARY)

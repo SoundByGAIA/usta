@@ -13,6 +13,9 @@ kendi isteğinden çıkarılır; yalnız okunan kaynak dosyalar ("X dosyasındak
 hedef sayılmaz. (İlk sürüm modelin yanıtındaki her görev dosyasını hedef sanıyordu; "todo.md'yi okudum, count.txt'e
 yazdım" yanıtında okunan todo.md için yanlış hatırlatma yapıp modeli şaşırttı. Lab izinde görüldü, düzeltildi.)
 
+Dosya adı vermeyen site/sayfa istekleri ("web sitesi yap") ayrı kuralla yakalanır: bu görevde hiç dosya yazılmadan
+yanıta kod dökülür ya da "oluşturdum" denirse bir kez hatırlatılır.
+
 Güvenlik: okunan bir içeriğin (enjeksiyonun) uydurduğu dosyayı yazmaya itilmez; hatırlatmalar izin/onay kurallarını
 değiştirmez.
 
@@ -52,6 +55,14 @@ _INTENT = re.compile(
     re.IGNORECASE,
 )
 MAX_INTENT_CHARS = 240
+# Kodsuz kullanıcı dosya adı vermez: "web sitesi yap", "menümü gösteren bir sayfa istiyorum". 16 Kasım ölçümü (9B,
+# kodsuz kullanıcı gibi site istekleri): model pastane görevinde HTML'i yanıta döküp "menünüz artık webde" dedi, hiçbir
+# dosya yazmadı; hedef kuralı istekte dosya adı olmadığı için tetiklenmedi.
+_ARTIFACT = re.compile(
+    r"\b(?:web\s*)?site\w*|\bsayfa\w*|\bweb\s*page|\bwebsite|\blanding\s*page|\bhomepage",
+    re.IGNORECASE,
+)
+_CODE_IN_ANSWER = re.compile(r"```|<html|<!doctype", re.IGNORECASE)
 
 
 def write_targets(task: str) -> list[str]:
@@ -70,6 +81,8 @@ class FinishCheck:
         self.max_nudges = max_nudges
         self.targets = write_targets(self.task)
         self.written: set[str] = set()
+        self.artifact = bool(_ARTIFACT.search(self.task))
+        self.wrote_any = False  # bu görevde herhangi bir dosya yazıldı mı (ya da komut çalıştı mı)
         self.nudges = 0
         self.fired: list[str] = []  # tetiklenen kurallar (Lab izi için)
 
@@ -84,6 +97,8 @@ class FinishCheck:
         """Gerçekten yapılan yazmaları kaydeder (reddedilen/başarısız çağrılar sayılmaz)."""
         if executed and tool in WRITE_TOOLS and isinstance(args.get("path"), str):
             self.written.add(self._norm(args["path"]))
+        if executed and tool in (*WRITE_TOOLS, "run"):
+            self.wrote_any = True
         # komutla yazma ("echo 3 > count.txt"): hedef adı geçen bir komut çalıştıysa yeniden yazmaya itilmez
         # (Lab izi: hatırlatma komutla yazılmış dosyayı model uzun bir cümleyle yeniden yazdırdı)
         if executed and tool == "run" and isinstance(args.get("command"), str):
@@ -107,6 +122,16 @@ class FinishCheck:
                 "target",
                 f"Görev `{missing[0]}` dosyasına yazmanı istiyor; {said}bu görevde o dosyaya henüz yazmadın. "
                 "İzin sormana gerek yok: istenen sonucu şimdi write_file ile yaz. Yazamıyorsan nedenini kısaca söyle.",
+            )
+        if (
+            self.artifact
+            and not self.wrote_any
+            and (_CODE_IN_ANSWER.search(text) or _CLAIM.search(text))
+        ):
+            return self._nudge(
+                "artifact",
+                "Kullanıcı bir site/sayfa istedi ama bu görevde hiçbir dosya yazmadın; kodu yanıta yazmak yetmez, "
+                "kullanıcı onu açamaz. Sayfayı şimdi write_file ile yaz (ör. index.html), sonra kısaca ne yaptığını söyle.",
             )
         intent_only = len(text) <= MAX_INTENT_CHARS and "?" not in text and not _CLAIM.search(text)
         if text and intent_only and _INTENT.search(text):

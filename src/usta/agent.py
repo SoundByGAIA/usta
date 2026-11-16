@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from usta import context as ctx
+from usta import sitebuild
 from usta.audit import AuditLog
 from usta.breaker import CircuitBreaker, Trip
 from usta.finishcheck import FinishCheck
@@ -68,7 +69,10 @@ class Agent:
         taint: bool = False,
         finish_check: bool = False,
         workspace_hint: bool = False,
+        site_steps: bool = False,
     ):
+        # DENEYSEL: yeni site isteği bölüm bölüm kurulur, her bölüm denetlenir (sitebuild.py)
+        self.site_steps = site_steps
         # DENEYSEL: görev başında çalışma klasöründeki dosyaların adları modele söylenir (16 Kasım: 9B "sitemin rengini
         # değiştir" isteğinde klasördeki index.html'e bakmadan "hangi dosya?" diye sordu)
         self.workspace_hint = workspace_hint
@@ -151,6 +155,9 @@ class Agent:
         self._usage_base = self._usage_now()
         if self.breaker is not None:
             self.breaker.start()
+        root = getattr(self.policy, "root", None)
+        if self.site_steps and sitebuild.applies(prompt, root):
+            return self._build_site(prompt, messages)
         tools = self.registry.schemas()
         for step in range(1, self.max_steps + 1):
             if self._cancelled():
@@ -221,6 +228,31 @@ class Agent:
                 return self._stopped(step, messages)
         self.audit.record("truncated", steps=self.max_steps)
         return AgentResult("(adım sınırına ulaşıldı)", self.max_steps, True, messages)
+
+    def _build_site(self, prompt: str, messages: list[Message]) -> AgentResult:
+        n = 0
+
+        def write(path: str, content: str) -> str:
+            nonlocal n
+            n += 1
+            return self._execute(
+                ToolCall(f"site-{n}", "write_file", {"path": path, "content": content})
+            )
+
+        builder = sitebuild.SiteBuilder(
+            self.model,
+            prompt,
+            write,
+            progress=lambda line: self._emit("message", content=line),
+            cancelled=self._cancelled,
+        )
+        answer, _ok = builder.run()
+        self._emit_usage()
+        if self._cancelled():
+            return self._stopped(len(builder.log), messages)
+        messages.append(Message("assistant", answer))
+        self.audit.record("answer", steps=len(builder.log))
+        return AgentResult(answer, len(builder.log), False, messages)
 
     def _drain(self, messages: list[Message]) -> bool:
         """Görev sürerken kullanıcının gönderdiği ek mesajları konuşmaya ekler."""

@@ -171,3 +171,19 @@ def test_countdown_section_is_not_written_by_the_model_and_layout_is_fixed(tmp_p
     assert page.count('id="sayac-gun"') == 1 and "Usta'nın hazır parçası" in result.answer
     assert page.index("body { display: flex }") < page.index(sitebuild.LAYOUT_CSS)
     assert not model.responses
+
+
+def test_invented_places_are_caught_but_single_capitalized_words_are_not():
+    made = (
+        "<section><h2>Konum, Harita ve Yollar</h2><ul><li>Konum: Bursa, Altınova Plaza Şeref Salonu</li>"
+        "<li>1) İznik Havalimanı</li><li>Düğün saat:04.30 da başlar.</li></ul></section>"
+    )
+    issues = sitebuild.problems(DAVETIYE, made)
+    assert any("Altınova Plaza Şeref Salonu" in p and "İznik Havalimanı" in p for p in issues)
+    assert any("saat" in p and "04.30" in p for p in issues)
+    ok = (
+        "<section><h2>Davet</h2><p>Ali ve Zeynep 14 Haziran 2027'de Bursa'daki düğünlerine bekliyor.</p>"
+        "<ul><li>Baklava: 120 TL – Klasik ve taze.</li><li>Tarih: 14.06.2027</li></ul></section>"
+    )
+    assert sitebuild.problems(DAVETIYE + " baklava 120 TL", ok) == []
+    assert sitebuild.invented_names(PASTANE, "<p>Hoş geldiniz, Tatlı Köşe'ye! Biz Nilüfer Bursa'dayız.</p>") == []

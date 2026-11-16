@@ -54,14 +54,23 @@ _STRIP = re.compile(
 )
 _STYLE = re.compile(r"<style\b[^>]*>(.*?)</style>", re.DOTALL | re.IGNORECASE)
 _NAME_SPLIT = re.compile(r"\s+[-–—]\s+|:\s")
-_TIME = re.compile(r"(?<![\d:])(?:[01]?\d|2[0-3]):[0-5]\d(?![\d:])")
+_TIME = re.compile(
+    r"(?<![\d:.])(?:[01]?\d|2[0-3]):[0-5]\d(?![\d:])|(?<=saat)\s*:?\s*(?:[01]?\d|2[0-3])[.:][0-5]\d(?!\d)",
+    re.IGNORECASE,
+)
+# uydurma yer adı: birden çok büyük harfli kelime ya da yer eki ("Asya Düğün Salonu", "İznik Havalimanı")
+_PLACE_WORD = re.compile(
+    r"salon|plaza|otel|hotel|mahalle|cadde|sokak|bulvar|havaliman|istasyon|park|meydan|apartman|sitesi$",
+    re.IGNORECASE,
+)
 _PHONE = re.compile(r"(?<!\d)(?:\+?90[\s-]?)?\(?0?\d{3}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}(?!\d)")
 _H2 = re.compile(r"<h2\b[^>]*>(.*?)</h2>", re.DOTALL | re.IGNORECASE)
 _BULLET = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s*")
 
 SYSTEM = (
     "Sen bir web sitesinin tek bir parçasını yazan yardımcısın. Yalnız istenen parçayı yaz, açıklama yapma. "
-    "Kullanıcının vermediği bilgi (ürün, fiyat, isim, adres, tarih) uydurma. Metinler Türkçe olsun."
+    "Kullanıcının vermediği bilgi (ürün, fiyat, isim, adres, salon, saat, telefon, tarih) uydurma. Kısa ve sade "
+    "cümleler kur. Metinler Türkçe olsun."
 )
 
 
@@ -149,6 +158,53 @@ class _Text(HTMLParser):
             self.parts.append(data)
 
 
+class _Blocks(HTMLParser):
+    """Paragraf ve liste maddelerinin metni, ayrı ayrı (başlıklar ve betikler hariç)."""
+
+    def __init__(self):
+        super().__init__()
+        self.blocks: list[str] = []
+        self._cur: list[str] | None = None
+        self._skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        self._skip += tag in ("script", "style")
+        if tag in ("p", "li", "td"):
+            self._cur = []
+
+    def handle_endtag(self, tag):
+        self._skip -= tag in ("script", "style") and self._skip > 0
+        if tag in ("p", "li", "td") and self._cur is not None:
+            self.blocks.append(" ".join("".join(self._cur).split()))
+            self._cur = None
+
+    def handle_data(self, data):
+        if self._cur is not None and not self._skip:
+            self._cur.append(data)
+
+
+def invented_names(task: str, fragment: str) -> list[str]:
+    """Bölümdeki yer/kurum adları (çok kelimeli özel ad ya da yer eki taşıyan) kullanıcının isteğinde yoksa.
+    16 Kasım: 9B davetiyeye "Altınova Plaza Şeref Salonu", "İznik Havalimanı" ekledi; tek kelimelik büyük harfli
+    sözcükler ("Klasik", "Taze") sayılmaz, yanlış alarm çok."""
+    known = set(re.findall(r"\w+", sitecheck._fold(task)))
+
+    def given(w: str) -> bool:  # "Bursa'daki" → "bursa"; ek almış kelimeler kökünden tanınır
+        return any(w.startswith(k[: max(3, len(k) - 2)]) or k.startswith(w) for k in known)
+
+    p = _Blocks()
+    p.feed(fragment)
+    out: list[str] = []
+    for block in p.blocks:
+        for name in sitecheck._names(block):
+            words = re.findall(r"\w+", sitecheck._fold(name))
+            if not words or all(given(w) for w in words):
+                continue
+            if len(words) >= 2 or any(_PLACE_WORD.search(w) for w in words):
+                out.append(name)
+    return list(dict.fromkeys(out))
+
+
 def visible_text(fragment: str) -> str:
     p = _Text()
     p.feed(fragment)
@@ -207,6 +263,9 @@ def problems(task: str, fragment: str) -> list[str]:
         made = [m for m in dict.fromkeys(rx.findall(shown)) if m not in task]
         if made:
             out.append(f"kullanıcının vermediği {what} var ({', '.join(made[:3])}); bunu çıkar")
+    names = invented_names(task, fragment)
+    if names:
+        out.append(f"kullanıcının vermediği yer/isim var ({', '.join(names[:3])}); bunları çıkar")
     err = script_error(fragment)
     if err:
         out.append(f"betikte hata var: {err}")

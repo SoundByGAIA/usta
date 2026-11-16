@@ -101,6 +101,11 @@ def test_site_request_without_a_file_name_answered_with_code_gets_a_reminder():
     assert FinishCheck("Make me a landing page for my bakery.").on_finish(
         "<html><body>Hi</body></html>"
     )
+    # 3. ölçüm: tasarımı anlatıp yapmak için izin istedi, dosya yazmadı
+    assert FinishCheck("Bana bir web sitesi yap.").on_finish(
+        "Sizin için şu tasarımı oluşturuyorum: pastel tonlar.\n\nWeb sitesini oluşturabiliyorum mu?"
+    )
+    assert FinishCheck(PASTANE).on_finish("Sayfayı hazırlamamı ister misiniz?")
 
 
 def test_site_request_is_satisfied_by_any_written_file():
@@ -218,3 +223,100 @@ def test_reminder_does_not_bypass_the_permission_engine(tmp_path):
     agent, ws = _agent(tmp_path, model, finish_check=True)
     agent.run(TASK_SUMMARY)
     assert not (Path(ws).parent / "disari.txt").exists()
+
+
+# --- site isteğindeki bilgiler (sitecheck.py) ---------------------------------------------------------
+def test_facts_are_taken_from_the_users_site_request():
+    from usta.sitecheck import facts
+
+    assert [f[0] for f in facts(PASTANE)] == [
+        "baklava",
+        "120 TL",
+        "sütlaç",
+        "80 TL",
+        "kazandibi",
+        "90 TL",
+        "Tatlı Köşe",
+        "Nilüfer",
+        "Bursa",
+    ]
+    davetiye = "Düğünümüz için bir davetiye sitesi istiyorum: Ali ve Zeynep evleniyor, 14 Haziran 2027, Bursa."
+    assert [f[0] for f in facts(davetiye)] == ["14 Haziran 2027", "Ali", "Zeynep", "Bursa"]
+    ayse = "Merhaba, ben Ayşe. Resim yapmayı seviyorum. E-postam (ayse@ornek.com) yazsın."
+    assert [f[0] for f in facts(ayse)] == [
+        "ayse@ornek.com",
+        "Ayşe",
+    ]  # cümle başındaki "Resim" ad değil
+
+
+def test_missing_facts_tolerate_case_spelling_of_dates_and_prices():
+    from usta.sitecheck import missing
+
+    page = (
+        "<h1>TATLI KÖŞE</h1><li>Baklava <b>120,00 ₺</b></li><li>Sütlaç ₺80</li><li>Kazandibi 90 TL</li>"
+        "<p>Nilüfer / BURSA</p>"
+    )
+    assert missing(PASTANE, [page]) == []
+    # gerçek 9B sayfası: "Süt Laç" yazmıştı; CSS'teki 80px fiyat sayılmaz
+    bad = page.replace("Sütlaç ₺80", "Süt Laç <span style='width:80px'>")
+    assert missing(PASTANE, [bad]) == ["sütlaç", "80 TL"]
+    assert "120 TL" in missing(
+        PASTANE, [page.replace("120,00 ₺", "1120 TL")]
+    )  # başka sayının parçası değil
+    davetiye = "Ali ve Zeynep evleniyor, 14 Haziran 2027, Bursa."
+    js = "<h1>Ali &amp; Zeynep</h1><p>Bursa</p><script>new Date('2027-06-14T12:00')</script>"
+    assert missing(davetiye, [js]) == []
+
+
+def test_site_with_missing_facts_gets_one_reminder_naming_them(tmp_path):
+    (tmp_path / "index.html").write_text(
+        "<h1>Tatlı Köşe</h1><p>Baklava 120 TL</p>", encoding="utf-8"
+    )
+    fc = FinishCheck(PASTANE, root=tmp_path)
+    fc.observe("write_file", {"path": "index.html"}, executed=True)
+    msg = fc.on_finish("Menünüz hazır!")
+    assert (
+        msg and "sütlaç" in msg and "Nilüfer" in msg and "uydurma" in msg and "baklava" not in msg
+    )
+    assert fc.on_finish("Menünüz hazır!") is None  # bir kez
+    # bilgiler tamamsa ya da kök verilmediyse sessiz
+    (tmp_path / "index.html").write_text(
+        "Tatlı Köşe baklava 120 TL sütlaç 80 TL kazandibi 90 TL Nilüfer Bursa", encoding="utf-8"
+    )
+    ok = FinishCheck(PASTANE, root=tmp_path)
+    ok.observe("write_file", {"path": "index.html"}, executed=True)
+    assert ok.on_finish("Hazır.") is None
+    noroot = FinishCheck(PASTANE)
+    noroot.observe("write_file", {"path": "index.html"}, executed=True)
+    assert noroot.on_finish("Hazır.") is None
+
+
+def test_pages_outside_the_workspace_are_not_read(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (tmp_path / "out.html").write_text("x", encoding="utf-8")
+    fc = FinishCheck(PASTANE, root=ws)
+    fc.observe("write_file", {"path": "../out.html"}, executed=True)
+    assert fc.on_finish("Hazır.") is None
+
+
+# --- çalışma klasörü bilgisi --------------------------------------------------------------------------
+class Recording(Scripted):
+    def chat(self, messages, tools=None):
+        self.seen = [m.content for m in messages]
+        return super().chat(messages, tools)
+
+
+def test_workspace_hint_lists_visible_files_only_when_enabled(tmp_path):
+    model = Recording(ModelResponse("tamam"))
+    agent, ws = _agent(tmp_path, model, workspace_hint=True)
+    (ws / "index.html").write_text("<h1>Ayşe</h1>")
+    (ws / ".usta").mkdir()
+    agent.run("Sitemin rengini maviye çevir.")
+    first = model.seen[1]
+    assert "index.html" in first and "log.txt" in first and ".usta" not in first
+    assert first.endswith("Sitemin rengini maviye çevir.") and "talimat değil" in first
+    off = Recording(ModelResponse("tamam"))
+    agent, _ = _agent(tmp_path, off)
+    agent.run("Sitemin rengini maviye çevir.")
+    assert off.seen[1] == "Sitemin rengini maviye çevir."

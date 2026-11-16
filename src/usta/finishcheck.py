@@ -30,6 +30,9 @@ dosyanın yeniden yazdırılması; sonuncusu düzeltildi). Bedeli: ortalama geci
 from __future__ import annotations
 
 import re
+from pathlib import Path
+
+from usta import sitecheck
 
 WRITE_TOOLS = ("write_file", "edit_file")
 _P = r"[\w.-]+(?:/[\w.-]+)*\.[A-Za-z0-9]{1,6}"
@@ -63,6 +66,11 @@ _ARTIFACT = re.compile(
     re.IGNORECASE,
 )
 _CODE_IN_ANSWER = re.compile(r"```|<html|<!doctype", re.IGNORECASE)
+# yapmak için izin sormak (16 Kasım, 3. ölçüm: "Web sitesini oluşturabiliyorum mu?" deyip bitirdi)
+_ASK_TO_BUILD = re.compile(
+    r"(?:yap|oluştur|hazırla|başla|yaz)\w*\s+m[ıiuü]\w*\s*\?|ister\s+misiniz|ister\s+misin|shall\s+i|should\s+i|want\s+me\s+to",
+    re.IGNORECASE,
+)
 
 
 def write_targets(task: str) -> list[str]:
@@ -76,12 +84,16 @@ def write_targets(task: str) -> list[str]:
 
 
 class FinishCheck:
-    def __init__(self, task: str = "", max_nudges: int = 2):
+    def __init__(self, task: str = "", max_nudges: int = 2, root: Path | None = None):
         self.task = task or ""
+        self.root = (
+            root  # verilirse site isteğinde yazılan sayfalar kullanıcının bilgileri için okunur
+        )
         self.max_nudges = max_nudges
         self.targets = write_targets(self.task)
         self.written: set[str] = set()
         self.artifact = bool(_ARTIFACT.search(self.task))
+        self.pages: list[str] = []  # bu görevde yazılan .html dosyaları (özgün yazımıyla)
         self.wrote_any = False  # bu görevde herhangi bir dosya yazıldı mı (ya da komut çalıştı mı)
         self.nudges = 0
         self.fired: list[str] = []  # tetiklenen kurallar (Lab izi için)
@@ -97,6 +109,8 @@ class FinishCheck:
         """Gerçekten yapılan yazmaları kaydeder (reddedilen/başarısız çağrılar sayılmaz)."""
         if executed and tool in WRITE_TOOLS and isinstance(args.get("path"), str):
             self.written.add(self._norm(args["path"]))
+            if args["path"].lower().endswith((".html", ".htm")) and args["path"] not in self.pages:
+                self.pages.append(args["path"])
         if executed and tool in (*WRITE_TOOLS, "run"):
             self.wrote_any = True
         # komutla yazma ("echo 3 > count.txt"): hedef adı geçen bir komut çalıştıysa yeniden yazmaya itilmez
@@ -112,6 +126,21 @@ class FinishCheck:
         self.nudges += 1
         return message
 
+    def _missing_facts(self) -> list[str]:
+        """Site isteğindeki bilgilerden yazılan sayfalarda geçmeyenler (kök verilmediyse ya da sayfa yoksa boş)."""
+        if self.root is None:
+            return []
+        root = Path(self.root).resolve()
+        texts: list[str] = []
+        for rel in self.pages[:5]:
+            try:
+                f = (root / rel).resolve()
+                if f.is_relative_to(root) and f.is_file():
+                    texts.append(f.read_text(encoding="utf-8", errors="replace")[:200_000])
+            except OSError:
+                continue
+        return sitecheck.missing(self.task, texts) if texts else []
+
     def on_finish(self, answer: str) -> str | None:
         """Model araç çağırmadan bitirmek istiyor: hatırlatma mesajı ya da None (bitir)."""
         text = (answer or "").strip()
@@ -126,12 +155,20 @@ class FinishCheck:
         if (
             self.artifact
             and not self.wrote_any
-            and (_CODE_IN_ANSWER.search(text) or _CLAIM.search(text))
+            and (_CODE_IN_ANSWER.search(text) or _CLAIM.search(text) or _ASK_TO_BUILD.search(text))
         ):
             return self._nudge(
                 "artifact",
                 "Kullanıcı bir site/sayfa istedi ama bu görevde hiçbir dosya yazmadın; kodu yanıta yazmak yetmez, "
                 "kullanıcı onu açamaz. Sayfayı şimdi write_file ile yaz (ör. index.html), sonra kısaca ne yaptığını söyle.",
+            )
+        lack = self._missing_facts() if self.artifact and self.wrote_any else []
+        if lack:
+            return self._nudge(
+                "facts",
+                f"Kullanıcının verdiği şu bilgiler yazdığın sayfada yok ya da değişmiş: {', '.join(lack[:8])}. "
+                "Sayfayı oku, bunları kullanıcının yazdığı gibi ekle; kullanıcının vermediği bilgi (ürün, fiyat, isim) "
+                "uydurma.",
             )
         intent_only = len(text) <= MAX_INTENT_CHARS and "?" not in text and not _CLAIM.search(text)
         if text and intent_only and _INTENT.search(text):

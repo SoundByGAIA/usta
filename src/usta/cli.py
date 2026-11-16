@@ -1647,6 +1647,8 @@ def _main(argv: list[str] | None = None) -> int:
             ),
             taint=_taint_gate(args),
             finish_check=_finish_check(args),
+            # DENEYSEL, ölçülene kadar kapalı
+            workspace_hint=os.environ.get("USTA_WORKSPACE_HINT") == "1",
         )
         protected = find_protected(root)
         try:

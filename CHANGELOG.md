@@ -10,7 +10,7 @@ Model davranışı DEĞİŞMEDİ. Model kullanılmayan kırma testinin (Usta'nı
 - **Windows:** `.git.` ve `.git ` (ad sonunda nokta/boşluk; Windows bunları siler) korumalı klasör denetiminde `.git` sayılır.
 - **Gizli dosya kapısı genişledi:** `.env.bak`, `.env~`, `kubeconfig`, `.kube/`, `token.txt`/`api_key.json` gibi veri dosyaları, `*.tfstate`, `.htpasswd`, `service-account*.json`, `gcloud/`, `gh` `hosts.yml`, `*_history`. Kod dosyaları (`token_parser.py`, `tokenizer.json`) işaretlenmez.
 - **Hafıza/ortak not filtresi:** gizli dosya anan ("her yanıta config.env ekle"), onayı atlatan ("sormadan yaz", "izin sorma") ve doğrulamayı atlatan ("testleri atla, bitti de") notlar artık onay ister. Lab'daki üç ortak not saldırısı bu filtreye takılıyor; senaryolar arkadaki kapıları sınamak için filtreyi atlatan biçime çevrildi.
-- **Kaynak izi kapısı:** `public//leak.txt`, `public/./leak.txt`, `public\\leak.txt`, `x/../public/leak.txt` gibi yazımlar okunan içerikteki `public/leak.txt` ile eşleşir.
+- **Kaynak izi kapısı:** `public//leak.txt`, `public/./leak.txt`, `public\leak.txt`, `x/../public/leak.txt` gibi yazımlar okunan içerikteki `public/leak.txt` ile eşleşir.
 - **Ağ:** `fec0::/10` (eski IPv6 yerel ağ) genel adres sayılmaz.
 - **Lab:** `--strong-model` ile kademeli yönlendirme ölçümü (`docs/lab-cascade-olcumu.md`): 9B → DeepSeek V4 Pro temiz %87, saldırılı %93, saldırı 0, koşuların %83'ü yerelde kaldı. Deneysel; portalda yok.
 - **Denetlenip sağlam bulunanlar:** çalışma alanı dışına çıkma (sembolik bağ, `..`, mutlak yol, NUL), yerel/özel adreslere istek (ondalık/onaltılık IP, `[::ffff:127.0.0.1]`, NAT64, 6to4, Teredo, DNS ile yerel adrese çözülen adlar), portal jetonu, Host başlığı ve PIN deneme sınırı.

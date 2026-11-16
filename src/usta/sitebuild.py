@@ -24,6 +24,7 @@ import subprocess
 import tempfile
 from collections.abc import Callable
 from html.parser import HTMLParser
+from itertools import pairwise
 from pathlib import Path
 
 from usta import sitecheck
@@ -40,6 +41,13 @@ _SCRIPT_WANTED = re.compile(r"animasyon|buton|düğme", re.IGNORECASE)
 _COUNTDOWN = re.compile(r"sayaç|geri\s*sayım|countdown|kaç\s+gün", re.IGNORECASE)
 # Sayfa düzeni Usta'nındır: modelin CSS'i renk ve yazıyı seçer, düzeni bozamaz (16 Kasım, 4B: body'yi flex yapıp
 # bölümleri yan yana dizdi)
+# model CSS yazamazsa (7B üç görevde de yazamadı) tarayıcının çıplak görünümü yerine
+DEFAULT_CSS = (
+    "body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f6f7fb;color:#222;line-height:1.6}"
+    "header{background:#1d3d9c;color:#fff;border-radius:12px}header h1{margin:8px 0}"
+    "section{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)}"
+    "h2{color:#1d3d9c;margin-top:0}a{color:#08808c}"
+)
 LAYOUT_CSS = (
     "body{display:block;margin:0;padding:0}"
     "header,section,footer{display:block;box-sizing:border-box;max-width:760px;margin:16px auto;padding:16px}"
@@ -251,6 +259,33 @@ def script_error(fragment: str) -> str:
         return (lines[0] if lines else "sözdizimi hatası")[:200]
 
 
+_ELEMENT = re.compile(r"<(li|p|td)\b[^>]*>.*?</\1>", re.DOTALL | re.IGNORECASE)
+
+
+def _made_up(task: str, element: str) -> bool:
+    shown = visible_text(element)
+    return bool(
+        invented_prices(task, element)
+        or invented_names(task, element)
+        or any(m not in task for rx in (_TIME, _PHONE) for m in rx.findall(shown))
+    )
+
+
+def scrub(task: str, fragment: str) -> tuple[str, int]:
+    """Yeniden yazdırmaya rağmen kalan uydurmalar: uydurma bilgi taşıyan paragraf/madde Usta tarafından silinir
+    (16 Kasım: 9B "bunu çıkar" dendiğinde başka bir otel ve telefon uydurdu)."""
+    removed = 0
+
+    def drop(m: re.Match) -> str:
+        nonlocal removed
+        if _made_up(task, m.group(0)):
+            removed += 1
+            return ""
+        return m.group(0)
+
+    return _ELEMENT.sub(drop, fragment), removed
+
+
 def problems(task: str, fragment: str) -> list[str]:
     out = []
     if len(visible_text(fragment)) < 3:
@@ -312,6 +347,9 @@ def _title(task: str, proposed: str = "") -> str:
     if 2 <= len(t) <= 60 and "<" not in t:
         return t
     names = sitecheck._names(task)
+    for a, b in pairwise(names):  # "Ali ve Zeynep" tek kişi adından iyidir
+        if f"{a} ve {b}" in task:
+            return f"{a} ve {b}"
     return names[0] if names else "Sitem"
 
 
@@ -407,8 +445,11 @@ class SiteBuilder:
             )
         )
         self._step(
-            "✓ Tasarım (renk ve yazı)" if css else "• Tasarım yazılamadı, sade görünüm kullanıldı"
+            "✓ Tasarım (renk ve yazı)"
+            if css
+            else "• Tasarım yazılamadı, Usta'nın hazır görünümü kullanıldı"
         )
+        css = css or DEFAULT_CSS
         sections: list[str] = []
         kept: list[
             tuple[int, str]
@@ -427,6 +468,11 @@ class SiteBuilder:
                 )
                 if len(problems(self.task, frag2)) <= len(issues):
                     frag, issues = frag2, problems(self.task, frag2)
+            if issues:
+                cleaned, n = scrub(self.task, frag)
+                if n and len(visible_text(cleaned)) >= 3:
+                    frag, issues = cleaned, problems(self.task, cleaned)
+                    self._step(f"• {plan_name(item)}: uydurma bilgi taşıyan {n} satırı Usta sildi")
             name = plan_name(item)
             if duplicate(frag, sections):
                 self._step(f"• {name} çıkarıldı (önceki bir bölümün tekrarı)")

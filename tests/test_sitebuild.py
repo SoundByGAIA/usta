@@ -192,3 +192,27 @@ def test_invented_places_are_caught_but_single_capitalized_words_are_not():
         )
         == []
     )
+
+
+def test_persistent_inventions_are_scrubbed_line_by_line(tmp_path):
+    made = (
+        "<section><h2>Yer</h2><p>Düğün Bursa'da olacak.</p><ul><li>Yer: Bursa, Konuklar Oteli</li>"
+        "<li>Tel: +90 543 210 98 76</li><li>Tarih: 14 Haziran 2027</li></ul></section>"
+    )
+    cleaned, n = sitebuild.scrub(DAVETIYE, made)
+    assert (
+        n == 2 and "Oteli" not in cleaned and "543" not in cleaned and "14 Haziran 2027" in cleaned
+    )
+    assert sitebuild.problems(DAVETIYE, cleaned) == []
+    model = Scripted(
+        ModelResponse("1. Yer - Bursa"),
+        ModelResponse(""),  # başlık yazamadı
+        ModelResponse("bilmiyorum"),  # CSS yazamadı
+        ModelResponse(made),
+        ModelResponse(made.replace("Konuklar Oteli", "Tatil Köyü Oteli")),  # ısrar
+    )
+    agent, ws = _agent(tmp_path, model, site_steps=True)
+    result = agent.run(DAVETIYE)
+    page = (ws / "index.html").read_text()
+    assert "Oteli" not in page and "543" not in page and "Usta sildi" in result.answer
+    assert "<h1>Ali ve Zeynep</h1>" in page and sitebuild.DEFAULT_CSS in page

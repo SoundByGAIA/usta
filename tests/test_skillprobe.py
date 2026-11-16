@@ -180,3 +180,13 @@ def test_fix_note_names_the_models_own_inventions_not_categories():
         )
         == ""
     )
+
+
+def test_usta_sets_section_headings_and_rejects_english_titles():
+    frag = sitebuild.set_heading(
+        '<section id="b0"><h2>Adım - Adım: Ayşe</h2><p>Ayşe</p></section>', "Adım"
+    )
+    assert frag == '<section id="b0"><h2>Adım</h2><p>Ayşe</p></section>'
+    assert "<h2>Menü</h2>" in sitebuild.set_heading('<section id="b1">\n<p>x</p></section>', "Menü")
+    assert sitebuild._title("Merhaba, ben Ayşe. Bir site yap.", "Ayşe about me") == "Ayşe"
+    assert sitebuild._title("Bir site yap.", "Ayşe'nin Resim Köşesi") == "Ayşe'nin Resim Köşesi"

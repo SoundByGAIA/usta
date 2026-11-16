@@ -140,6 +140,13 @@ def parse_css(s: str) -> str:
     return css.strip() if "{" in css else ""
 
 
+def set_heading(fragment: str, name: str) -> str:
+    """Bölüm başlığını Usta koyar: planın kısa adı (4B planın tüm satırını başlık yaptı: "Adım - Adım: Ayşe")."""
+    h = f"<h2>{html.escape(name, quote=False)}</h2>"
+    out, n = _H2.subn(h, fragment, count=1)
+    return out if n else re.sub(r"(<section\b[^>]*>)", rf"\1\n{h}", fragment, count=1)
+
+
 def parse_section(s: str, idx: int) -> str:
     body = _unfence(s)
     m = _SECTION.search(body)
@@ -379,7 +386,12 @@ def assemble(title: str, css: str, sections: list[str], tail: str = "") -> str:
 
 def _title(task: str, proposed: str = "") -> str:
     t = " ".join(_unfence(proposed).strip().strip("\"'#*").split())
-    if 2 <= len(t) <= 60 and "<" not in t:
+    english = re.search(
+        r"\b(?:about|me|my|the|welcome|page|website|home|of|our|your)\b", t, re.IGNORECASE
+    )
+    if (
+        2 <= len(t) <= 60 and "<" not in t and not english
+    ):  # 4B Türkçe başlık isteğine "Ayşe about me" yazdı
         return t
     names = sitecheck._names(task)
     for a, b in pairwise(names):  # "Ali ve Zeynep" tek kişi adından iyidir
@@ -510,7 +522,7 @@ class SiteBuilder:
             "(html, head, style) is added by the system. Put only the facts that belong to this section.\n"
             f"{script}{fix}"
         )
-        return parse_section(self._ask(prompt), idx)
+        return set_heading(parse_section(self._ask(prompt), idx), plan_name(item))
 
     def _piece(self, what: str) -> str:
         """En küçük birim: kısa düz metin (HTML yok), denetlenir; olmazsa boş (modelin sağlıklı

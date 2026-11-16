@@ -1,5 +1,7 @@
 """Yazma becerisi sondası (skillprobe.py) ve seviyeye göre site kurma."""
 
+import re
+
 from test_api import Scripted
 from usta import sitebuild, skillprobe
 from usta.models import ModelResponse
@@ -131,3 +133,50 @@ def test_heading_only_section_counts_as_empty():
     assert sitebuild.problems(PASTANE, "<section><h2>Menü</h2></section>") == [
         "bölümde başlık dışında metin yok"
     ]
+
+
+class Recording(Scripted):
+    def __init__(self, *responses):
+        super().__init__(*responses)
+        self.prompts: list[str] = []
+
+    def chat(self, messages, tools=None):
+        self.prompts.append("\n".join(m.content for m in messages))
+        return super().chat(messages, tools)
+
+
+def test_prompts_name_no_forbidden_items(tmp_path):
+    """Yasak listesi ("telefon, saat, adres ekleme") 4B'ye tam onları yazdırdı (0/5); talimatlar olumlu kalmalı."""
+    model = Recording(
+        ModelResponse("1. Menü - tatlılar"),
+        ModelResponse("Tatlı Köşe"),
+        ModelResponse("body { color: #333 }"),
+        ModelResponse(
+            "<section><h2>Menü</h2><p>Baklava 120 TL, sütlaç 80 TL, kazandibi 90 TL</p>"
+            "<p>Tatlı Köşe, Nilüfer, Bursa</p></section>"
+        ),
+    )
+    agent, _ = _agent(tmp_path, model, site_steps=True, site_level=2)
+    agent.run(PASTANE)
+    forbidden = re.compile(
+        r"telefon|phone|\bsaat|hours|\badres|address|uydurma|invent|do not|don't", re.IGNORECASE
+    )
+    for prompt in model.prompts + [p for p, _ in skillprobe.PROBES.values()]:
+        own = prompt.replace(PASTANE, "")  # kullanıcının kendi sözleri sayılmaz
+        assert not forbidden.search(own), (forbidden.search(own).group(0), own[:300])
+
+
+def test_fix_note_names_the_models_own_inventions_not_categories():
+    note = sitebuild.fix_note(
+        DAVETIYE,
+        "<section><h2>Yer</h2><p>Bursa, Konuklar Oteli, saat 19:00, tel 0532 123 45 67</p></section>",
+    )
+    assert "facts: 19:00, 0532 123 45 67, Konuklar Oteli" in note and not re.search(
+        r"telefon|phone|saat|hours", note
+    )
+    assert (
+        sitebuild.fix_note(
+            DAVETIYE, "<section><h2>Davet</h2><p>Ali ve Zeynep evleniyor.</p></section>"
+        )
+        == ""
+    )

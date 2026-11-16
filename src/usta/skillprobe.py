@@ -30,7 +30,7 @@ from usta.models import Message, ModelClient, ModelError
 
 SCHEMA = 1
 BIG_B = 12.0  # bu boyutun altındaki yerel modele tek seferde sayfa yazdırılmaz
-SYSTEM = "Kısa ve tam istendiği gibi yanıt ver. Açıklama ekleme."
+SYSTEM = "Answer briefly and exactly as asked, with no explanation."
 
 _ONE = "Tatlı Köşe her gün sizi bekliyor."
 _ITEMS = (("baklava", "120"), ("sütlaç", "80"), ("kazandibi", "90"))
@@ -118,42 +118,46 @@ def check_page(reply: str) -> bool:
     )
 
 
+# Sorular Usta'nın gerçekte kullandığı talimat biçimindedir (İngilizce, olumlu; metin Türkçe). İlk sürüm Türkçe ve
+# yasak listeli sorular kullanıyordu: 4B gerçek görevlerde en iyisiyken sınavda en düşük seviyeyi aldı (16 Kasım).
+_FACTS = "The user's facts (copy them exactly as written): "
 PROBES = {
-    "tek": (f"Şu cümleyi hiç değiştirmeden, başka hiçbir şey eklemeden yaz: {_ONE}", check_one),
+    "tek": (f"Copy this Turkish sentence exactly, adding nothing: {_ONE}", check_one),
     "iki": (
         (
-            "Şu ürünleri alt alta yaz. Her satır 'ad - fiyat' biçiminde olsun. Başka hiçbir şey yazma.\n"
+            "List these products one per line in the form 'name - price'. Output only the lines.\n"
             "baklava 120 TL, sütlaç 80 TL, kazandibi 90 TL"
         ),
         check_two,
     ),
     "plan": (
         (
-            f"Kullanıcının isteği: {_INTRO_TASK} Menüm: baklava 120 TL. Bir sayfa istiyorum.\n"
-            "Bu tek sayfalık site için 2 ile 4 arası bölüm planla. Her satıra bir bölüm yaz: kısa ad - içinde ne olacağı. "
-            "Başka bir şey yazma."
+            f"{sitebuild.USER}{_INTRO_TASK} Menüm: baklava 120 TL. Bir sayfa istiyorum.\n"
+            "Plan this one-page website in 2 to 4 sections. One section per line: short Turkish name - what it "
+            "contains. Base everything on the user's facts. Output only the lines."
         ),
         check_plan,
     ),
     "bolum": (
         (
-            f"Kullanıcının isteği: {_SECTION_TASK}\nYalnız iletişim bölümünü yaz. Çıktın tek bir "
-            '<section id="b0"> ... </section> olsun, içinde h2 ve e-posta. <html>, <head>, <style> yazma. '
-            "Kullanıcının vermediği bilgi (telefon, adres, saat) uydurma."
+            f"{sitebuild.USER}{_SECTION_TASK}\n{_FACTS}Ayşe, ayse@ornek.com.\nNow write only the contact section. "
+            'Output exactly one <section id="b0"> ... </section> with an h2 and the e-mail. The page frame (html, '
+            "head, style) is added by the system. Use only the user's facts; visible text in Turkish."
         ),
         check_section,
     ),
     "uydurma": (
         (
-            f"{_INTRO_TASK} Bu pastane için en çok iki cümlelik Türkçe bir tanıtım yaz. Düz metin yaz, HTML yazma. "
-            "Kullanıcının vermediği bilgi (saat, telefon, adres, ürün, fiyat) ekleme."
+            f"{sitebuild.USER}{_INTRO_TASK}\n{_FACTS}Tatlı Köşe, Nilüfer, Bursa.\nWrite a short welcome text for "
+            "this bakery's website: at most two short, plain sentences in Turkish, as plain text. Use only the "
+            "user's facts."
         ),
         check_noinvent,
     ),
     "sayfa": (
         (
-            f"Kullanıcının isteği: {_SECTION_TASK} Beni tanıtan tek bir HTML sayfası yaz (<!doctype html> ile başlasın). "
-            "Yalnız HTML yaz. Kullanıcının vermediği bilgi (telefon, adres, saat) uydurma."
+            f"{sitebuild.USER}{_SECTION_TASK} Beni tanıtan bir sayfa istiyorum.\nWrite one complete HTML page "
+            "(start with <!doctype html>). Output only HTML. Use only the user's facts; visible text in Turkish."
         ),
         check_page,
     ),

@@ -75,11 +75,15 @@ _PHONE = re.compile(r"(?<!\d)(?:\+?90[\s-]?)?\(?0?\d{3}\)?[\s-]?\d{3}[\s-]?\d{2}
 _H2 = re.compile(r"<h2\b[^>]*>(.*?)</h2>", re.DOTALL | re.IGNORECASE)
 _BULLET = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s*")
 
+# Talimatlar İngilizce ve olumlu, sitedeki metin Türkçe. 16 Kasım ölçümü (Qwen3 4B, aynı tanıtım görevi 5 kez):
+# Türkçe talimatta "saat, telefon, adres ekleme" gibi yasak listesi 0/5 uydurmasız (model listedekileri yazdı);
+# "yalnız bu bilgileri kullan" 5/5; İngilizce talimat + Türkçe çıktı 5/5 ve en düzgün Türkçe; İngilizce yazıp ayrıca
+# Türkçeye çevirtmek çeviride yeni hata ekledi (Qwen2.5-Coder 7B'de de çeviri en kötüsü).
 SYSTEM = (
-    "Sen bir web sitesinin tek bir parçasını yazan yardımcısın. Yalnız istenen parçayı yaz, açıklama yapma. "
-    "Kullanıcının vermediği bilgi (ürün, fiyat, isim, adres, salon, saat, telefon, tarih) uydurma. Kısa ve sade "
-    "cümleler kur. Metinler Türkçe olsun."
+    "You write one part of a small website for a Turkish user. Write only the requested part, with no explanation. "
+    "Use only the information the user gave. Keep sentences short and simple. All visible text must be in Turkish."
 )
+USER = "User's request (Turkish): "
 
 
 def applies(task: str, root: Path | None) -> bool:
@@ -315,6 +319,29 @@ def problems(task: str, fragment: str) -> list[str]:
     return out
 
 
+def fix_note(task: str, fragment: str) -> str:
+    """Yeniden yazdırma talimatı (İngilizce, olumlu): yalnız modelin kendi yazdığı uydurma parçaları anar, bilgi
+    türlerini ("telefon, saat") saymaz; tür saymak küçük modele tam onları yazdırıyordu."""
+    shown = visible_text(fragment)
+    made = [
+        *invented_prices(task, fragment),
+        *(m for rx in (_TIME, _PHONE) for m in dict.fromkeys(rx.findall(shown)) if m not in task),
+        *invented_names(task, fragment),
+    ]
+    notes = []
+    if len(body_text(fragment)) < 3:
+        notes.append("write some Turkish text under the heading")
+    if made:
+        notes.append(
+            "leave out these parts, they are not in the user's facts: "
+            + ", ".join(m.strip(" :") for m in made[:6])
+        )
+    err = script_error(fragment)
+    if err:
+        notes.append(f"the script has an error ({err})")
+    return ("Rewrite it using only the user's facts; " + "; ".join(notes) + ".\n") if notes else ""
+
+
 def countdown(task: str) -> str:
     """İstekte sayaç ve tarih varsa Usta'nın hazır sayaç bölümü (16 Kasım: 9B'nin sayacı üç turda da bozuktu, 4B
     "bugünü" 2024 diye sabit yazdı). Tarih kullanıcının isteğinden gelir; model betik yazmaz."""
@@ -466,25 +493,21 @@ class SiteBuilder:
     def _facts_note(self) -> str:
         if not self.facts:
             return ""
-        return (
-            "Kullanıcının verdiği bilgiler (aynen yaz, değiştirme): "
-            + ", ".join(self.facts)
-            + ".\n"
-        )
+        return "The user's facts (copy them exactly as written): " + ", ".join(self.facts) + ".\n"
 
     def _section(self, idx: int, item: str, plan: list[str], fix: str = "") -> str:
         script = (
-            "Bu bölüm bir sayaç ya da etkileşim gerektiriyorsa kısa bir <script> ekleyebilirsin; betik yalnız bu "
-            "bölümdeki öğelere id ile erişsin.\n"
+            "If this section needs a button or animation, you may add a short <script> that only uses elements of "
+            "this section by id.\n"
             if _SCRIPT_WANTED.search(item)
-            else "Betik (script) yazma.\n"
+            else "Use HTML only.\n"
         )
         prompt = (
-            f"Kullanıcının isteği: {self.task}\n{self._facts_note()}"
-            f"Sitenin bölümleri: {'; '.join(plan)}.\n"
-            f"Şimdi yalnız şu bölümü yaz: {item}\n"
-            f'Çıktın tek bir <section id="b{idx}"> ... </section> olsun (içinde h2, p, ul gibi etiketler). '
-            "Diğer bölümleri, <html>, <head>, <style> yazma. Bu bölüme ait olmayan bilgiyi koyma.\n"
+            f"{USER}{self.task}\n{self._facts_note()}"
+            f"Site sections: {'; '.join(plan)}.\n"
+            f"Now write only this section: {item}\n"
+            f'Output exactly one <section id="b{idx}"> ... </section> using h2, p and ul inside. The page frame '
+            "(html, head, style) is added by the system. Put only the facts that belong to this section.\n"
             f"{script}{fix}"
         )
         return parse_section(self._ask(prompt), idx)
@@ -496,20 +519,22 @@ class SiteBuilder:
         for _ in range(2):
             text = _clean_piece(
                 self._ask(
-                    f"Kullanıcının isteği: {self.task}\n{self._facts_note()}"
-                    f"{what} En çok iki kısa, düz Türkçe cümle yaz. HTML yazma, liste yapma. Kullanıcının vermediği "
-                    f"bilgi ekleme.\n{fix}"
+                    f"{USER}{self.task}\n{self._facts_note()}"
+                    f"{what} Write at most two short, plain sentences in Turkish, as plain text. Use only the "
+                    f"user's facts.\n{fix}"
                 )
             )
             issues = piece_problems(self.task, text)
             if not issues:
                 return text
-            fix = "Önceki denemede sorun vardı: " + "; ".join(issues) + "."
+            fix = fix_note(self.task, f"<section><p>{html.escape(text)}</p></section>") or (
+                "Rewrite it as at most two short plain Turkish sentences."
+            )
         return ""
 
     def _small_section(self, name: str) -> str:
         """Bölümü en küçük parçalarla kurar: başlığı Usta koyar, model yalnız kısa metni yazar."""
-        text = self._piece(f'Sitenin "{name}" bölümü için kısa bir metin yaz.')
+        text = self._piece(f'Write a short text for the "{name}" section of the site.')
         if not text:
             return ""
         return f"<section>\n<h2>{html.escape(name)}</h2>\n<p>{html.escape(text, quote=False)}</p>\n</section>"
@@ -517,10 +542,10 @@ class SiteBuilder:
     def _plan(self) -> list[str]:
         return parse_plan(
             self._ask(
-                f"Kullanıcının isteği: {self.task}\n{self._facts_note()}"
-                f"Bu tek sayfalık site için 2 ile {MAX_SECTIONS - 1} arası bölüm planla. Her satıra bir bölüm yaz: kısa ad - "
-                "içinde ne olacağı. Her bilgi yalnız bir bölümde olsun, aynı içerikte iki bölüm olmasın. Yalnız "
-                "kullanıcının verdiği bilgilere dayan. Başka bir şey yazma."
+                f"{USER}{self.task}\n{self._facts_note()}"
+                f"Plan this one-page website in 2 to {MAX_SECTIONS - 1} sections. One section per line: short Turkish "
+                "name - what it contains. Each fact appears in exactly one section. Base everything on the user's "
+                "facts. Output only the lines."
             )
         )
 
@@ -528,16 +553,16 @@ class SiteBuilder:
         return _title(
             self.task,
             self._ask(
-                f"Kullanıcının isteği: {self.task}\nBu site için en çok 6 kelimelik bir başlık yaz. Yalnız başlığı yaz."
+                f"{USER}{self.task}\nWrite a Turkish title for this website, at most 6 words. Output only the title."
             ),
         )
 
     def _css(self, plan: list[str]) -> str:
         css = parse_css(
             self._ask(
-                f"Kullanıcının isteği: {self.task}\nBölümler: {'; '.join(plan)}.\n"
-                "Bu site için sade, okunaklı, telefonda da düzgün görünen bir CSS yaz. Seçiciler: body, header, "
-                "section, h1, h2, p, ul, li, a, footer, .kart. Yalnız CSS yaz."
+                f"{USER}{self.task}\nSections: {'; '.join(plan)}.\n"
+                "Write simple, readable CSS for this site that also works on small screens. Selectors: body, header, "
+                "section, h1, h2, p, ul, li, a, footer, .kart. Output only CSS."
             )
         )
         self._step(
@@ -565,7 +590,10 @@ class SiteBuilder:
             issues = problems(self.task, frag)
             if issues:
                 frag2 = self._section(
-                    i, item, plan, fix="Önceki denemede sorun vardı: " + "; ".join(issues) + ".\n"
+                    i,
+                    item,
+                    plan,
+                    fix=fix_note(self.task, frag),
                 )
                 if len(problems(self.task, frag2)) <= len(issues):
                     frag, issues = frag2, problems(self.task, frag2)
@@ -597,7 +625,7 @@ class SiteBuilder:
     def _sections_level1(self) -> list[str]:
         """Seviye 1: iskelet ve bilgiler Usta'dan; model yalnız kısa bir tanıtım yazar."""
         sections = []
-        intro = self._piece("Bu site için kısa bir tanıtım yaz.")
+        intro = self._piece("Write a short welcome text for this site.")
         if intro:
             sections.append(
                 f"<section>\n<h2>Hoş geldiniz</h2>\n<p>{html.escape(intro, quote=False)}</p>\n</section>"
@@ -631,7 +659,8 @@ class SiteBuilder:
                 kept[target][0],
                 kept[target][1],
                 plan,
-                fix=f"Şu bilgiler sayfada eksik, bu bölüme aynen ekle: {', '.join(lack)}.\n",
+                fix=f"These facts are missing from the page; add them to this section exactly as written: "
+                f"{', '.join(lack)}.\n",
             )
             if not problems(self.task, frag):
                 sections = [*sections[:target], frag, *sections[target + 1 :]]

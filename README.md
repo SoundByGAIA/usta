@@ -43,16 +43,16 @@ izin istiyorlar, bilgi uyduruyorlar. Usta'nın asıl işi bu açığı kapatmak.
 
 - **Söz–eylem denetimi** (varsayılan açık). Model istenen dosyayı yazmadan bitirmek isterse kısa bir hatırlatma
   alıyor. 9B bir modelde görev başarısı 13/25'ten 19/25'e çıktı, saldırı başarısı değişmedi.
-  [docs/lab-sozeylem-olcumu.md](docs/lab-sozeylem-olcumu.md)
+  [docs/olcumler/soz-eylem.md](docs/olcumler/soz-eylem.md)
 - **Kodsuz kullanıcının site isteği** (deneysel, `USTA_SITE_STEPS=1`). İskeleti, kullanıcının verdiği bilgileri ve
   sayacı Usta koyuyor, model yalnız kısa bir metin yazıyor. 3 küçük modelle 45 denemenin 45'i doğru, 12–21 saniye.
-  Aynı istekler tek seferde yazdırıldığında 45'te 10 tuttu. [docs/lab-site-olcumu.md](docs/lab-site-olcumu.md)
+  Aynı istekler tek seferde yazdırıldığında 45'te 10 tuttu. [docs/olcumler/site-istekleri.md](docs/olcumler/site-istekleri.md)
 - Küçük modele "telefon, saat yazma" demek ona tam olarak telefon ve saat uyduruyor (5 denemede 5). Talimatlarımız bu
   yüzden olumlu yazılıyor. Aynı belgede.
 
 Çalışmayanları da yazıyoruz. Düşünmeyi kısmak küçük modelde başarıyı düşürdü
-([docs/lab-dusunme-olcumu.md](docs/lab-dusunme-olcumu.md)). Doğrulama kapısı ve devre kesici, zayıf modeli tek başına
-kurtarmadı ([docs/v0.2.0-raporu.md](docs/v0.2.0-raporu.md)).
+([docs/olcumler/dusunme.md](docs/olcumler/dusunme.md)). Doğrulama kapısı ve devre kesici, zayıf modeli tek başına
+kurtarmadı ([docs/arsiv/0.2.0-olcumleri.md](docs/arsiv/0.2.0-olcumleri.md)).
 
 ## Güvenlik
 
@@ -97,7 +97,7 @@ Tek bir görev için: `usta run "not.txt dosyasını özetle" -w ./klasor`. API 
 ## Ölçüm araçları
 
 - `usta lab`: aynı görevi temiz ve saldırılı haliyle (zehirli dosya, sahte talimat, sızdırma denemesi) çalıştırır.
-  Modelin söylediğine değil, gerçekten yaptığı araç çağrılarına bakar. [docs/reliability-lab.md](docs/reliability-lab.md)
+  Modelin söylediğine değil, gerçekten yaptığı araç çağrılarına bakar. [docs/lab.md](docs/lab.md)
 - `usta bench`: küçük yazılım görevlerini, ajanın göremediği testlerle doğrular.
 - `usta probe`: modelin araç çağırma yeteneğini ölçer ve saklar.
 
@@ -110,7 +110,8 @@ make ci        # ruff + pytest
 ```
 
 Kutu testleri için Docker ve `python:3.12-slim` imajı gerekir. Yoksa o testler atlanır. Katkı için:
-[CONTRIBUTING.md](CONTRIBUTING.md). Mimari ve tehdit modeli: [docs/design.md](docs/design.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). Mimari ve tehdit modeli: [docs/design.md](docs/design.md). Bütün ayarlar ve
+deneysel seçenekler: [docs/ayarlar.md](docs/ayarlar.md).
 
 ## Lisans ve emek verenler
 

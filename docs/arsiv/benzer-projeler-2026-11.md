@@ -2,7 +2,7 @@
 
 Tarih: 2026-11-07. Kaynak: her projenin kendi GitHub deposu ve README'si. **Bu karşılaştırma bağımsız bir
 ölçüm değildir:** aşağıda "belgesinde yazıyor" denen şeyleri çalıştırıp doğrulamadım; yalnız Usta için kendi
-ölçümlerimiz var (bkz. `docs/v0.2.0-raporu.md`). Tablo 7 Kasım 2026'daki durumu gösterir, güncellenmedi. Yıldız sayıları o günkü değerlerdir ve kalite göstergesi değildir.
+ölçümlerimiz var (bkz. `docs/arsiv/0.2.0-olcumleri.md`). Tablo 7 Kasım 2026'daki durumu gösterir, güncellenmedi. Yıldız sayıları o günkü değerlerdir ve kalite göstergesi değildir.
 
 ## Büyüklük (GitHub, 2026-11-07)
 

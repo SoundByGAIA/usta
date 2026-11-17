@@ -1,4 +1,4 @@
-# Ortak hafıza: tasarım taslağı (0.6.0)
+# Evdeki ortak hafıza: tasarım
 
 Durum: 0.6.0'da uygulandı, kendi küçük sunucumuzla. ai-memory'yi de değerlendirdik, aşağıdaki karşılaştırma neden onu
 seçmediğimizi anlatıyor. Kod: `src/usta/ortak.py`, testler: `tests/test_ortak.py`, `tests/test_ortak_api.py`. Dışarıdan bir güvenlik incelemesi bekleniyor.

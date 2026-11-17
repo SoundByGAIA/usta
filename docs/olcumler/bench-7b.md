@@ -1,4 +1,4 @@
-# Orta zorlukta bench (mid-*): ilk ölçüm
+# Orta zorlukta bench görevleri (7B)
 
 Tarih: 2026-11-08. Amaç: önceki bench'in doygunluğunu (DeepSeek 18/18, 7B zor görevlerde 0) kırmak.
 Görev sayısı: 9 (6 dev, 3 final). Final görevleri bu ölçümde AÇILMADI. Kullanılan: 6 dev görevi × 3 tekrar = 18 koşu/kol.

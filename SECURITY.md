@@ -51,7 +51,7 @@ En değerli hedefler (önem sırasıyla):
 8. Windows'a özel: masaüstü simgesi, arka planda çalışma, `running.json`, `kurulum/Usta-Kur.bat`.
 
 Hazır araçlar. `usta lab validate` ve `usta lab smoke` izin katmanını saldırılı senaryolarla ölçer
-([docs/reliability-lab.md](docs/reliability-lab.md)); kendi senaryonuzu `src/usta/lab/scenarios/v1.jsonl` biçiminde ekleyebilirsiniz.
+([docs/lab.md](docs/lab.md)); kendi senaryonuzu `src/usta/lab/scenarios/v1.jsonl` biçiminde ekleyebilirsiniz.
 Daha önce kapatılan açıkların testleri `tests/test_hardening2.py`, `tests/test_hardening3.py`, `tests/test_policy.py`,
 `tests/test_sandbox.py`, `tests/test_taint.py` ve `tests/test_portal.py` içindedir: nereye bakıldığını gösterir.
 
@@ -95,7 +95,7 @@ Ayrıntı: [docs/design.md](docs/design.md) §5. Özet ve bilinçli sınırlar:
   parçası, güvenilmeyen kaynaklardan (dosya içeriği, `fetch_url`, `web_search`, MCP) gelen metinde geçiyor ve sizin isteminizde geçmiyorsa eylem
   onay ister (manuel modda gerekçeyle sorulur, oto modda reddedilir). Sınırlar: komut çıktısındaki talimatlar kapsam dışıdır (test izlerindeki
   meşru yollar sürekli işaretlenmesin diye); model enjekte metni yazdığı dosyanın *içeriğine* kopyalarsa yakalanmaz; sezgiseldir, kesin koruma
-  değildir. Ölçüm: [docs/v0.2.1-raporu.md](docs/v0.2.1-raporu.md).
+  değildir. Ölçüm: [docs/arsiv/0.2.1-olcumleri.md](docs/arsiv/0.2.1-olcumleri.md).
 - Sızdırma kanalları (belgeli): izinli alan adlarına HTTPS; model uç noktanız (istemler ve açılan dosya içerikleri o API'ye gider);
   önizlemede ajanın yazdığı sayfanın kendi kendine başka adrese yönlenmesi (iframe sandbox'ı bunu engelleyemez; `connect-src`, `form-action` ve
   `allow-top-navigation` kapalıdır).

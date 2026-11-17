@@ -1,4 +1,4 @@
-# USTA Reliability Lab
+# Reliability Lab
 
 Ajanın güvenilirliğini gerçekleşen araç eylemleriyle ölçen bağımsız modül (`src/usta/lab/`). Ajan döngüsünü,
 izin motorunu veya araçları değiştirmez: gerçek `Agent`, gerçek `Policy` ve gerçek dosya araçlarını çalıştırır,

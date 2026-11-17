@@ -1,17 +1,17 @@
-# Usta'nın kendi becerisini yazması ve başka yapay zekâ programlarını yönetmesi (C): tasarım
+# Beceri önerme ve başka yapay zekâ programlarına iş verme
 
-Durum: uygulandı. C1 (beceri tasarımcısı) 0.7.0'da, C2 (orkestra şefi) 0.8.0'da.
+Beceri önerme 0.7.0'da, başka programlara iş verme 0.8.0'da geldi.
 
 ## Amaç
 
-1. Kendi becerisini tasarlama (C1): Kullanıcı "şunu her seferinde böyle yap" der; Usta bunu bir *beceri* olarak yazıp
+1. Beceri önerme: Kullanıcı "şunu her seferinde böyle yap" der; Usta bunu bir *beceri* olarak yazıp
    önerir; kullanıcı okur ve onaylarsa kaydedilir (DeepSeek Creator benzeri, ama onaylı).
-2. Orkestra şefi (C2): Bilgisayarda kurulu diğer yapay zekâ programlarını (Claude Code, Codex, ileride Hermes vb.)
+2. Başka programlara iş verme: Bilgisayarda kurulu diğer yapay zekâ programlarını (Claude Code, Codex, ileride Hermes vb.)
    Usta'dan çıkmadan, Usta'nın gözetiminde yardıma çağırması.
 
 İkisi de aynı ilkeye dayanır: Usta öneri yapar, kullanıcı karar verir; model kendi yetkisini genişletemez.
 
-## C1: beceri tasarımcısı
+## Beceri önerme
 
 Beceri = `~/.usta/skills/<ad>.md` düz metin yönergesi (mevcut sistem; `/ad ek metin` yazınca metin + istek olur).
 Kod değildir ve izinleri değiştirmez.
@@ -28,7 +28,7 @@ Kod değildir ve izinleri değiştirmez.
 - Sınır: öneri en çok 4000 harf (okunabilir kalsın); adı küçük harf/rakam/`-`/`_`.
 - Eklenti (kod içeren) yapılmaz. Kod gerektiren ihtiyaç için kullanıcıya MCP kataloğu gösterilir.
 
-## C2: orkestra şefi
+## Başka programlara iş verme
 
 Katalog, serbest komut değil. Çağrılabilecek programlar `harnesses.py`'de sabit bir listedir (kimlik, ad, ikili adı,
 "yalnız okuma" ve "dosya yazabilir" çağrı şablonları). Model ya da kullanıcı keyfi komut veremez; `mcpcatalog` ile aynı ilke.

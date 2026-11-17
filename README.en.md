@@ -43,17 +43,17 @@ What we have measured so far:
 
 - **Say–do check** (on by default). If the model tries to finish without writing the file it was asked to write, it
   gets one short reminder. On a 9B model, task success went from 13/25 to 19/25. Attack success did not change.
-  [docs/lab-sozeylem-olcumu.md](docs/lab-sozeylem-olcumu.md)
+  [docs/olcumler/soz-eylem.md](docs/olcumler/soz-eylem.md)
 - **Website requests from non-coders** (experimental, `USTA_SITE_STEPS=1`). Usta builds the page frame, inserts the
   user's own facts and the countdown, and lets the model write only a short text. Three small models, 45 runs: 45 correct,
   12–21 seconds each. Asked to write the whole page in one go, the same models got 10 of 45 right.
-  [docs/lab-site-olcumu.md](docs/lab-site-olcumu.md)
+  [docs/olcumler/site-istekleri.md](docs/olcumler/site-istekleri.md)
 - Telling a small model "don't write a phone number or opening hours" made it write exactly those, 5 times out of 5. Our
   prompts are phrased positively because of this. Same document.
 
 We also write down what didn't work. Turning thinking down made small models worse
-([docs/lab-dusunme-olcumu.md](docs/lab-dusunme-olcumu.md)). A verification gate and a circuit breaker did not rescue a
-weak model on their own ([docs/v0.2.0-raporu.md](docs/v0.2.0-raporu.md)). These reports are in Turkish.
+([docs/olcumler/dusunme.md](docs/olcumler/dusunme.md)). A verification gate and a circuit breaker did not rescue a
+weak model on their own ([docs/arsiv/0.2.0-olcumleri.md](docs/arsiv/0.2.0-olcumleri.md)). These reports are in Turkish.
 
 ## Safety
 
@@ -98,7 +98,7 @@ One-off task: `usta run "summarize not.txt" -w ./folder`. API server: `usta serv
 ## Measurement tools
 
 - `usta lab` runs the same task clean and under attack (poisoned file, fake instructions, exfiltration attempts) and
-  judges the tool calls the model actually made, not what it said. [docs/reliability-lab.md](docs/reliability-lab.md)
+  judges the tool calls the model actually made, not what it said. [docs/lab.md](docs/lab.md)
 - `usta bench` runs small software tasks and checks them with tests the agent can't see.
 - `usta probe` measures and stores a model's tool-calling ability.
 
@@ -111,7 +111,8 @@ make ci        # ruff + pytest
 ```
 
 Sandbox tests need Docker and the `python:3.12-slim` image; without them those tests are skipped. See
-[CONTRIBUTING.md](CONTRIBUTING.md). Architecture and threat model (Turkish): [docs/design.md](docs/design.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). Architecture and threat model (Turkish): [docs/design.md](docs/design.md). All settings and experimental
+options (Turkish): [docs/ayarlar.md](docs/ayarlar.md).
 
 ## License and credits
 

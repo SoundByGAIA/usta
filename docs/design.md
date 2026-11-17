@@ -149,10 +149,10 @@ Bağımlılıklar: fastapi, uvicorn, httpx, pydantic; test: pytest. Yerel CI = `
 
 ## 0.2.0'da eklenenler (güvenilirlik ve ölçüm)
 
-Ayrıntılı denetim ve boşluk analizi: [implementation-audit.md](implementation-audit.md). Sonuçlar ve maliyetler: [v0.2.0-raporu.md](v0.2.0-raporu.md).
+Ayrıntılı denetim ve boşluk analizi: [0.1 denetimi](arsiv/0.1-denetimi.md). Sonuçlar ve maliyetler: [0.2.0 ölçümleri](arsiv/0.2.0-olcumleri.md).
 
 - MCP Runtime (`mcp_runtime.py`, §5.3): MCP sunucuları varsayılan olarak yalıtılmış konteynerde; `prepare` ile paket/imaj sabitleme.
-- Reliability Lab (`lab/`, [reliability-lab.md](reliability-lab.md)): eşleştirilmiş temiz/saldırılı koşular, araç eylemi izi, deterministik değerlendirici, metrik motoru.
+- Reliability Lab (`lab/`, [lab.md](lab.md)): eşleştirilmiş temiz/saldırılı koşular, araç eylemi izi, deterministik değerlendirici, metrik motoru.
 - Bench teşhisi (`taxonomy.py`, `bench.py`): başarısızlık sınıflandırması, adım izi, modelsiz tekrar oynatma, eşleştirilmiş kol karşılaştırması, train/dev/final bölümleri.
 - Yetenek profili (`capability.py`): protokol başına sondalar (uçtan uca ajan görevleri dahil); uç nokta + model revizyonu + yapılandırma ile anahtarlı.
 - Sembol araçları (`symbols.py`, deneysel): Tree-sitter ile çok dilli semboller, stat tabanlı güncel indeks, bütçeli bağlam; yoksa regex/AST'ye düşer.

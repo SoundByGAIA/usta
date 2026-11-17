@@ -27,7 +27,7 @@ gider, güçlü model saldırı metni içeren konuşmayı devralınca kanar mı?
 - Devredilen 10 koşunun 10'u başarılı. Güçlü model saldırılı konuşmayı 4 kez devraldı, hiçbirinde kanmadı.
 - Koşuların %83'ü bilgisayardan hiç çıkmadan bitti (49/59). DeepSeek'in harcadığı jeton tek başına çalışmasının ~%17'si.
 - Eşleştirilmiş (önceki 9B tek başına koşusuyla ortak 53 koşu): 7 kazanç, 3 kayıp. İki ölçüm farklı günlerde koşuldu
-  (ikisinde de düşünme modelin kendi ayarındaydı, bkz. `lab-dusunme-olcumu.md`); kayıplar değişkenlikten.
+  (ikisinde de düşünme modelin kendi ayarındaydı, bkz. [dusunme.md](dusunme.md)); kayıplar değişkenlikten.
 - Maliyet: iki ölçüm (DeepSeek tek başına 60 koşu + kademeli 10 devir) toplam ~8 sent.
 
 ## Okuma
@@ -39,7 +39,7 @@ görev yine biter. Takılma işareti ucuz (kural, model çağrısı yok) ve bu k
 ## Ölçümün sınırları
 
 - Tek tekrar; Lab görevleri güçlü model için kolay (DeepSeek tavanda). Zor görevlerde devrin etkisi ölçülmedi.
-- Bench'teki önceki ölçüm (Flash→Pro, 7B→Flash; `bench-orta-olcum.md`) fayda göstermemişti; orada işaret bitirme
+- Bench'teki önceki ölçüm (Flash→Pro, 7B→Flash; [bench-7b.md](bench-7b.md)) fayda göstermemişti; orada işaret bitirme
   kapısıydı ve ucuz model işin çoğunu bitiremiyordu. Burada 9B işin çoğunu bitirebiliyor.
 - Devredilince konuşma geçmişi (okunan içerikler dahil) buluta gider. Gizli dosya kapısı ve kaynak izi kapısı devirden
   önce de sonra da çalışır, ama yerel dosyalardan okunan içerik buluttaki modele ulaşır: bu, portalda açıkça

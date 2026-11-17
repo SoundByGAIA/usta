@@ -130,10 +130,10 @@ def test_all_text_io_declares_utf8_encoding():
 def test_mount_path_check_allows_only_drive_colon_on_windows():
     from usta.sandbox import unsafe_mount_path as bad
 
-    assert not bad("C:\\Users\\Ayse\\proje", windows=True)
+    assert not bad("C:\\Users\\Ayşe\\proje", windows=True)
     assert not bad("D:/proje", windows=True)
     assert bad("C:\\a:b", windows=True) and bad("C:\\a,b", windows=True)
-    assert bad("C:\\Users\\Ayse", windows=False)  # Linux'ta ':' hâlâ reddedilir
+    assert bad("C:\\Users\\Ayşe", windows=False)  # Linux'ta ':' hâlâ reddedilir
     assert bad("/ev/a:b", windows=False) and not bad("/ev/proje", windows=False)
 
 

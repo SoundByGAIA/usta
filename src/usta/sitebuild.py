@@ -525,8 +525,8 @@ class SiteBuilder:
         return set_heading(parse_section(self._ask(prompt), idx), plan_name(item))
 
     def _piece(self, what: str) -> str:
-        """En küçük birim: kısa düz metin (HTML yok), denetlenir; olmazsa boş (modelin sağlıklı
-        yapabildiği en küçük parçaya böl)."""
+        """En küçük birim: kısa düz metin (HTML yok), denetlenir; olmazsa boş (modelin sağlıklı yapabildiği
+        en küçük parça)."""
         fix = ""
         for _ in range(2):
             text = _clean_piece(

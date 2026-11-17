@@ -41,7 +41,7 @@ artırdığını göstermiyor; v0.2.0 de bunu iddia etmemelidir.
 
 ### 3.1 MCP yürütme izolasyonu (P0)
 
-`McpClient.start()` sunucuyu `subprocess.Popen` ile **ana makinede, kullanıcının yetkileriyle** başlatır:
+`McpClient.start()` sunucuyu `subprocess.Popen` ile ana makinede, kullanıcının yetkileriyle başlatır:
 
 - Ortam: `BASE_ENV = PATH, HOME, LANG, LC_ALL, TMPDIR, USER` + sunucunun tanımlı `env` adları.
   `HOME` ana makineninkidir; sunucu `~/.ssh`, `~/.usta/token`, `~/.usta/apis.json` dosyalarını okuyabilir.
@@ -63,7 +63,7 @@ döngüsü uçtan uca enjeksiyonla ölçülmüyor.
 
 ### 3.3 Bench teşhisi (P0)
 
-`TaskResult` sonuç ve sayaçları tutar; **neden** başarısız olduğunu (araç argüman hatası, yanlış dosya,
+`TaskResult` sonuç ve sayaçları tutar; neden başarısız olduğunu (araç argüman hatası, yanlış dosya,
 tekrar eden yaklaşım, bağlam doluşu, model hatası, altyapı) ayırmaz. Eksikler: başarısızlık sınıflandırması,
 adım bazlı olay izi, tekrar oynatma, eşleştirilmiş kol karşılaştırması, geliştirme/nihai görev ayrımı,
 görev başına onarım denemesi sayısı. Altyapı hataları ayrı sayılıyor (iyi) ama toplam koşu içindeki oranı

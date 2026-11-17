@@ -33,7 +33,7 @@ Ucuz model başlar; bitirme kapısı başarısız sayarsa ya da devre kesici aç
 | 7B → Flash (yalnız kapı/kesici işareti) | 2/18 | 5 | 134 bin | 468 bin |
 | 7B → Flash (+ "düzenlemeden bitirdi" işareti) | 14/18 | 17 | 496 bin | 733 bin |
 
-- **Flash → Pro:** kapı yalnız 3 koşuda tetiklendi; kalan hatalar yanlış çözümle "bitti" idi (deponun testleri yakalamıyor). Fayda yok; 12/18 ile 14/18 arası gürültü.
-- **7B → Flash:** yalnız kapı işaretiyle 2/18. İkinci işaret (7B hiç düzenleme yapmadan "bitti" derse yanıtı at, güçlüye sor) eklenince 14/18, ama 17 koşunun 17'si Flash'a devredildi: bu, Flash'ın işi yapması + 7B'nin boşa token yakması demek. Flash'ın harcadığı token (496 bin) tek başına Flash C'den (536 bin) yalnız ~%7 az: bulut token tasarrufu gürültü düzeyinde; toplam token ve süre daha yüksek.
+- Flash → Pro: kapı yalnız 3 koşuda tetiklendi; kalan hatalar yanlış çözümle "bitti" idi (deponun testleri yakalamıyor). Fayda yok; 12/18 ile 14/18 arası gürültü.
+- 7B → Flash: yalnız kapı işaretiyle 2/18. İkinci işaret (7B hiç düzenleme yapmadan "bitti" derse yanıtı at, güçlüye sor) eklenince 14/18, ama 17 koşunun 17'si Flash'a devredildi: bu, Flash'ın işi yapması + 7B'nin boşa token yakması demek. Flash'ın harcadığı token (496 bin) tek başına Flash C'den (536 bin) yalnız ~%7 az: bulut token tasarrufu gürültü düzeyinde; toplam token ve süre daha yüksek.
 - İkinci işaret dev sonuçlarına bakılarak eklendi (ayarlama); bu yüzden 14/18 kanıt sayılmaz, final görevlerinde doğrulanmadı.
-- **Karar:** deneysel kalır, varsayılan değil. Gerçek token tasarrufu için ucuz modelin işin büyük kısmını kendisinin bitirebilmesi gerekir; 7B bu görevlerde bunu yapamıyor.
+- Karar: deneysel kalır, varsayılan değil. Gerçek token tasarrufu için ucuz modelin işin büyük kısmını kendisinin bitirebilmesi gerekir; 7B bu görevlerde bunu yapamıyor.

@@ -348,7 +348,7 @@ def test_crash_handler_writes_secret_free_report_and_friendly_message(
 
 def test_crash_handler_explains_admin_created_usta_folder(monkeypatch, capsys, env):
     def boom(argv=None):
-        raise PermissionError(13, "Permission denied", r"C:\Users\Ayse\.usta\token")
+        raise PermissionError(13, "Permission denied", r"C:\Users\Ayşe\.usta\token")
 
     monkeypatch.setattr(cli, "_main", boom)
     assert cli.main([]) == 1

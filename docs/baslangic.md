@@ -89,7 +89,7 @@ Bilgisayar ve tablet **aynı Wi-Fi'a** bağlı olmalı.
 
 Bu bağlantı şifrelenmez. Yalnız evindeki gibi güvendiğin bir Wi-Fi'da kullan.
 
-## Bilmen gerekenler (dürüst notlar)
+## Bilmen gerekenler
 
 - **Docker yoksa komut çalıştırılamaz.** Usta, bilgisayarında bir komut çalıştırması gerektiğinde bunu güvenlik için Docker adlı programın içinde yapar. Docker kurulu değilse Usta dosya yazabilir ve okuyabilir ama komut çalıştıramaz (ör. yazdığı kodu deneyemez). Basit sayfa/metin işleri için gerekmez.
 - **Windows'ta denendi, ama sınırlı.** Usta Linux'ta geliştirildi. 9 Kasım 2026'da gerçek bir Windows 10 bilgisayarda (Python 3.14) kurulum, açılış, ayarlar, dosya yazma ve Türkçe karakterler denendi ve buldukları düzeltildi. 10 Kasım'da masaüstü simgesi, arka planda çalışma ve tek tıkla kurulum dosyası (`Usta-Kur.bat`) da denendi. Docker'lı komut çalıştırma ve tablet bağlantısı Windows'ta denenmedi. Bir şey bozulursa **Ayarlar → "Yardım iste"** düğmesine bas ve çıkan yazıyı sana Usta'yı veren kişiye gönder (içinde yazdıkların, dosyaların ve anahtarın olmaz).

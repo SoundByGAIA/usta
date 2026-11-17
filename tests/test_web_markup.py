@@ -57,7 +57,7 @@ def test_wizard_has_a_step_rail_and_three_places_to_run_the_ai():
     for needed in ("wiz-cloud", "wiz-local", "wiz-lan", "wiz-lan-step", "wiz-lan-form"):
         assert f'id="{needed}"' in html
     # dinamik oluşturulan küçük kartlar düğmedir ama içlerinde başka düğme olmaz
-    js = (WEB / "app.js").read_text(encoding="utf-8")
+    js = "\n".join((WEB / f).read_text(encoding="utf-8") for f in ("ayarlar.js", "kurulum.js", "app.js"))
     assert 'WIZ_STEPS = ["wiz-start", "wiz-lan-step"' in js
 
 
@@ -70,7 +70,7 @@ def test_jargon_is_hidden_in_the_simple_view():
 def test_glossary_balloon_and_back_button_markup():
     html = INDEX.read_text(encoding="utf-8")
     assert 'id="gloss-tip"' in html and 'role="tooltip"' in html  # "?" balonu
-    js = (WEB / "app.js").read_text(encoding="utf-8")
+    js = "\n".join((WEB / f).read_text(encoding="utf-8") for f in ("ayarlar.js", "kurulum.js", "app.js"))
     assert '"Sayfaya dön"' in js  # açık bölümün düğmesi geri dönüş düğmesi olur
     # "?" artık sözlük sayfasına atlamaz: balon açar, sayfa değişmez (sözlüğe ancak balondaki düğmeyle gidilir)
     click = js[js.index("const b = qBtn(ev);") :][:200]
@@ -81,7 +81,7 @@ def test_skill_design_markup_and_the_card_never_saves_by_itself():
     html = INDEX.read_text(encoding="utf-8")
     for needed in ("skill-design", "my-skills", "design-note", "design-off"):
         assert f'id="{needed}"' in html
-    js = (WEB / "app.js").read_text(encoding="utf-8")
+    js = "\n".join((WEB / f).read_text(encoding="utf-8") for f in ("ayarlar.js", "kurulum.js", "app.js"))
     card = js[js.index("function skillProposalNode") : js.index("async function loadMySkills")]
     # kayıt yalnız Kaydet düğmesinin tıklamasında ve kullanıcının gördüğü (sunucunun doğruladığı) metinle yapılır
     assert card.count('method: "PUT"') == 1
@@ -96,7 +96,7 @@ def test_harness_settings_markup_and_every_program_starts_closed():
     html = INDEX.read_text(encoding="utf-8")
     for needed in ("harness-list", "harness-msg"):
         assert f'id="{needed}"' in html
-    js = (WEB / "app.js").read_text(encoding="utf-8")
+    js = "\n".join((WEB / f).read_text(encoding="utf-8") for f in ("ayarlar.js", "kurulum.js", "app.js"))
     block = js[js.index("async function loadHarnesses") : js.index("async function loadPrograms")]
     assert (
         "box.checked = !!p.enabled" in block

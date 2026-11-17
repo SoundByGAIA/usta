@@ -1,9 +1,12 @@
 // Usta web arayüzü. Güvenilmeyen içerik (model çıktısı, dosyalar) yalnız textContent ile basılır.
 (function () {
   "use strict";
+  const U = (window.UstaApp = window.UstaApp || {});
+  Object.assign(U, { api, apisMsg, errorText, fillPrompt, h, hideGlossTip, loadApis, loadModels, showTab });
   const L = window.UstaLogic;
   const $ = (id) => document.getElementById(id);
   const state = { token: "", ws: null, task: null, active: false, abort: null, approvals: {}, contextWindow: null, files: [], replay: false, openFile: null, openDirs: new Set(), selDir: "", defaultWs: null, zoom: "auto", fsMode: null, tab: "stream", resultOn: false, panelStack: [], designSkill: false };
+  Object.assign(U, { state });
   const STATUS = {
     running: "çalışıyor", awaiting_approval: "onay bekliyor", cancelling: "durduruluyor",
     done: "bitti", cancelled: "durduruldu", failed: "başarısız",
@@ -222,7 +225,7 @@
   function renderEvent(type, data) {
     if (type === "usage") { officeEvent(type, data); showUsage(data, state.contextWindow); officeContextWindow(); return; } // usage sayaçları değiştirmez
     officeEvent(type, data);
-    if (type === "tool_call" && data && data.tool === "propose_skill" && !state.replay) return addNode(skillProposalNode(data.args || {}));
+    if (type === "tool_call" && data && data.tool === "propose_skill" && !state.replay) return addNode(U.skillProposalNode(data.args || {}));
     const s = L.summarize(type, data);
     if (type === "message" && !s.body) return;
     if (s.kind === "tool" || s.kind === "result") {
@@ -629,7 +632,7 @@
     const res = await api(`/workspaces/${encodeURIComponent(state.ws)}/tasks`, { method: "POST", body: JSON.stringify(body) });
     if (!res.ok) { addNode(h("div", "msg error", await errorText(res))); return; }
     const task = await res.json();
-    setDesignSkill(false);  // tek seferlik: bir sonraki görev yine normal
+    U.setDesignSkill(false);  // tek seferlik: bir sonraki görev yine normal
     state.contextWindow = task.context_window || null;
     showUsage(null);
     officeContextWindow(); // modelin bağlam penceresi Ofis göstergelerine
@@ -675,460 +678,11 @@
     return true;
   }
 
-  // --- ek araçlar (MCP): yalnız katalogdan ekleme, serbest komut yok ---
-  function toolsMsg(text, cls) {
-    const m = $("tools-msg");
-    m.textContent = text || "";
-    m.className = cls || "empty";
-  }
-  async function toolsCall(path, method, body) {
-    const res = await api(`/mcp${path}`, { method, body: body ? JSON.stringify(body) : undefined });
-    if (!res.ok) { toolsMsg(await errorText(res), "error"); return null; }
-    return res.json();
-  }
-  async function loadTools() {
-    const res = await api("/mcp");
-    if (!res.ok) { toolsMsg(await errorText(res), "error"); return; }
-    const data = await res.json();
-    const inst = $("tools-installed"), cat = $("tools-catalog");
-    inst.replaceChildren();
-    cat.replaceChildren();
-    if (!data.servers.length) inst.appendChild(h("p", "empty", "Henüz araç eklenmedi."));
-    for (const s of data.servers) inst.appendChild(serverCard(s));
-    const avail = data.catalog.filter((c) => !c.added);
-    if (!avail.length) cat.appendChild(h("p", "empty", "Eklenebilecek başka araç yok."));
-    for (const c of avail) cat.appendChild(catalogCard(c));
-  }
-  function catalogCard(c) {
-    const card = h("div", "card");
-    card.append(h("strong", null, c.title), h("p", null, c.description), h("code", "cmd", c.command.join(" ")));
-    card.appendChild(h("p", "empty", `Yalıtılmış konteynerde çalışır (imaj: ${c.image}; ağ: ${c.allow_hosts.length ? c.allow_hosts.join(", ") : "kapalı"}). İmaj yerelde olmalı: docker pull ${c.image}`));
-    if (c.homepage.startsWith("https://")) {
-      const a = h("a", null, c.homepage);
-      a.href = c.homepage;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      card.appendChild(h("p", "empty")).appendChild(a);
-    }
-    const add = h("button", "primary", "Ekle");
-    add.type = "button";
-    add.addEventListener("click", async () => {
-      add.disabled = true;
-      if (await toolsCall(`/catalog/${encodeURIComponent(c.id)}`, "POST")) { toolsMsg("Eklendi. Önce Hazırla (paketleri indirip sabitler), anahtarı gir, sonra Test et.", "ok"); await loadTools(); }
-      else add.disabled = false;
-    });
-    card.appendChild(add);
-    return card;
-  }
-  function serverCard(s) {
-    const card = h("div", "card");
-    const title = h("strong", null, s.name);
-    const host = s.isolation === "host";
-    card.append(title, h("span", "chip", s.enabled ? "açık" : "kapalı"), h("span", "chip", host ? "ANA MAKİNE (yalıtımsız)" : "yalıtılmış konteyner"));
-    if (!host) card.appendChild(h("span", "chip", s.pinned ? "sabitlendi" : "sabitlenmedi"));
-    card.append(h("p", "empty", `onay: ${s.approve === "allow" ? "sormadan çalışır" : "her çağrıda sorulur"}${host ? "" : ` · imaj: ${s.image || "YOK"} · ağ: ${s.allow_hosts.length ? s.allow_hosts.join(", ") : "kapalı"}`}`), h("code", "cmd", s.command.join(" ")));
-    for (const e of s.env) {
-      const row = h("div", "key-row");
-      const input = h("input");
-      input.type = "password";
-      input.autocomplete = "off";
-      input.spellcheck = false;
-      input.placeholder = e.set ? `${e.name} tanımlı (değiştirmek için yaz)` : `${e.name} değerini gir`;
-      input.setAttribute("aria-label", e.name);
-      const save = h("button", null, "Kaydet");
-      save.type = "button";
-      save.addEventListener("click", async () => {
-        const v = input.value.trim();
-        if (!v) return;
-        if (await toolsCall(`/${encodeURIComponent(s.name)}/secrets/${encodeURIComponent(e.name)}`, "PUT", { value: v })) {
-          input.value = "";
-          toolsMsg(`${e.name} kaydedildi.`, "ok");
-          await loadTools();
-        }
-      });
-      row.append(input, save);
-      card.appendChild(row);
-    }
-    const actions = h("div", "row");
-    const test = h("button", null, "Test et");
-    test.type = "button";
-    test.addEventListener("click", async () => {
-      test.disabled = true;
-      toolsMsg("Konteyner başlatılıyor...");
-      const r = await toolsCall(`/${encodeURIComponent(s.name)}/test`, "POST");
-      test.disabled = false;
-      if (r) toolsMsg(`${r.tools.length} araç bulundu: ${r.tools.map((t) => t.name).join(", ")}`.slice(0, 600), "ok");
-    });
-    const prepare = h("button", null, s.pinned ? "Yeniden hazırla" : "Hazırla");
-    prepare.type = "button";
-    prepare.hidden = host;
-    prepare.addEventListener("click", async () => {
-      prepare.disabled = true;
-      toolsMsg("Hazırlanıyor: paketler yalnız paket kayıtlarına açık ağda indirilir, kurulum betikleri çalışmaz (birkaç dakika sürebilir)...");
-      const r = await toolsCall(`/${encodeURIComponent(s.name)}/prepare`, "POST");
-      prepare.disabled = false;
-      if (r) { toolsMsg("Hazır: imaj ve paketler sabitlendi.", "ok"); await loadTools(); }
-    });
-    const toggle = h("button", null, s.enabled ? "Kapat" : "Aç");
-    toggle.type = "button";
-    toggle.addEventListener("click", async () => {
-      if (await toolsCall(`/${encodeURIComponent(s.name)}/enabled`, "POST", { enabled: !s.enabled })) await loadTools();
-    });
-    const remove = h("button", null, "Kaldır");
-    remove.type = "button";
-    let armed = null;
-    remove.addEventListener("click", async () => {
-      if (!armed) {
-        remove.textContent = "Emin misin? Tekrar tıkla";
-        armed = setTimeout(() => { armed = null; remove.textContent = "Kaldır"; }, 4000);
-        return;
-      }
-      clearTimeout(armed);
-      if (await toolsCall(`/${encodeURIComponent(s.name)}`, "DELETE")) await loadTools();
-    });
-    actions.append(prepare, test, toggle, remove);
-    card.appendChild(actions);
-    return card;
-  }
-  function renderGlossary() {
-    const found = UstaGlossary.search($("gloss-q").value);
-    $("gloss-list").replaceChildren(...(found.length ? found.map((t) => {
-      const card = h("div", "card");
-      card.append(h("strong", null, t.term), h("p", null, t.say), h("p", "wiz-note", `Benzetme: ${t.like}`));
-      return card;
-    }) : [h("p", "empty", "Bunu bulamadım. Başka bir kelimeyle dene ya da Usta'ya sor.")]));
-  }
-  // --- eksik programı Usta kursun (şimdilik Ollama, yalnız Windows'ta) ---
-  let installTimer = null;
-  function installButton(what, label, onDone) {
-    const box = h("div", "install-box");
-    const btn = h("button", "primary", label);
-    btn.type = "button";
-    const msg = h("p", "wiz-note", "");
-    msg.setAttribute("role", "status");
-    const bar = h("progress", "wiz-progress");
-    bar.hidden = true;
-    const poll = async () => {
-      let s = {};
-      try { const r = await api("/system/install"); if (r.ok) s = await r.json(); } catch { /* sonraki turda dene */ }
-      if (s.active) { const mins = Math.floor((s.elapsed || 0) / 60);
-      msg.textContent = `${s.status || "Kuruluyor"}… ${mins} dakikadır sürüyor. Program yaklaşık 1 GB; yavaş internette saatler sürebilir. Pencereyi kapatma; istersen aşağıdaki bağlantıdan kendin indir.`; installTimer = setTimeout(poll, 2000); return; }
-      bar.hidden = true; btn.disabled = false;
-      if (s.done) { msg.textContent = s.status || "Hazır."; onDone(); return; }
-      msg.textContent = s.error || "Kurulum olmadı. Aşağıdaki bağlantıdan kendin indirebilirsin.";
-    };
-    btn.addEventListener("click", async () => {
-      btn.disabled = true; bar.hidden = false; msg.textContent = "Başlıyorum…";
-      const r = await api("/system/install", { method: "POST", body: JSON.stringify({ what }) });
-      if (!r.ok) { btn.disabled = false; bar.hidden = true; msg.textContent = await errorText(r); return; }
-      clearTimeout(installTimer);
-      installTimer = setTimeout(poll, 1500);
-    });
-    box.append(btn, bar, msg);
-    return box;
-  }
-
-  // --- "Seni tanıyayım" (kişisel profil; yalnız kullanıcı yazar) ---
-  let kisiFacts = [];
-  const kisiMsg = (t, c) => { const m = $("kisi-msg"); m.textContent = t || ""; m.className = "wiz-note" + (c ? ` ${c}` : ""); };
-  function renderKisiFacts() {
-    $("kisi-liste").replaceChildren(...kisiFacts.map((f, i) => {
-      const li = h("li");
-      const del = h("button", null, "Sil");
-      del.type = "button"; del.setAttribute("aria-label", `Sil: ${f}`);
-      del.addEventListener("click", () => { kisiFacts.splice(i, 1); renderKisiFacts(); kisiMsg("Silindi. Kalıcı olması için Kaydet'e bas."); });
-      li.append(h("span", null, f), del);
-      return li;
-    }));
-  }
-  async function loadProfile() {
-    const r = await api("/profile");
-    if (!r.ok) return;
-    const k = await r.json();
-    $("kisi-ad").value = k.ad || "";
-    $("kisi-uslup").value = k.uslup || "sade";
-    $("kisi-hakkimda").value = k.hakkimda || "";
-    kisiFacts = Array.isArray(k.bilgiler) ? k.bilgiler.slice() : [];
-    renderKisiFacts();
-    kisiMsg("");
-  }
-  async function saveProfile() {
-    const body = { ad: $("kisi-ad").value, uslup: $("kisi-uslup").value, hakkimda: $("kisi-hakkimda").value, bilgiler: kisiFacts };
-    const r = await api("/profile", { method: "PUT", body: JSON.stringify(body) });
-    if (!r.ok) { kisiMsg(await errorText(r), "error"); return; }
-    kisiMsg("Kaydettim. Bundan sonraki görevlerde bunları bilerek çalışırım.", "ok");
-  }
-
-  // --- evdeki ortak hafıza ---
-  const ortakMsg = (t, c) => { const m = $("ortak-msg"); m.textContent = t || ""; m.className = "wiz-note" + (c ? ` ${c}` : ""); };
-  async function ortakCall(path, method, body) {
-    const r = await api(path, { method: method || "POST", body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) { ortakMsg(await errorText(r), "error"); return null; }
-    return r.json();
-  }
-  function ortakRow(text, who, buttons) {
-    const li = h("li");
-    const left = h("span", null, text);
-    if (who) left.append(h("span", "who", `  (${who})`));
-    const acts = h("span", "acts");
-    for (const [label, fn] of buttons) { const b = h("button", null, label); b.type = "button"; b.setAttribute("aria-label", `${label}: ${text}`); b.addEventListener("click", fn); acts.append(b); }
-    li.append(left, acts);
-    return li;
-  }
-  async function loadOrtak() {
-    const r = await api("/ortak");
-    if (!r.ok) { $("ortak-durum").textContent = "Ortak hafıza durumunu alamadım."; return; }
-    const d = await r.json();
-    for (const id of ["ortak-yok", "ortak-sahip", "ortak-bagli", "ortak-notlar-kutu"]) $(id).hidden = true;
-    $("ortak-kod-kutu").hidden = true; $("ortak-kod-not").hidden = true;
-    const profileLocked = d.rol === "bagli";
-    for (const id of ["kisi-ad", "kisi-uslup", "kisi-hakkimda", "kisi-yeni"]) $(id).disabled = profileLocked;
-    for (const id of ["kisi-save", "kisi-clear"]) $(id).disabled = profileLocked;
-    $("kisi-form").querySelector("button").disabled = profileLocked;
-    if (d.rol === "yok") {
-      $("ortak-durum").textContent = "Şu an kapalı: bilgilerin yalnız bu bilgisayarda.";
-      $("ortak-yok").hidden = false;
-      return;
-    }
-    $("ortak-notlar-kutu").hidden = false;
-    $("ortak-notlar").replaceChildren(...(d.notlar || []).map((n) => ortakRow(n.text, n.kaynak, d.rol === "ev-sahibi" ? [["Sil", async () => { if (await ortakCall(`/ortak/notlar/${n.id}`, "DELETE")) loadOrtak(); }]] : [])));
-    if (d.rol === "ev-sahibi") {
-      $("ortak-durum").textContent = d.calisiyor ? `Bu bilgisayar ortak hafızayı tutuyor (${d.adres}). Adı: ${d.ad}.` : "Ortak hafıza açık ama şu an dinlemiyor (ağa bağlı mısın?).";
-      $("ortak-sahip").hidden = false;
-      $("ortak-esler").replaceChildren(...((d.eslesmeler || []).length ? d.eslesmeler.map((e) => ortakRow(e.ad, "", [["Kaldır", async () => { if (await ortakCall(`/ortak/eslesmeler/${e.id}`, "DELETE")) loadOrtak(); }]])) : [h("li", "wiz-note", "Henüz bağlı bilgisayar yok.")]));
-      $("ortak-bekleyen").replaceChildren(...((d.bekleyen || []).length ? d.bekleyen.map((n) => ortakRow(n.text, `${n.kaynak} ekledi`, [
-        ["Onayla", async () => { if (await ortakCall(`/ortak/notlar/${n.id}/onayla`)) loadOrtak(); }],
-        ["Reddet", async () => { if (await ortakCall(`/ortak/notlar/${n.id}`, "DELETE")) loadOrtak(); }],
-      ])) : [h("li", "wiz-note", "Bekleyen not yok.")]));
-    } else {
-      $("ortak-durum").textContent = `Bu bilgisayar "${d.baglanti.ad}" bilgisayarındaki (${d.baglanti.adres}) ortak hafızaya bağlı. Bilgilerini orada değiştirirsin.`;
-      $("ortak-bagli").hidden = false;
-      const w = $("ortak-uyari");
-      w.hidden = !d.ulasilamiyor;
-      w.textContent = d.ulasilamiyor ? `Ev sahibine şu an ulaşamıyorum (${d.hata}). Son bildiğim kopyayı kullanıyorum.` : "";
-      if (d.profil) { $("kisi-ad").value = d.profil.ad || ""; $("kisi-uslup").value = d.profil.uslup || "sade"; $("kisi-hakkimda").value = d.profil.hakkimda || ""; kisiFacts = (d.profil.bilgiler || []).slice(); renderKisiFacts(); }
-      kisiMsg("Bu bilgiler ev sahibi bilgisayardan geliyor; burada değiştirilemez.");
-    }
-  }
-
-  // --- Beceri tasarımcısı: Usta önerir, SEN onaylarsan kaydedilir ---
-  function setDesignSkill(on) {
-    state.designSkill = !!on;
-    $("design-note").hidden = !on;
-  }
-  function startSkillDesign() {
-    closePanels();
-    showTab("stream");
-    setDesignSkill(true);
-    fillPrompt("Şu işi her seferinde aynı şekilde yapan bir beceri tasarla: ");
-  }
-  const rowOf = (...nodes) => { const r = h("div", "row"); r.append(...nodes); return r; };  // h() yalnız metin alır
-  function skillProposalNode(args) {
-    const box = h("div", "msg skill-proposal");
-    box.append(h("strong", null, "Usta yeni bir beceri önerdi"), h("p", "wiz-note", "Okuyup beğenirsen Kaydet'e bas. Sen onaylamadan hiçbir şey kaydedilmez."));
-    const body = h("div");
-    body.append(h("p", "wiz-note", "Öneri kontrol ediliyor…"));
-    box.append(body);
-    (async () => {
-      let d;
-      try {
-        const r = await api("/skills/check", { method: "POST", body: JSON.stringify({ name: String(args.name ?? ""), description: String(args.description ?? ""), instructions: String(args.instructions ?? "") }) });
-        if (!r.ok) { body.replaceChildren(h("p", "error", `Bu öneri kaydedilemez: ${await errorText(r)}`)); return; }
-        d = await r.json();
-      } catch (_) { body.replaceChildren(h("p", "error", "Öneri kontrol edilemedi.")); return; }
-      const parts = [h("p", null, `Adı: /${d.name}`), h("pre", "skill-text", d.content)];
-      const ack = h("input"); ack.type = "checkbox"; ack.id = `ack-${d.name}-${Math.random().toString(36).slice(2, 7)}`;
-      const save = h("button", "primary", "Kaydet"); save.type = "button";
-      const drop = h("button", null, "Vazgeç"); drop.type = "button";
-      const msg = h("p", "wiz-note", ""); msg.setAttribute("role", "status");
-      if (d.risky) {
-        box.classList.add("risky");
-        const list = h("ul", "wiz-list con");
-        for (const w of d.warnings) list.append(h("li", null, w));
-        const lab = h("label"); lab.htmlFor = ack.id; lab.append(" Uyarıları okudum, yine de kaydetmek istiyorum.");
-        parts.push(h("p", "plain-warn", "Dikkat: bu öneride şunlar var."), list, rowOf(ack, lab));
-        save.disabled = true;
-        ack.addEventListener("change", () => { save.disabled = !ack.checked; });
-      }
-      parts.push(rowOf(save, drop), msg);
-      body.replaceChildren(...parts);
-      save.addEventListener("click", async () => {
-        save.disabled = true; drop.disabled = true;
-        const r = await api(`/skills/${encodeURIComponent(d.name)}`, { method: "PUT", body: JSON.stringify({ content: d.content }) });  // kullanıcının gördüğü metin
-        if (!r.ok) { msg.textContent = await errorText(r); msg.className = "error"; save.disabled = d.risky && !ack.checked; drop.disabled = false; return; }
-        for (const b of box.querySelectorAll("button, input")) b.disabled = true;
-        msg.textContent = `Kaydettim. Kullanmak için /${d.name} yaz ya da Ayarlar → Becerilerim → Kullan.`; msg.className = "wiz-note ok";
-        loadMySkills();
-      });
-      drop.addEventListener("click", () => { for (const b of box.querySelectorAll("button, input")) b.disabled = true; msg.textContent = "Vazgeçtin, bir şey kaydedilmedi."; });
-    })();
-    return box;
-  }
-  async function loadMySkills() {
-    const list = $("my-skills");
-    const r = await api("/skills");
-    if (!r.ok) { list.replaceChildren(h("li", "wiz-note", "Becerileri alamadım.")); return; }
-    const rows = await r.json();
-    list.replaceChildren(...(rows.length ? rows.map((s) => {
-      const li = h("li");
-      const left = h("span", null, `/${s.name}`);
-      left.append(h("span", "who", `  ${s.description}`));
-      const acts = h("span", "acts");
-      const use = h("button", null, "Kullan"); use.type = "button";
-      use.addEventListener("click", () => { closePanels(); showTab("stream"); fillPrompt(`/${s.name} `); });
-      const del = h("button", null, "Sil"); del.type = "button"; del.setAttribute("aria-label", `Sil: /${s.name}`);
-      del.addEventListener("click", async () => { const d = await api(`/skills/${encodeURIComponent(s.name)}`, { method: "DELETE" }); if (d.ok) loadMySkills(); });
-      acts.append(use, del);
-      li.append(left, acts);
-      return li;
-    }) : [h("li", "wiz-note", "Henüz becerin yok. \"Usta'ya yeni bir iş öğret\"e basarak başla.")]));
-  }
-
-  // --- yardımcı yapay zekâ programları (orkestra şefi): hepsi KAPALI başlar ---
-  async function loadHarnesses() {
-    const list = $("harness-list");
-    const r = await api("/harnesses");
-    if (!r.ok) { list.replaceChildren(h("li", "wiz-note", "Programları alamadım.")); return; }
-    const rows = (await r.json()).programlar || [];
-    list.replaceChildren(...rows.map((p) => {
-      const li = h("li");
-      const left = h("span");
-      left.append(h("strong", null, p.label));
-      left.append(h("span", "who", p.installed ? `  ${p.version || "kurulu"}` : "  bu bilgisayarda kurulu değil"));
-      const facts = [p.read_only ? "Yalnız okuma kipi var (varsayılan bu)." : (p.note ? "" : "Yalnız okuma kipi YOK: dosya yazabilir."), p.unsupported, p.note].filter(Boolean);  // not aynı şeyi söylüyorsa tekrar etme
-      if (p.installed) left.append(h("div", "wiz-note", facts.join(" ")));
-      const acts = h("span", "acts");
-      const id = `hn-${p.id}`;
-      const box = h("input"); box.type = "checkbox"; box.id = id; box.checked = !!p.enabled;
-      box.disabled = !p.installed || !!p.unsupported;
-      const lab = h("label"); lab.htmlFor = id; lab.textContent = " Usta çağırabilsin";
-      box.addEventListener("change", async () => {
-        box.disabled = true;
-        const res = await api(`/harnesses/${encodeURIComponent(p.id)}`, { method: "PUT", body: JSON.stringify({ enabled: box.checked }) });
-        const m = $("harness-msg");
-        if (!res.ok) { box.checked = !box.checked; m.textContent = await errorText(res); m.className = "wiz-note error"; }
-        else { m.textContent = box.checked ? `${p.label} açıldı. Usta onu çağırmadan önce her seferinde sana soracak.` : `${p.label} kapatıldı.`; m.className = "wiz-note ok"; }
-        box.disabled = false;
-      });
-      acts.append(box, lab);
-      li.append(left, acts);
-      return li;
-    }));
-  }
-
-  async function loadPrograms() {
-    const box = $("programs");
-    let d = {};
-    try { const res = await api("/system/info"); if (res.ok) d = await res.json(); } catch { /* durum bilinmiyor */ }
-    const items = [
-      { name: "Ollama", ok: d.ollama_installed, why: "Yapay zekâyı kendi bilgisayarında çalıştırır. Gerekli mi? Yalnız \"Bu bilgisayarda\" seçeneğini seçersen. İnternet servisi kullanıyorsan gerekmez.", url: "https://ollama.com/download", text: "Ollama'yı indir", install: d.can_install && d.can_install.ollama ? "ollama" : null },
-      { name: "Docker Desktop", ok: d.docker_installed, why: "Usta'nın bilgisayarında komut çalıştırmasını güvenli bir kutuda yapar. Gerekli mi? Sayfa, yazı, hesap makinesi gibi basit işler için hayır. Yazdığı kodu denemesini istiyorsan evet.", url: "https://www.docker.com/products/docker-desktop/", text: "Docker Desktop'ı indir" },
-    ];
-    box.replaceChildren(...items.map((it) => {
-      const card = h("div", "card");
-      const state = d.os === undefined ? "" : (it.ok ? " (kurulu ✓)" : " (kurulu değil)");
-      const ask = h("button", "q", "?");
-      ask.type = "button"; ask.dataset.gloss = it.name.split(" ")[0]; ask.title = "Bu ne demek?"; ask.setAttribute("aria-label", `Bu ne demek? ${it.name}`);
-      card.append(h("strong", null, `${it.name}${state} `), ask, h("p", null, it.why));
-      if (!it.ok && it.install) card.appendChild(installButton(it.install, `${it.name}'ı benim için kur`, loadPrograms));
-      if (!it.ok) card.appendChild(wizLink(it.url, it.install ? "ya da kendin indir" : it.text));
-      return card;
-    }));
-  }
   let tipFor = null, tipPinned = false, tipTimer = null;  // "?" balonu durumu (aşağıda)
   const PANELS = ["tools", "apis", "privacy", "wizard", "tablet", "settings", "glossary"];
+  Object.assign(U, { PANELS });
   const openPanel = () => PANELS.find((p) => !$(p).hidden) || null;
-  // Açık bölümün düğmesi "Sayfaya dön" olur; basınca BİR ÖNCEKİ yere döner (ana ekran ya da geldiğin bölüm)
-  function showPanel(name) {
-    for (const p of PANELS) {
-      const on = p === name;
-      const btn = $(`${p}-btn`);
-      $(p).hidden = !on;
-      btn.setAttribute("aria-pressed", String(on));
-      if (!btn.dataset.label) btn.dataset.label = btn.textContent;
-      btn.textContent = on ? "Sayfaya dön" : btn.dataset.label;
-    }
-    document.querySelector("main").hidden = !!name;
-    hideGlossTip();
-    if (!name) return;
-    if (name === "tools") { toolsMsg(""); loadTools(); loadSkills(); }
-    else if (name === "privacy") loadPrivacy();
-    else if (name === "wizard") wizShow("wiz-start");
-    else if (name === "tablet") loadTablet();
-    else if (name === "settings") { loadPrograms(); loadMySkills(); loadHarnesses(); loadProfile().then(loadOrtak); }
-    else if (name === "glossary") { $("gloss-q").value = ""; renderGlossary(); $("gloss-q").focus(); }
-    else { apisMsg(""); loadApis(); }
-  }
-  function togglePanel(name) {
-    const current = openPanel();
-    if (current === name) { showPanel(state.panelStack.pop() || null); return; }  // "Sayfaya dön"
-    if (current) state.panelStack.push(current); else state.panelStack = [];
-    showPanel(name);
-  }
-  function closePanels() { state.panelStack = []; showPanel(null); }
-  const fmtBytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
-  async function loadTablet() {
-    const res = await api("/pair", { method: "POST" });
-    $("tablet-off").hidden = res.ok;
-    $("tablet-on").hidden = !res.ok;
-    $("tablet-msg").textContent = "";
-    if (!res.ok) { if (res.status !== 404) $("tablet-msg").textContent = await errorText(res); return; }
-    const d = await res.json();
-    $("tablet-pin").textContent = d.pin;
-    $("tablet-ttl").textContent = `Bu kod ${Math.round(d.ttl / 60)} dakika geçerli.`;
-    $("tablet-urls").replaceChildren(...(d.urls.length ? d.urls.map((u) => h("code", "cmd", u)) : [h("p", "empty", "Yerel ağ adresi bulunamadı. Bilgisayarın Wi-Fi'a bağlı mı?")]));
-  }
-  async function loadPrivacy() {
-    const res = await api("/privacy");
-    if (!res.ok) { $("privacy-sends").replaceChildren(h("p", "error", await errorText(res))); return; }
-    const d = await res.json();
-    const where = { "bu-bilgisayar": "bu bilgisayar", "yerel-ağ": "yerel ağ", internet: "internet" };
-    $("privacy-sends").replaceChildren(...d.sends.map((t) => h("p", null, t)));
-    const list = h("div", "models");
-    for (const a of d.apis) list.appendChild(h("span", d.model && d.model.name === a.name ? "cur" : null, `${a.name}: ${where[a.where]}`));
-    $("privacy-sends").appendChild(list);
-    $("privacy-other").replaceChildren(...d.other.map((t) => h("li", null, t)));
-    $("privacy-home").textContent = `Klasör: ${d.home}`;
-    $("privacy-stored").replaceChildren(...d.stored.map((f) => {
-      const card = h("div", "card");
-      card.append(h("strong", null, f.name), h("span", "chip", fmtBytes(f.bytes)), h("p", "empty", f.what));
-      return card;
-    }));
-  }
-  const toggleTools = () => togglePanel("tools");
-
-  // --- beceriler: klasörü göster, yükle, sil ---
-  function skillsMsg(text, cls) { const m = $("skills-msg"); m.textContent = text || ""; m.className = cls || "empty"; }
-  async function loadSkills() {
-    const box = $("skills-list");
-    box.replaceChildren();
-    const res = await api("/skills");
-    if (!res.ok) { skillsMsg(await errorText(res), "error"); return; }
-    const list = await res.json();
-    if (!list.length) box.appendChild(h("p", "empty", "Henüz beceri yok."));
-    for (const s of list) {
-      const row = h("div", "skill-row");
-      row.append(h("span", null, `/${s.name}  ${s.description}`));
-      const del = h("button", null, "Sil");
-      del.type = "button";
-      del.addEventListener("click", async () => {
-        const r = await api(`/skills/${encodeURIComponent(s.name)}`, { method: "DELETE" });
-        if (r.ok) loadSkills(); else skillsMsg(await errorText(r), "error");
-      });
-      row.appendChild(del);
-      box.appendChild(row);
-    }
-  }
-  async function uploadSkills(files) {
-    for (const f of Array.from(files)) {
-      const name = f.name.replace(/\.md$/i, "").toLowerCase().replace(/[^a-z0-9çğıöşü_-]+/g, "-").replace(/^-+/, "").slice(0, 30);
-      if (!name || f.size > 20000) { skillsMsg(`${f.name}: ad geçersiz ya da 20 KB'tan büyük`, "error"); continue; }
-      const res = await api(`/skills/${encodeURIComponent(name)}`, { method: "PUT", body: JSON.stringify({ content: await f.text() }) });
-      skillsMsg(res.ok ? `/${name} yüklendi.` : `${f.name}: ${await errorText(res)}`, res.ok ? "ok" : "error");
-    }
-    loadSkills();
-  }
-
+  Object.assign(U, { openPanel });
   // --- API'ler ---
   function apisMsg(text, cls) { const m = $("apis-msg"); m.textContent = text || ""; m.className = cls || "empty"; }
   async function loadApis() {
@@ -1186,399 +740,6 @@
     $("api-form").reset();
     apisMsg("API eklendi; modelleri model listesinde görünür.", "ok");
     loadApis(); loadModels();
-  }
-
-  // --- bilgisayarımdaki model ---
-  const LOCAL_SLUG = { 11434: "ollama", 1234: "lm-studio", 8080: "llama-cpp", 8000: "vllm" };
-  const CTX_CHOICES = [4096, 8192, 16384, 32768, 65536, 131072];
-  async function scanLocal() {
-    const box = $("local-found");
-    box.replaceChildren();
-    const raw = $("local-port").value.trim();
-    const body = raw ? { port: Number(raw) } : {};
-    const res = await api("/local/scan", { method: "POST", body: JSON.stringify(body) });
-    if (!res.ok) { apisMsg(await errorText(res), "error"); return; }
-    const found = await res.json();
-    if (!found.length) { box.appendChild(h("p", "empty", "Bu portlarda çalışan bir model sunucusu bulamadım. Program açık mı?")); return; }
-    for (const f of found) {
-      const card = h("div", "card");
-      card.append(h("strong", null, `${f.name} (port ${f.port})`), h("code", "cmd", f.endpoint));
-      const models = h("div", "models");
-      for (const m of f.models) models.appendChild(h("span", null, m));
-      if (!f.models.length) models.appendChild(h("span", null, "model yok"));
-      card.appendChild(models);
-      const add = h("button", "primary", "Ekle");
-      add.type = "button";
-      add.addEventListener("click", async () => {
-        const name = LOCAL_SLUG[f.port] || `yerel-${f.port}`;
-        const r = await api("/apis", { method: "POST", body: JSON.stringify({ name, endpoint: f.endpoint }) });
-        if (r.ok) { apisMsg(`Eklendi (${name}); modeller model listesinde görünür.`, "ok"); loadApis(); loadModels(); }
-        else apisMsg(await errorText(r), "error");
-      });
-      const actions = h("div", "row");
-      actions.appendChild(add);
-      card.appendChild(actions);
-      if (f.port === 11434 && f.models.length) {
-        const row = h("div", "key-row");
-        const msel = h("select");
-        msel.setAttribute("aria-label", "Model");
-        for (const m of f.models) { const o = h("option", null, m); o.value = m; msel.appendChild(o); }
-        const csel = h("select");
-        csel.setAttribute("aria-label", "Bağlam");
-        for (const c of CTX_CHOICES) { const o = h("option", null, `${c / 1024}K`); o.value = String(c); csel.appendChild(o); }
-        csel.value = "16384";
-        const go = h("button", null, "Bağlamı uygula");
-        go.type = "button";
-        go.title = "Ollama'da bu bağlamla yeni bir model kopyası oluşturur (ağırlıklar kopyalanmaz)";
-        go.addEventListener("click", async () => {
-          go.disabled = true;
-          const r = await api("/local/context", { method: "POST", body: JSON.stringify({ port: f.port, model: msel.value, num_ctx: Number(csel.value) }) });
-          go.disabled = false;
-          if (r.ok) { const d = await r.json(); apisMsg(`Oluşturuldu: ${d.model}. Model listesinden seçebilirsin.`, "ok"); scanLocal(); loadApis(); loadModels(); }
-          else apisMsg(await errorText(r), "error");
-        });
-        row.append(msel, csel, go);
-        card.appendChild(row);
-      }
-      box.appendChild(card);
-    }
-  }
-
-
-  // --- kurulum sihirbazı (kodsuz kullanıcı için: "API/endpoint/token" yok) ---
-  // Servis bilgileri resmî sayfalardan doğrulandı (2026-11-09). Ücretsiz katman iddiası yalnız doğrulananlar için.
-  const WIZ_SERVICES = [
-    { id: "gemini", label: "Google Gemini", free: true, endpoint: "https://generativelanguage.googleapis.com/v1beta/openai",
-      url: "https://aistudio.google.com/apikey", linkText: "Google AI Studio anahtar sayfasını aç",
-      steps: ["Sayfa açılınca Google hesabınla giriş yap.", "\"Create API key\" (anahtar oluştur) düğmesine bas.", "Çıkan uzun yazıyı kopyala ve aşağıdaki kutuya yapıştır."],
-      note: "Ücretsiz kotası var, ama günlük istek sınırı düşüktür ve Google bunu değiştirebilir. Ücretsiz katmanda yazdıkların Google'ın ürünlerini geliştirmek için kullanılabilir (Google'ın koşullarına bak).",
-      prefer: "gemini-2.5-flash" },
-    { id: "openrouter", label: "OpenRouter", free: true, endpoint: "https://openrouter.ai/api/v1",
-      url: "https://openrouter.ai/keys", linkText: "OpenRouter anahtar sayfasını aç",
-      steps: ["Sayfa açılınca hesap aç (e-posta ya da Google ile) ve giriş yap.", "Anahtar oluştur düğmesine bas ve bir ad ver.", "Çıkan uzun yazıyı kopyala ve aşağıdaki kutuya yapıştır."],
-      note: "Ücretsiz kalmak için \"openrouter/free\" modelini seç (sihirbaz onu önerir). \"openrouter/auto\" ücretli modellere yönlendirir. Ücretsiz modellerin günlük istek sınırı düşüktür; bazı ücretsiz modellerde sağlayıcı yazdıklarını kaydedebilir.",
-      prefer: "openrouter/free" },
-    { id: "deepseek", label: "DeepSeek", free: false, endpoint: "https://api.deepseek.com/v1",
-      url: "https://platform.deepseek.com/api_keys", linkText: "DeepSeek anahtar sayfasını aç",
-      steps: ["Sayfa açılınca hesap aç ve giriş yap.", "Hesabına bakiye yükle (bakiye yoksa anahtar çalışmaz).", "\"API keys\" sayfasında anahtar oluştur ve kopyala."],
-      note: "Ücretlidir: kullandıkça bakiyeden düşer.", prefer: "deepseek-chat" },
-    { id: "anthropic", label: "Claude (Anthropic)", free: false, endpoint: "https://api.anthropic.com/v1",
-      url: "https://platform.claude.com/settings/keys", linkText: "Claude anahtar sayfasını aç",
-      steps: ["Sayfa açılınca hesap aç ve giriş yap.", "Kullanmak için kredi yükle (ücretli servis).", "Anahtar oluştur ve çıkan yazıyı kopyala."],
-      note: "Ücretlidir. Anthropic bu bağlantı yolunu \"deneme ve karşılaştırma amaçlı\" diye etiketlemiştir; bir şey çalışmazsa bize haber ver.",
-      prefer: "claude-sonnet-5-5" },
-    { id: "opencode", label: "OpenCode (çok modelli ağ geçidi)", free: false, endpoint: "https://opencode.ai/inference/openai/v1",
-      url: "https://opencode.ai/console", linkText: "OpenCode konsolunu aç",
-      steps: ["Sayfa açılınca giriş yap.", "Faturalandırma bilgilerini ve kredi ekle (anahtardan önce gerekir).", "Anahtarı kopyala ve aşağıdaki kutuya yapıştır."],
-      note: "Ücretlidir, kullandıkça kredi düşer. OpenCode'un ücretsiz modelleri yalnız OpenCode uygulamasında çalışır; burada yalnız ücretli modeller görünür. GPT ve Claude modelleri bu ağ geçidinde farklı bir yolla çalıştığı için listede yoktur; onlar için doğrudan OpenAI ve Claude seçeneklerini kullan.",
-      prefer: "deepseek-v4-pro" },
-    { id: "openai", label: "OpenAI (GPT)", free: false, endpoint: "https://api.openai.com/v1",
-      url: "https://platform.openai.com/api-keys", linkText: "OpenAI anahtar sayfasını aç",
-      steps: ["Sayfa açılınca hesap aç ve giriş yap.", "Kullanmak için ödeme bilgisi ekle ya da kredi yükle.", "\"API keys\" sayfasında anahtar oluştur ve kopyala."],
-      note: "Ücretlidir.", prefer: "" },
-  ];
-  const WIZ_STEPS = ["wiz-start", "wiz-lan-step", "wiz-local-step", "wiz-cloud-step", "wiz-test-step"];
-  const WIZ_RAIL = { "wiz-start": 1, "wiz-lan-step": 2, "wiz-local-step": 2, "wiz-cloud-step": 2, "wiz-test-step": 3 };
-  const WIZ_EXAMPLES = ["Bir hesap makinesi web sayfası yap.", "Bu klasördeki dosyaları incele ve ne işe yaradıklarını kısaca anlat.", "Bugünün tarihini büyük yazıyla gösteren basit bir sayfa yap."];
-  const wizMsg = (t, c) => { const m = $("wiz-msg"); m.textContent = t || ""; m.className = c || "empty"; };
-  function wizBusy(on, text) { $("wizard").classList.toggle("wiz-busy", !!on); wizMsg(on ? text : "", on ? "ok" : "empty"); }
-  function wizShow(id) {
-    for (const s of WIZ_STEPS) $(s).hidden = s !== id;
-    const n = WIZ_RAIL[id] || 1;
-    for (const li of $("wiz-rail").children) {
-      const k = Number(li.dataset.n);
-      li.classList.toggle("done", k < n);
-      if (k === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
-    }
-    wizMsg("");
-    if (id === "wiz-start") wizReco();
-  }
-  function openWizard() { if ($("wizard").hidden) togglePanel("wizard"); else wizShow("wiz-start"); }
-  const trimSlash = (u) => String(u || "").replace(/\/+$/, "");
-  function wizLink(url, text) {
-    const a = h("a", "wiz-link", text);
-    a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
-    return a;
-  }
-
-  async function wizReco() {
-    const el = $("wiz-reco-text");
-    el.textContent = "Bilgisayarına bakıyorum…";
-    let d = null;
-    try { const r = await api("/system/info"); if (r.ok) d = await r.json(); } catch (_) { /* yoksay */ }
-    const ram = d && d.ram_gb ? `${d.ram_gb} GB` : null;
-    $("wiz-pick-cloud").classList.add("reco");
-    if (d && d.recommend && !d.recommend.model) {
-      el.textContent = `Bilgisayarının belleği az (${ram}). İnternet servisiyle başla; ücretsiz seçenek olarak Google Gemini'yi deneyebilirsin.`;
-    } else {
-      el.textContent = "Yeni başlıyorsan ve anahtar almaktan çekinmiyorsan: İnternet servisiyle başla, ücretsiz seçenek olarak Google Gemini'yi dene. "
-        + `Yazdıklarının bilgisayarından çıkmaması senin için çok önemliyse: Bu bilgisayarda${ram ? ` (belleğin ${ram}, bu iş için uygun)` : ""}, ama zor işlerde zayıf kalabileceğini bil. `
-        + "Evde daha güçlü bir bilgisayarın varsa: Evdeki başka bilgisayarda.";
-    }
-  }
-
-  async function wizUse(apiName, model) {
-    wizBusy(true, "Modeli tanıyorum, bu yarım dakika sürebilir. Lütfen bekle…");
-    let r;
-    try { r = await api("/model", { method: "PUT", body: JSON.stringify({ model, api: apiName }) }); }
-    finally { wizBusy(false); }
-    if (!r.ok) { wizMsg(await errorText(r), "error"); return; }
-    await loadModels();
-    wizTest();
-  }
-  async function wizEnsureLocalApi() {
-    const endpoint = "http://127.0.0.1:11434/v1";
-    const rows = await (await api("/apis")).json();
-    const row = rows.find((a) => trimSlash(a.endpoint) === endpoint);
-    if (row) return row.name;
-    const r = await api("/apis", { method: "POST", body: JSON.stringify({ name: "ollama", endpoint }) });
-    if (!r.ok) throw new Error(await errorText(r));
-    return "ollama";
-  }
-  const fmtGb = (n) => `${(n / 1073741824).toFixed(1)} GB`;
-  let wizPullTimer = null;
-  function wizStopPull() { clearTimeout(wizPullTimer); wizPullTimer = null; }
-
-  async function wizLocal() {
-    wizStopPull();
-    wizShow("wiz-local-step");
-    const body = $("wiz-local-body");
-    body.replaceChildren(h("p", null, "Bilgisayarına bakıyorum…"));
-    const res = await api("/system/info");
-    if (!res.ok) { body.replaceChildren(h("p", "error", await errorText(res))); return; }
-    const d = await res.json();
-    const rec = d.recommend || {};
-    const out = [h("p", null, d.ram_gb ? `Bilgisayarının belleği: ${d.ram_gb} GB.` : "Bilgisayarının belleğini öğrenemedim.")];
-    if (!rec.model) {
-      out.push(h("p", null, rec.reason || ""));
-      const go = h("button", "primary", "İnternet servisine geç");
-      go.type = "button"; go.addEventListener("click", wizCloud);
-      body.replaceChildren(...out, go);
-      return;
-    }
-    out.push(h("p", null, rec.reason));
-    if (!d.ollama_running) {
-      const card = h("div", "card");
-      card.append(h("strong", null, "1. Ollama programını kur"),
-        h("p", null, "Ollama, yapay zekâ modellerini bilgisayarında çalıştıran ücretsiz bir programdır."));
-      const canAuto = d.can_install && d.can_install.ollama;
-      if (canAuto) {
-        card.append(h("p", "wiz-note", "İstersen düğmeye bas, Usta senin için kurar (yaklaşık 1 GB iner)."), installButton("ollama", "Ollama'yı benim için kur", wizLocal));
-      }
-      card.appendChild(wizLink("https://ollama.com/download", canAuto ? "Ya da kendin indir: Ollama sayfasını aç" : "Ollama indirme sayfasını aç"));
-      const ol = h("ol", "wiz-steps");
-      for (const t of canAuto ? ["Kurulum bitince bu sayfa kendiliğinden devam eder."] : ["İndirdiğin dosyayı aç ve kur.", "Kurulum bitince Ollama'yı bir kez aç (Başlat menüsünde \"Ollama\").", "Bu pencereye dön ve aşağıdaki \"Tekrar ara\" düğmesine bas."]) ol.appendChild(h("li", null, t));
-      card.appendChild(ol);
-      body.replaceChildren(...out, card);
-      return;
-    }
-    const have = (d.installed || []).includes(rec.model);
-    const card = h("div", "card");
-    if (!have) {
-      card.append(h("strong", null, `2. Modeli indir: ${rec.model}`),
-        h("p", null, `Yaklaşık ${rec.size_gb} GB indirir. Hızlı internetle birkaç dakika sürer, yavaşta daha uzun. İndirirken bu pencereyi kapatma.`));
-      const dl = h("button", "primary", `İndir (≈ ${rec.size_gb} GB)`);
-      dl.type = "button";
-      dl.addEventListener("click", () => wizPull(rec.model, card));
-      card.appendChild(dl);
-    } else {
-      card.append(h("strong", null, `Önerilen model zaten kurulu: ${rec.model}`));
-      const use = h("button", "primary", "Bunu kullan");
-      use.type = "button";
-      use.addEventListener("click", async () => { try { wizUse(await wizEnsureLocalApi(), rec.model); } catch (e) { wizMsg(String(e.message || e), "error"); } });
-      card.appendChild(use);
-    }
-    body.replaceChildren(...out, card);
-    const others = (d.installed || []).filter((m) => m !== rec.model);
-    if (others.length) {
-      body.appendChild(h("p", "wiz-group", "Bilgisayarında kurulu diğer modeller:"));
-      for (const m of others) {
-        const b = h("button", "card wiz-choice");
-        b.type = "button"; b.append(h("strong", null, m));
-        b.addEventListener("click", async () => { try { wizUse(await wizEnsureLocalApi(), m); } catch (e) { wizMsg(String(e.message || e), "error"); } });
-        body.appendChild(b);
-      }
-    }
-  }
-  async function wizPull(model, card) {
-    const r = await api("/local/pull", { method: "POST", body: JSON.stringify({ model }) });
-    if (!r.ok && r.status !== 409) { wizMsg(await errorText(r), "error"); return; }
-    const bar = h("progress", "wiz-progress"); bar.max = 100; bar.value = 0;
-    const label = h("p", "note", "İndirme başlıyor…");
-    card.replaceChildren(h("strong", null, `İndiriliyor: ${model}`), bar, label);
-    const poll = async () => {
-      if ($("wiz-local-step").hidden) return;  // kullanıcı başka adıma geçti
-      let s = null;
-      try { const p = await api("/local/pull"); if (p.ok) s = await p.json(); } catch (_) { /* tekrar dene */ }
-      if (s && s.error) {
-        card.replaceChildren(h("p", "error", s.error));
-        const again = h("button", null, "Tekrar dene"); again.type = "button"; again.addEventListener("click", wizLocal);
-        card.appendChild(again);
-        return;
-      }
-      if (s && s.done) { wizLocal(); return; }
-      if (s && s.total) {
-        const pct = Math.min(100, Math.round((s.completed / s.total) * 100));
-        bar.value = pct;
-        label.textContent = `%${pct} (${fmtGb(s.completed)} / ${fmtGb(s.total)})`;
-      }
-      wizPullTimer = setTimeout(poll, 1000);
-    };
-    poll();
-  }
-
-  // --- evdeki başka bilgisayar ---
-  const lanApiName = (host) => `ev-${String(host).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`.slice(0, 30).replace(/-+$/, "") || "ev-pc";
-  async function wizLanUse(found, model) {
-    try {
-      const endpoint = trimSlash(found.endpoint);
-      const rows = await (await api("/apis")).json();
-      let name = (rows.find((a) => trimSlash(a.endpoint) === endpoint) || {}).name;
-      if (!name) {
-        name = lanApiName(found.host || found.endpoint);
-        const r = await api("/apis", { method: "POST", body: JSON.stringify({ name, endpoint }) });
-        if (!r.ok) { wizMsg(await errorText(r), "error"); return; }
-      }
-      wizUse(name, model);
-    } catch (e) { wizMsg(String(e.message || e), "error"); }
-  }
-  function lanCard(found) {
-    const card = h("div", "card wiz-lan-card");
-    const where = found.host || found.endpoint;
-    card.append(h("strong", null, `${found.name} · ${where}`));
-    if (!found.models.length) {
-      card.append(h("p", "wiz-note", "Bu bilgisayarda henüz indirilmiş bir model yok. Öbür bilgisayarda bir model indir, sonra \"Tekrar ara\"ya bas."));
-      return card;
-    }
-    card.append(h("p", "wiz-note", `${found.models.length} model var. Hangisini kullanalım?`));
-    const sel = h("select");
-    sel.setAttribute("aria-label", "Model");
-    for (const m of found.models) sel.append(h("option", null, m));
-    const go = h("button", "primary", "Bunu kullan");
-    go.type = "button";
-    go.addEventListener("click", () => wizLanUse(found, sel.value));
-    const row = h("div", "row");
-    row.append(sel, go);
-    card.append(row);
-    return card;
-  }
-  async function wizLan() {
-    wizStopPull();
-    wizShow("wiz-lan-step");
-    const box = $("wiz-lan-found");
-    box.replaceChildren(h("p", null, "Evdeki ağa bakıyorum… (birkaç saniye sürer)"));
-    $("wiz-lan-rescan").disabled = true;
-    let list = [];
-    try {
-      const r = await api("/local/scan-lan", { method: "POST" });
-      if (!r.ok) { box.replaceChildren(h("p", "error", await errorText(r))); return; }
-      list = await r.json();
-    } finally { $("wiz-lan-rescan").disabled = false; }
-    if (!list.length) {
-      box.replaceChildren(h("p", null, "Evdeki ağda yapay zekâ bulamadım. Öbür bilgisayar açık ve \"ağa açık\" mı? Aşağıdan nasıl hazırlanacağına bak ya da adresi kendin yaz."));
-      return;
-    }
-    box.replaceChildren(h("p", null, list.length === 1 ? "Bir tane buldum:" : `${list.length} tane buldum:`), ...list.map(lanCard));
-  }
-  async function wizLanTry(ev) {
-    ev.preventDefault();
-    const host = $("wiz-lan-host").value.trim();
-    if (!host) return;
-    const box = $("wiz-lan-found");
-    box.replaceChildren(h("p", null, `${host} adresine bakıyorum…`));
-    const r = await api("/local/probe-host", { method: "POST", body: JSON.stringify({ host }) });
-    if (!r.ok) { box.replaceChildren(h("p", "error", await errorText(r))); return; }
-    box.replaceChildren(lanCard(await r.json()));
-  }
-
-  let wizService = null;
-  function wizCloud() {
-    wizStopPull();
-    wizShow("wiz-cloud-step");
-    wizService = null;
-    $("wiz-service-help").hidden = true;
-    $("wiz-cloud-form").hidden = true;
-    $("wiz-models").hidden = true;
-    const box = $("wiz-services");
-    box.replaceChildren();
-    const groups = [["Ücretsiz seçenekler", true], ["Ücretli servisler (bakiye ya da kredi gerekir)", false]];
-    for (const [title, free] of groups) {
-      box.appendChild(h("p", "wiz-group", title));
-      const row = h("div", "wiz-choices");
-      for (const svc of WIZ_SERVICES.filter((x) => x.free === free)) {
-        const b = h("button", "card wiz-choice");
-        b.type = "button";
-        const name = h("strong", null, svc.label);
-        name.appendChild(h("span", free ? "wiz-tag" : "wiz-tag paid", free ? "ücretsiz katmanı var" : "ücretli"));
-        b.append(name);
-        b.addEventListener("click", () => wizPickService(svc));
-        row.appendChild(b);
-      }
-      box.appendChild(row);
-    }
-  }
-  function wizPickService(svc) {
-    wizService = svc;
-    const help = $("wiz-service-help");
-    const ol = h("ol", "wiz-steps");
-    for (const t of svc.steps) ol.appendChild(h("li", null, t));
-    help.replaceChildren(h("strong", null, `${svc.label}: anahtarı nasıl alırım?`), wizLink(svc.url, svc.linkText), ol, h("p", "wiz-note", svc.note));
-    help.hidden = false;
-    $("wiz-cloud-form").hidden = false;
-    $("wiz-models").hidden = true;
-    wizMsg("");
-    help.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-  async function wizTryKey(ev) {
-    ev.preventDefault();
-    const svc = wizService;
-    const key = $("wiz-key").value.trim();
-    if (!svc || !key) return;
-    wizBusy(true, "Anahtarı deniyorum…");
-    try {
-      let r = await api("/apis", { method: "POST", body: JSON.stringify({ name: svc.id, endpoint: svc.endpoint, key }) });
-      if (r.status === 409) r = await api(`/apis/${svc.id}/key`, { method: "PUT", body: JSON.stringify({ key }) });
-      if (!r.ok) { wizBusy(false); wizMsg(await errorText(r), "error"); return; }
-      $("wiz-key").value = "";
-      const info = await (await api("/model")).json();
-      const g = (info.apis || []).find((x) => x.api === svc.id);
-      wizBusy(false);
-      if (!g || !g.models.length) { wizMsg("Anahtar kabul edilmedi ya da servise ulaşılamadı. Doğru kopyaladığından emin ol (başında/sonunda boşluk olmasın) ve tekrar dene.", "error"); return; }
-      const sel = $("wiz-model");
-      const list = L.chatModels(g.models, svc.prefer);
-      sel.replaceChildren(...list.map((m) => { const o = h("option", null, m.replace(/^models\//, "")); o.value = m; return o; }));
-      sel.value = list[0];
-      $("wiz-models").hidden = false;
-    } catch (e) {
-      wizBusy(false);
-      wizMsg("Bir şey ters gitti, tekrar dene.", "error");
-    }
-  }
-  async function wizTest() {
-    wizShow("wiz-test-step");
-    $("wiz-test-title").textContent = "Deniyorum…";
-    $("wiz-test-text").textContent = "Modele kısa bir merhaba gönderiyorum.";
-    $("wiz-examples").hidden = true;
-    $("wiz-test-back").hidden = true;
-    const res = await api("/setup/ping", { method: "POST" });
-    const d = res.ok ? await res.json() : { ok: false, error: await errorText(res) };
-    if (!d.ok) {
-      $("wiz-test-title").textContent = "Olmadı";
-      $("wiz-test-text").textContent = d.error;
-      $("wiz-test-back").hidden = false;
-      return;
-    }
-    $("wiz-test-title").textContent = "Hazır!";
-    $("wiz-test-text").textContent = `Model cevap verdi (${d.seconds} sn): "${d.reply}". Şimdi bir şey dene:`;
-    const box = $("wiz-examples");
-    box.replaceChildren(...WIZ_EXAMPLES.map((t) => {
-      const b = h("button", "card wiz-choice");
-      b.type = "button";
-      b.append(h("strong", null, t));
-      b.addEventListener("click", () => { closePanels(); $("prompt").value = t; $("prompt").focus(); });
-      return b;
-    }));
-    box.hidden = false;
   }
 
   // --- dosya gezgini ---
@@ -1825,7 +986,7 @@
     $("token-form").hidden = true;
     setConn("Bağlı", "ok");
     const modelInfo = await loadModels();
-    if (modelInfo && !modelInfo.model) openWizard();  // model seçilmemiş: sihirbaz açılır
+    if (modelInfo && !modelInfo.model) U.openWizard();  // model seçilmemiş: sihirbaz açılır
     const [ids] = await Promise.all([loadWorkspaces(), loadSettings()]);
     const saved = get("usta_ws");
     // kayıtlı alan yoksa terminalin açtığı alan, o da yoksa tek/ilk alan seçilir (yazı alanı kilitli kalmasın)
@@ -1858,14 +1019,14 @@
     comp.classList.remove("drop");
     if (state.ws && !state.active && ev.dataTransfer) addFiles(ev.dataTransfer.files);
   });
-  $("tools-btn").addEventListener("click", () => togglePanel("tools"));
-  $("apis-btn").addEventListener("click", () => togglePanel("apis"));
-  $("privacy-btn").addEventListener("click", () => togglePanel("privacy"));
+  $("tools-btn").addEventListener("click", () => U.togglePanel("tools"));
+  $("apis-btn").addEventListener("click", () => U.togglePanel("apis"));
+  $("privacy-btn").addEventListener("click", () => U.togglePanel("privacy"));
   $("api-form").addEventListener("submit", addApi);
-  $("local-scan").addEventListener("click", scanLocal);
-  $("wizard-btn").addEventListener("click", () => togglePanel("wizard"));
-  $("tablet-btn").addEventListener("click", () => togglePanel("tablet"));
-  $("glossary-btn").addEventListener("click", () => togglePanel("glossary"));
+  $("local-scan").addEventListener("click", U.scanLocal);
+  $("wizard-btn").addEventListener("click", () => U.togglePanel("wizard"));
+  $("tablet-btn").addEventListener("click", () => U.togglePanel("tablet"));
+  $("glossary-btn").addEventListener("click", () => U.togglePanel("glossary"));
   // --- "?" balonu: üzerine gelince ya da odaklanınca açıklama çıkar; tıklayınca açık kalır (sayfadan ayrılmaz) ---
   const tipEl = () => $("gloss-tip");
   function hideGlossTip() {
@@ -1887,8 +1048,8 @@
     open.addEventListener("click", () => {
       const q = btn.dataset.gloss;
       hideGlossTip();
-      if ($("glossary").hidden) togglePanel("glossary");
-      $("gloss-q").value = q; renderGlossary();
+      if ($("glossary").hidden) U.togglePanel("glossary");
+      $("gloss-q").value = q; U.renderGlossary();
     });
     el.replaceChildren(h("strong", null, term.term), h("p", null, term.say), h("p", "wiz-note", `Benzetme: ${term.like}`), open);
     el.hidden = false;
@@ -1918,23 +1079,22 @@
     if (!tipEl().hidden && !tipEl().contains(ev.target)) hideGlossTip();  // dışarı tıklayınca kapanır
   });
   document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !tipEl().hidden) { const f = tipFor; hideGlossTip(); if (f) f.focus(); } });
-  $("gloss-q").addEventListener("input", renderGlossary);
-  $("settings-btn").addEventListener("click", () => togglePanel("settings"));
-  $("tablet-renew").addEventListener("click", loadTablet);
-  $("wiz-local").addEventListener("click", wizLocal);
-  $("wiz-cloud").addEventListener("click", wizCloud);
-  $("wiz-lan").addEventListener("click", wizLan);
-  $("wiz-lan-back").addEventListener("click", () => wizShow("wiz-start"));
-  $("wiz-lan-rescan").addEventListener("click", wizLan);
-  $("wiz-lan-form").addEventListener("submit", wizLanTry);
-  $("wiz-local-back").addEventListener("click", () => wizShow("wiz-start"));
-  $("wiz-local-rescan").addEventListener("click", wizLocal);
-  $("wiz-cloud-back").addEventListener("click", () => wizShow("wiz-start"));
-  $("wiz-test-back").addEventListener("click", () => wizShow("wiz-start"));
-  $("wiz-cloud-form").addEventListener("submit", wizTryKey);
-  $("wiz-model-go").addEventListener("click", () => wizUse(wizService.id, $("wiz-model").value));
+  $("gloss-q").addEventListener("input", U.renderGlossary);
+  $("settings-btn").addEventListener("click", () => U.togglePanel("settings"));
+  $("tablet-renew").addEventListener("click", U.loadTablet);
+  $("wiz-local").addEventListener("click", U.wizLocal);
+  $("wiz-cloud").addEventListener("click", U.wizCloud);
+  $("wiz-lan").addEventListener("click", U.wizLan);
+  $("wiz-lan-back").addEventListener("click", () => U.wizShow("wiz-start"));
+  $("wiz-lan-rescan").addEventListener("click", U.wizLan);
+  $("wiz-lan-form").addEventListener("submit", U.wizLanTry);
+  $("wiz-local-back").addEventListener("click", () => U.wizShow("wiz-start"));
+  $("wiz-local-rescan").addEventListener("click", U.wizLocal);
+  $("wiz-cloud-back").addEventListener("click", () => U.wizShow("wiz-start"));
+  $("wiz-test-back").addEventListener("click", () => U.wizShow("wiz-start"));
+  $("wiz-cloud-form").addEventListener("submit", U.wizTryKey);
   $("skill-upload").addEventListener("click", () => $("skill-input").click());
-  $("skill-input").addEventListener("change", async () => { await uploadSkills($("skill-input").files); $("skill-input").value = ""; });
+  $("skill-input").addEventListener("change", async () => { await U.uploadSkills($("skill-input").files); $("skill-input").value = ""; });
   $("f-refresh").addEventListener("click", () => refreshTree());
   $("f-new-file").addEventListener("click", () => startFs("create_file"));
   $("f-new-dir").addEventListener("click", () => startFs("create_dir"));
@@ -1951,43 +1111,36 @@
   $("preview-go").addEventListener("click", loadPreview);
   $("preview-reload").addEventListener("click", loadPreview);
   $("preview-path").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); loadPreview(); } });
-  $("kisi-form").addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    const v = $("kisi-yeni").value.trim();
-    if (!v) return;
-    if (kisiFacts.length >= 20) { kisiMsg("En çok 20 madde yazabilirsin. Birini silip yenisini ekle.", "error"); return; }
-    kisiFacts.push(v); $("kisi-yeni").value = ""; renderKisiFacts(); kisiMsg("Eklendi. Kalıcı olması için Kaydet'e bas.");
-  });
-  $("kisi-save").addEventListener("click", saveProfile);
-  $("skill-design").addEventListener("click", startSkillDesign);
-  $("design-off").addEventListener("click", () => { setDesignSkill(false); $("prompt").value = ""; });
-  $("ortak-ac").addEventListener("click", async () => { ortakMsg("Açıyorum…"); if (await ortakCall("/ortak/ev-sahibi", "POST", { acik: true })) { ortakMsg("Açıldı. Şimdi \"kod göster\"e basıp öbür bilgisayardan bağlanabilirsin.", "ok"); loadOrtak(); } });
-  $("ortak-kapat").addEventListener("click", async () => { if (await ortakCall("/ortak/ev-sahibi", "POST", { acik: false })) { ortakMsg("Kapattım. Bağlı bilgisayarlar artık ulaşamaz.", "ok"); loadOrtak(); } });
+  $("kisi-save").addEventListener("click", U.saveProfile);
+  $("skill-design").addEventListener("click", U.startSkillDesign);
+  $("design-off").addEventListener("click", () => { U.setDesignSkill(false); $("prompt").value = ""; });
+  $("ortak-ac").addEventListener("click", async () => { U.ortakMsg("Açıyorum…"); if (await U.ortakCall("/ortak/ev-sahibi", "POST", { acik: true })) { U.ortakMsg("Açıldı. Şimdi \"kod göster\"e basıp öbür bilgisayardan bağlanabilirsin.", "ok"); U.loadOrtak(); } });
+  $("ortak-kapat").addEventListener("click", async () => { if (await U.ortakCall("/ortak/ev-sahibi", "POST", { acik: false })) { U.ortakMsg("Kapattım. Bağlı bilgisayarlar artık ulaşamaz.", "ok"); U.loadOrtak(); } });
   $("ortak-kod-al").addEventListener("click", async () => {
-    const d = await ortakCall("/ortak/kod");
+    const d = await U.ortakCall("/ortak/kod");
     if (!d) return;
     $("ortak-kod-kutu").textContent = d.kod; $("ortak-kod-kutu").hidden = false;
     $("ortak-kod-not").textContent = `Öbür bilgisayarda "Evdeki ortak hafıza" bölümüne şu adresi ve bu kodu yaz: ${d.adres}. Kod 5 dakika geçerli ve bir kez kullanılır.`;
-    $("ortak-kod-not").hidden = false; ortakMsg("");
+    $("ortak-kod-not").hidden = false; U.ortakMsg("");
   });
   $("ortak-baglan-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
-    ortakMsg("Bağlanıyorum…");
-    const d = await ortakCall("/ortak/baglan", "POST", { adres: $("ortak-adres").value.trim(), kod: $("ortak-kod").value.trim() });
-    if (d) { $("ortak-baglan-form").reset(); ortakMsg(`Bağlandım: ${d.ad}.`, "ok"); await loadProfile(); loadOrtak(); }
+    U.ortakMsg("Bağlanıyorum…");
+    const d = await U.ortakCall("/ortak/baglan", "POST", { adres: $("ortak-adres").value.trim(), kod: $("ortak-kod").value.trim() });
+    if (d) { $("ortak-baglan-form").reset(); U.ortakMsg(`Bağlandım: ${d.ad}.`, "ok"); await U.loadProfile(); U.loadOrtak(); }
   });
-  $("ortak-ayril").addEventListener("click", async () => { if (await ortakCall("/ortak/ayril")) { ortakMsg("Bağlantıyı kestim. Bilgilerin yine bu bilgisayarın kendi bilgileri.", "ok"); await loadProfile(); loadOrtak(); } });
+  $("ortak-ayril").addEventListener("click", async () => { if (await U.ortakCall("/ortak/ayril")) { U.ortakMsg("Bağlantıyı kestim. Bilgilerin yine bu bilgisayarın kendi bilgileri.", "ok"); await U.loadProfile(); U.loadOrtak(); } });
   $("ortak-not-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const v = $("ortak-not").value.trim();
     if (!v) return;
-    const d = await ortakCall("/ortak/notlar", "POST", { text: v });
-    if (d) { $("ortak-not").value = ""; ortakMsg(d.durum === "bekliyor" ? "Notu ev sahibine gönderdim. O onaylayana kadar yapay zekâya gitmez." : "Not eklendi.", "ok"); loadOrtak(); }
+    const d = await U.ortakCall("/ortak/notlar", "POST", { text: v });
+    if (d) { $("ortak-not").value = ""; U.ortakMsg(d.durum === "bekliyor" ? "Notu ev sahibine gönderdim. O onaylayana kadar yapay zekâya gitmez." : "Not eklendi.", "ok"); U.loadOrtak(); }
   });
   $("kisi-clear").addEventListener("click", async () => {
     const r = await api("/profile", { method: "DELETE" });
-    if (!r.ok) { kisiMsg(await errorText(r), "error"); return; }
-    await loadProfile(); kisiMsg("Hepsini sildim.", "ok");
+    if (!r.ok) { U.kisiMsg(await errorText(r), "error"); return; }
+    await U.loadProfile(); U.kisiMsg("Hepsini sildim.", "ok");
   });
   $("accent").addEventListener("click", (ev) => {
     const b = ev.target.closest && ev.target.closest(".swatch");
@@ -2007,8 +1160,8 @@
     saveSetting({ view: next });
   });
   $("view").addEventListener("change", () => { applyView($("view").value); saveSetting({ view: $("view").value }); });
-  $("set-wizard").addEventListener("click", () => { if ($("wizard").hidden) togglePanel("wizard"); else wizShow("wiz-start"); });
-  $("set-tablet").addEventListener("click", () => togglePanel("tablet"));
+  $("set-wizard").addEventListener("click", () => { if ($("wizard").hidden) U.togglePanel("wizard"); else U.wizShow("wiz-start"); });
+  $("set-tablet").addEventListener("click", () => U.togglePanel("tablet"));
   // Yardım raporu: sunucu hazırlar, kullanıcı görür ve kendisi gönderir (kendiliğinden hiçbir yere gitmez).
   let helpReport = null;
   $("set-help").addEventListener("click", async () => {
@@ -2038,7 +1191,7 @@
     if (!quitArmed) { b.textContent = "Emin misin? Tekrar bas"; quitArmed = setTimeout(() => { quitArmed = null; b.textContent = "Usta'yı kapat"; }, 4000); return; }
     clearTimeout(quitArmed); quitArmed = null;
     const r = await api("/quit", { method: "POST" });
-    if (!r.ok) { b.textContent = "Usta'yı kapat"; wizMsg(await errorText(r), "error"); return; }
+    if (!r.ok) { b.textContent = "Usta'yı kapat"; U.wizMsg(await errorText(r), "error"); return; }
     document.body.replaceChildren(h("p", "wiz-note", "Usta kapandı. Tekrar açmak için masaüstündeki Usta simgesine çift tıkla. Bu sekmeyi kapatabilirsin."));
     document.body.style.padding = "32px";
   });

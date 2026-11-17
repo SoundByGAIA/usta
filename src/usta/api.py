@@ -82,11 +82,13 @@ WEB_DIR = Path(__file__).parent / "web"
 UI_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
-    "/ayarlar.js": ("ayarlar.js", "text/javascript; charset=utf-8"),
-    "/kurulum.js": ("kurulum.js", "text/javascript; charset=utf-8"),
+    "/settings.js": ("settings.js", "text/javascript; charset=utf-8"),
+    "/setup.js": ("setup.js", "text/javascript; charset=utf-8"),
     "/logic.js": ("logic.js", "text/javascript; charset=utf-8"),
     "/office-logic.js": ("office-logic.js", "text/javascript; charset=utf-8"),
     "/glossary.js": ("glossary.js", "text/javascript; charset=utf-8"),
+    "/office-scene.js": ("office-scene.js", "text/javascript; charset=utf-8"),
+    "/office-actors.js": ("office-actors.js", "text/javascript; charset=utf-8"),
     "/office.js": ("office.js", "text/javascript; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
 }

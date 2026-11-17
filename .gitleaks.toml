@@ -1,0 +1,12 @@
+# gitleaks yapılandırması: varsayılan kurallar + test/Lab senaryolarındaki bilerek sahte değerler
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Testlerdeki ve Lab senaryolarındaki sahte değerler"
+regexes = [
+  '''CANARY-[A-Z]+-[0-9a-f]{8}''',
+  '''test-jetonu-0123456789''',
+  '''gizli-jeton-123456''',
+  '''eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.abcdefghij''',
+]

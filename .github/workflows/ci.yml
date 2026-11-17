@@ -16,6 +16,8 @@ jobs:
         python: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # gitleaks tüm geçmişi tarar
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -29,6 +31,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --require-hashes -r requirements-dev.lock
           python -m pip install --no-deps -e .
+      - name: Sır taraması (gitleaks, tüm geçmiş)
+        run: |
+          V=8.21.2
+          curl -sSLO https://github.com/gitleaks/gitleaks/releases/download/v$V/gitleaks_${V}_linux_x64.tar.gz
+          curl -sSLO https://github.com/gitleaks/gitleaks/releases/download/v$V/gitleaks_${V}_checksums.txt
+          grep linux_x64 gitleaks_${V}_checksums.txt | sha256sum -c -
+          tar xzf gitleaks_${V}_linux_x64.tar.gz gitleaks
+          ./gitleaks git . --config .gitleaks.toml --redact --no-banner
       - name: Lint
         run: ruff check src tests
       - name: Test

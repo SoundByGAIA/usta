@@ -86,4 +86,4 @@ Tek bir sınav, seviye seçimini güvenilir biçimde yapamıyor. Yukarıdaki öl
 
 Bulut modeller (DeepSeek V4 Pro tek seferde 4/4) ve 12B üstü yerel modeller tek seferde kalır. Bu ölçümde 12B üstü yerel model yoktu; daha büyük bir makinede ayrıca ölçülmeli.
 
-Ham veriler oturumun geçici klasöründeydi (`night/res/scores.tsv`, `times.tsv`, `probe.jsonl`).
+Ham veriler (sayfalar, kayıtlar, `scores.tsv`, `times.tsv`, `probe.jsonl`) depoda değil.

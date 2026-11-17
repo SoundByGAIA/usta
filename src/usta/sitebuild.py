@@ -1,18 +1,17 @@
-"""Bölüm bölüm site kurma (DENEYSEL, varsayılan kapalı: `USTA_SITE_STEPS=1`).
+"""Kodsuz kullanıcının site isteğini parça parça kurma (deneysel, `USTA_SITE_STEPS=1`).
 
-Kodsuz kullanıcının "bana bir site yap" isteğinde küçük model tüm sayfayı tek seferde yazınca her şey birden bozuluyor
-(16 Kasım ölçümü, 9B: uydurma ürün ve düğün salonu, bozuk sayaç, eksik bilgi). Burada iş parçalanır:
+Küçük model bir sayfanın tamamını tek seferde yazınca bilgi uydurur, sayacı bozar, dosyayı hiç yazmaz. Burada iş
+modelin sağlıklı yapabileceği parçalara bölünür:
 
-1. Model kısa bir plan yazar (her satır bir bölüm). Kullanıcıya yapılacaklar listesi olarak gösterilir.
-2. Model tasarımı (CSS) ayrı yazar.
-3. Her bölüm ayrı, küçük bir istekle yazılır ve hemen denetlenir: içinde metin var mı, kullanıcının vermediği fiyat
-   var mı, betik varsa sözdizimi doğru mu (node varsa). Sorunlu bölüm bir kez yeniden yazdırılır.
-4. Usta parçaları tek index.html'de birleştirir (modelin yazdığı değil, sabit iskelet) ve kullanıcının verdiği
-   bilgilerin sayfada olup olmadığına bakar; eksik varsa ilgili bölüm bir kez daha yazdırılır.
+- Seviye 2: model kısa bir plan, tasarım (CSS) ve her bölümü ayrı ayrı yazar. Her bölüm hemen denetlenir (metin var
+  mı, kullanıcının vermediği fiyat, saat, telefon, yer adı var mı, betik sözdizimi doğru mu); sorunlu bölüm bir kez
+  yeniden yazdırılır, yine olmazsa bir basamak aşağı inilir.
+- Seviye 1: iskeleti, kullanıcının bilgilerini ve sayacı Usta koyar; model yalnız kısa düz metin yazar.
 
-Her istek kısa olduğu için küçük bağlam yeter; model hiçbir aracı çağırmaz. Dosya yazma ajanın olağan yolundan geçer
-(izin, denetim kaydı, geri alma). Yalnız yeni site isteklerinde çalışır: istekte dosya adı geçiyorsa ya da klasörde
-zaten bir .html varsa olağan ajan döngüsü kullanılır.
+Her iki seviyede de sayfayı Usta sabit bir iskelette birleştirir, sayaç Usta'nın hazır parçasıdır ve modelin
+ekleyemediği bilgiyi Usta kendisi ekler. Model araç çağırmaz; dosya yazma ajanın olağan yolundan geçer (izin, denetim
+kaydı, geri alma). Yalnız yeni site isteklerinde çalışır: istekte dosya adı geçiyorsa ya da klasörde zaten bir .html
+varsa olağan ajan döngüsü kullanılır. Ölçüm: docs/olcumler/site-istekleri.md.
 """
 
 from __future__ import annotations
@@ -39,9 +38,7 @@ DEFAULT_PLAN = [
 ]
 _SCRIPT_WANTED = re.compile(r"animasyon|buton|düğme", re.IGNORECASE)
 _COUNTDOWN = re.compile(r"sayaç|geri\s*sayım|countdown|kaç\s+gün", re.IGNORECASE)
-# Sayfa düzeni Usta'nındır: modelin CSS'i renk ve yazıyı seçer, düzeni bozamaz (16 Kasım, 4B: body'yi flex yapıp
-# bölümleri yan yana dizdi)
-# model CSS yazamazsa (7B üç görevde de yazamadı) tarayıcının çıplak görünümü yerine
+# model CSS yazamazsa tarayıcının çıplak görünümü yerine
 DEFAULT_CSS = (
     "body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f6f7fb;color:#222;line-height:1.6}"
     "header{background:#1d3d9c;color:#fff;border-radius:12px}header h1{margin:8px 0}"
@@ -75,10 +72,8 @@ _PHONE = re.compile(r"(?<!\d)(?:\+?90[\s-]?)?\(?0?\d{3}\)?[\s-]?\d{3}[\s-]?\d{2}
 _H2 = re.compile(r"<h2\b[^>]*>(.*?)</h2>", re.DOTALL | re.IGNORECASE)
 _BULLET = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s*")
 
-# Talimatlar İngilizce ve olumlu, sitedeki metin Türkçe. 16 Kasım ölçümü (Qwen3 4B, aynı tanıtım görevi 5 kez):
-# Türkçe talimatta "saat, telefon, adres ekleme" gibi yasak listesi 0/5 uydurmasız (model listedekileri yazdı);
-# "yalnız bu bilgileri kullan" 5/5; İngilizce talimat + Türkçe çıktı 5/5 ve en düzgün Türkçe; İngilizce yazıp ayrıca
-# Türkçeye çevirtmek çeviride yeni hata ekledi (Qwen2.5-Coder 7B'de de çeviri en kötüsü).
+# Talimatlar İngilizce ve olumlu, sitedeki metin Türkçe. Yasak listesi ("telefon, saat yazma") küçük modele tam o
+# bilgileri uydurtuyor; talimatlarda bilgi türü sayılmaz (ölçüm: docs/olcumler/site-istekleri.md).
 SYSTEM = (
     "You write one part of a small website for a Turkish user. Write only the requested part, with no explanation. "
     "Use only the information the user gave. Keep sentences short and simple. All visible text must be in Turkish."
@@ -113,8 +108,8 @@ def plan_name(item: str) -> str:
 
 
 def parse_plan(s: str) -> list[str]:
-    """Modelin planından bölüm satırları. 4B planı başlıklı ve iç içe yazdı ("*Hobilerim" altında "Resim yapma"):
-    vurgulu satırlarla vurgusuzlar karışıksa yalnız vurgulular bölüm sayılır; "Bölüm Planı" gibi başlıklar atılır."""
+    """Modelin planından bölüm satırları. Plan iç içe yazılmışsa ("*Hobilerim" altında "Resim yapma") yalnız vurgulu
+    satırlar bölüm sayılır; "Bölüm Planı" gibi başlıklar atılır."""
     rows = []
     for line in _unfence(s).splitlines():
         line = _BULLET.sub("", line).strip()
@@ -141,7 +136,7 @@ def parse_css(s: str) -> str:
 
 
 def set_heading(fragment: str, name: str) -> str:
-    """Bölüm başlığını Usta koyar: planın kısa adı (4B planın tüm satırını başlık yaptı: "Adım - Adım: Ayşe")."""
+    """Bölüm başlığını Usta koyar: planın kısa adı ("Menü - tatlılar ve fiyatlar" → "Menü")."""
     h = f"<h2>{html.escape(name, quote=False)}</h2>"
     out, n = _H2.subn(h, fragment, count=1)
     return out if n else re.sub(r"(<section\b[^>]*>)", rf"\1\n{h}", fragment, count=1)
@@ -203,9 +198,8 @@ class _Blocks(HTMLParser):
 
 
 def invented_names(task: str, fragment: str) -> list[str]:
-    """Bölümdeki yer/kurum adları (çok kelimeli özel ad ya da yer eki taşıyan) kullanıcının isteğinde yoksa.
-    16 Kasım: 9B davetiyeye "Altınova Plaza Şeref Salonu", "İznik Havalimanı" ekledi; tek kelimelik büyük harfli
-    sözcükler ("Klasik", "Taze") sayılmaz, yanlış alarm çok."""
+    """Bölümdeki yer/kurum adları (çok kelimeli özel ad ya da yer eki taşıyan: "… Düğün Salonu", "… Havalimanı")
+    kullanıcının isteğinde yoksa. Tek kelimelik büyük harfli sözcükler ("Klasik", "Taze") sayılmaz; yanlış alarm çok."""
     known = set(re.findall(r"\w+", sitecheck._fold(task)))
 
     def given(w: str) -> bool:  # "Bursa'daki" → "bursa"; ek almış kelimeler kökünden tanınır
@@ -291,8 +285,7 @@ def _made_up(task: str, element: str) -> bool:
 
 
 def scrub(task: str, fragment: str) -> tuple[str, int]:
-    """Yeniden yazdırmaya rağmen kalan uydurmalar: uydurma bilgi taşıyan paragraf/madde Usta tarafından silinir
-    (16 Kasım: 9B "bunu çıkar" dendiğinde başka bir otel ve telefon uydurdu)."""
+    """Yeniden yazdırmaya rağmen kalan uydurmalar: uydurma bilgi taşıyan paragraf/madde Usta tarafından silinir."""
     removed = 0
 
     def drop(m: re.Match) -> str:
@@ -328,7 +321,7 @@ def problems(task: str, fragment: str) -> list[str]:
 
 def fix_note(task: str, fragment: str) -> str:
     """Yeniden yazdırma talimatı (İngilizce, olumlu): yalnız modelin kendi yazdığı uydurma parçaları anar, bilgi
-    türlerini ("telefon, saat") saymaz; tür saymak küçük modele tam onları yazdırıyordu."""
+    türlerini ("telefon, saat") saymaz; tür saymak küçük modele tam onları yazdırır."""
     shown = visible_text(fragment)
     made = [
         *invented_prices(task, fragment),
@@ -350,8 +343,8 @@ def fix_note(task: str, fragment: str) -> str:
 
 
 def countdown(task: str) -> str:
-    """İstekte sayaç ve tarih varsa Usta'nın hazır sayaç bölümü (16 Kasım: 9B'nin sayacı üç turda da bozuktu, 4B
-    "bugünü" 2024 diye sabit yazdı). Tarih kullanıcının isteğinden gelir; model betik yazmaz."""
+    """İstekte sayaç ve tarih varsa Usta'nın hazır sayaç bölümü. Tarih kullanıcının isteğinden gelir, "bugün"
+    tarayıcının saatinden; model betik yazmaz."""
     m = sitecheck._DATE.search(task or "")
     if not _COUNTDOWN.search(task or "") or not m:
         return ""
@@ -389,9 +382,7 @@ def _title(task: str, proposed: str = "") -> str:
     english = re.search(
         r"\b(?:about|me|my|the|welcome|page|website|home|of|our|your)\b", t, re.IGNORECASE
     )
-    if (
-        2 <= len(t) <= 60 and "<" not in t and not english
-    ):  # 4B Türkçe başlık isteğine "Ayşe about me" yazdı
+    if 2 <= len(t) <= 60 and "<" not in t and not english:  # İngilizce başlık önerisi kabul edilmez
         return t
     names = sitecheck._names(task)
     for a, b in pairwise(names):  # "Ali ve Zeynep" tek kişi adından iyidir

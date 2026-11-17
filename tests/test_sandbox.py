@@ -159,7 +159,7 @@ def test_git_and_usta_are_mounted_read_only(tmp_path):
 
 
 def test_missing_usta_dir_is_created_and_mounted_read_only_so_memory_cannot_be_planted(tmp_path):
-    # Kırma testi (16 Kasım): ilk görevde .usta yokken kutudaki komut .usta/memory/NOTES.md yazabiliyordu
+    # .usta yokken kutudaki komut .usta/memory/NOTES.md yazamamalı
     args = " ".join(build_docker_args(SandboxConfig(workdir=tmp_path), ["true"]))
     assert (tmp_path / ".usta").is_dir()
     assert f"{tmp_path.resolve() / '.usta'}:/workspace/.usta:ro" in args

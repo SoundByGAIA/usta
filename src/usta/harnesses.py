@@ -1,5 +1,5 @@
 """Orkestra şefi: bilgisayardaki diğer yapay zekâ programlarını (Claude Code, Codex, OpenCode, DeepSeek Harness, Hermes)
-Usta'nın gözetiminde yardıma çağırma. Tasarım: `docs/c-orkestra-tasarim.md`.
+Usta'nın gözetiminde yardıma çağırma. Tasarım: `docs/beceri-ve-baska-programlar.md`.
 
 Güvenlik duruşu:
 
@@ -81,7 +81,7 @@ class Harness:
         return self.read_args is not None
 
 
-# Her satırın bayrakları programın kendi `--help` çıktısından/belgesinden doğrulandı (docs/c-orkestra-tasarim.md).
+# Her satırın bayrakları programın kendi `--help` çıktısından/belgesinden doğrulandı (docs/beceri-ve-baska-programlar.md).
 CATALOG: dict[str, Harness] = {
     h.id: h
     for h in (
@@ -274,8 +274,8 @@ def build_command(h: Harness, task: str, write: bool) -> tuple[list[str], bytes 
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
-    """Programı VE çocuklarını kapatır. Windows'ta `proc.kill()` yalnız ana süreci öldürür (gerçek Windows'ta görüldü:
-    zaman aşımından sonra çocuk süreç çalışmaya devam etti); `taskkill /T` ağacın tamamını kapatır."""
+    """Programı VE çocuklarını kapatır. Windows'ta `proc.kill()` yalnız ana süreci öldürür, çocuklar
+    çalışmaya devam eder; `taskkill /T` ağacın tamamını kapatır."""
     with contextlib.suppress(OSError, ProcessLookupError, subprocess.SubprocessError):
         if _platform() == "win32":
             subprocess.run(

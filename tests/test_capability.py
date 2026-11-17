@@ -368,7 +368,7 @@ def test_agent_tasks_probe_runs_real_agent_loop_on_lab_scenarios():
 
 
 def test_agent_tasks_dominates_the_score_so_a_protocol_that_cannot_finish_tasks_loses():
-    """Tek çağrı sondalarını geçip çok adımlı görevi bitiremeyen protokol (7B native örneği) artık öne çıkamaz."""
+    """Tek çağrı sondalarını geçip çok adımlı görevi bitiremeyen protokol öne çıkamaz."""
 
     class SingleShotOnly(Perfect):
         def chat(self, messages, tools=None, **kw):

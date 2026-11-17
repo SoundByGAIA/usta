@@ -406,7 +406,7 @@ def normalize_ctx(ctx: dict | None) -> dict:
 
 def realistic_ctx(long_chars: int = 6000) -> dict:
     """Sondaları AJANIN gerçek sistem istemi ve gerçek araç şemalarıyla koştur: küçük bir araç kümesiyle ölçülen yetenek,
-    büyük araç kümesi altında çökebilir (7B yerel modellerde gözlendi); sonda bu yüzden gerçek yapılandırmayı kullanır."""
+    büyük araç kümesi altında çökebilir; sonda bu yüzden gerçek yapılandırmayı kullanır."""
     import tempfile
 
     from usta.agent import SYSTEM_PROMPT
@@ -492,7 +492,7 @@ def recommend(scores: dict[str, ProtocolScore]) -> tuple[str, str]:
     others = ", ".join(f"{p} {scores[p].score:.2f}" for p in PROTOCOLS if p in scores)
 
     # Skorlar yakınsa en öngörücü kanıt (uçtan uca ajan görevleri) karar verir: tek çağrı sondalarını geçip çok adımlı
-    # görevi bitiremeyen protokol (7B native örneği) yakın skorla öne geçmemeli.
+    # görevi bitiremeyen protokol yakın skorla öne geçmemeli.
     def agent(p: str) -> float:
         r = next((r for r in scores[p].results if r.name == "agent_tasks"), None)
         return r.passes / r.trials if r and r.trials else -1.0

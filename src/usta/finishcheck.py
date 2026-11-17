@@ -1,30 +1,21 @@
-"""Bitirme anında söz–eylem denetimi (portalda ve komut satırında varsayılan AÇIK): küçük modellerin "erken bitirme" hataları.
+"""Bitirme anında söz–eylem denetimi: küçük modellerin "erken bitirme" hataları.
 
-Reliability Lab'da (DeepSeek-V4-Pro-Qwen3.5-9B, 2026-11-14) görülen kalıplar:
+Küçük modeller sık sık şunları yapar:
 
-- **Yapmadığını yaptım demek:** yalnız klasörü listeleyip "summary.txt dosyasına yazıldı" deyip bitirmek.
-- **Gereksiz izin istemek:** görev açıkça "dosyaya yaz" derken "yazmamı ister misiniz?" diye sormak.
-- **Sonucu dosya yerine yanıta yazmak** ya da boş yanıtla bitirmek.
-- **Niyet söyleyip durmak:** "Dosyaları kontrol ediyorum." / "Önce dosyaya bakalım." deyip araç çağırmadan bitirmek.
+- yalnız klasörü listeleyip "summary.txt dosyasına yazıldı" deyip bitirmek,
+- görev açıkça "dosyaya yaz" derken "yazmamı ister misiniz?" diye sormak,
+- sonucu dosya yerine yanıta yazmak ya da boş yanıtla bitirmek,
+- "dosyaları kontrol ediyorum" deyip araç çağırmadan bitirmek.
 
-İlk üçü tek kuralla yakalanır: kullanıcının isteğinde yazılması istenen **hedef dosya** ("X dosyasına yaz", "X'e
-kaydet", "write to X") bitirme anında hâlâ yazılmamışsa kısa bir hatırlatma yapılır. Hedef yalnız kullanıcının
-kendi isteğinden çıkarılır; yalnız okunan kaynak dosyalar ("X dosyasındaki") ve modelin yanıtında geçen başka dosyalar
-hedef sayılmaz. (İlk sürüm modelin yanıtındaki her görev dosyasını hedef sanıyordu; "todo.md'yi okudum, count.txt'e
-yazdım" yanıtında okunan todo.md için yanlış hatırlatma yapıp modeli şaşırttı. Lab izinde görüldü, düzeltildi.)
+İlk üçü tek kuralla yakalanır: kullanıcının isteğinde yazılması istenen hedef dosya ("X dosyasına yaz", "X'e kaydet",
+"write to X") bitirme anında hâlâ yazılmamışsa kısa bir hatırlatma yapılır. Hedef yalnız kullanıcının kendi isteğinden
+çıkarılır; yalnız okunan kaynak dosyalar ("X dosyasındaki") ve modelin yanıtında geçen başka dosyalar hedef sayılmaz.
 
-Dosya adı vermeyen site/sayfa istekleri ("web sitesi yap") ayrı kuralla yakalanır: bu görevde hiç dosya yazılmadan
-yanıta kod dökülür ya da "oluşturdum" denirse bir kez hatırlatılır.
+Dosya adı vermeyen site/sayfa isteklerinde ("web sitesi yap") hiç dosya yazılmadan kod yanıta dökülür, "oluşturdum"
+denir ya da izin sorulursa; sayfa yazılmışsa da kullanıcının verdiği bilgiler sayfada yoksa bir kez hatırlatılır.
 
-Güvenlik: okunan bir içeriğin (enjeksiyonun) uydurduğu dosyayı yazmaya itilmez; hatırlatmalar izin/onay kurallarını
-değiştirmez.
-
-Ölçüm (Reliability Lab, DeepSeek-V4-Pro-Qwen3.5-9B Q4_K_M, düşünme kapalı, 29 senaryo x temiz/saldırılı, 15 Kasım 2026):
-meşru görev başarısı 13/25 → 19/25, saldırı altında görev başarısı 16/25 → 21/25, saldırı başarısı 1/25 → 1/25 (iki
-koşuda farklı senaryo; ikisinde de hatırlatma tetiklenmedi), yanlış ret 0 → 0, hiç araç çağırmayan koşu 2 → 0.
-Eşleştirilmiş koşularda 18 kazanç, 3 kayıp (ikisi hatırlatmadan önce yanlış dosya adına yazma, biri `run` ile yazılmış
-dosyanın yeniden yazdırılması; sonuncusu düzeltildi). Bedeli: ortalama gecikme ~%20 arttı. Kapatmak:
-`--no-finish-check` ya da `USTA_FINISH_CHECK=0`.
+Okunan bir içeriğin uydurduğu dosyayı yazmaya itilmez; hatırlatmalar izin ve onay kurallarını değiştirmez. Görev başına
+en çok iki hatırlatma. Ölçüm: docs/olcumler/soz-eylem.md. Kapatmak: `--no-finish-check` ya da `USTA_FINISH_CHECK=0`.
 """
 
 from __future__ import annotations
@@ -58,15 +49,13 @@ _INTENT = re.compile(
     re.IGNORECASE,
 )
 MAX_INTENT_CHARS = 240
-# Kodsuz kullanıcı dosya adı vermez: "web sitesi yap", "menümü gösteren bir sayfa istiyorum". 16 Kasım ölçümü (9B,
-# kodsuz kullanıcı gibi site istekleri): model pastane görevinde HTML'i yanıta döküp "menünüz artık webde" dedi, hiçbir
-# dosya yazmadı; hedef kuralı istekte dosya adı olmadığı için tetiklenmedi.
+# kodsuz kullanıcı dosya adı vermez: "web sitesi yap", "menümü gösteren bir sayfa istiyorum"
 _ARTIFACT = re.compile(
     r"\b(?:web\s*)?site\w*|\bsayfa\w*|\bweb\s*page|\bwebsite|\blanding\s*page|\bhomepage",
     re.IGNORECASE,
 )
 _CODE_IN_ANSWER = re.compile(r"```|<html|<!doctype", re.IGNORECASE)
-# yapmak için izin sormak (16 Kasım, 3. ölçüm: "Web sitesini oluşturabiliyorum mu?" deyip bitirdi)
+# yapmak için izin sormak ("oluşturayım mı?", "shall I")
 _ASK_TO_BUILD = re.compile(
     r"(?:yap|oluştur|hazırla|başla|yaz)\w*\s+m[ıiuü]\w*\s*\?|ister\s+misiniz|ister\s+misin|shall\s+i|should\s+i|want\s+me\s+to",
     re.IGNORECASE,
@@ -96,7 +85,7 @@ class FinishCheck:
         self.pages: list[str] = []  # bu görevde yazılan .html dosyaları (özgün yazımıyla)
         self.wrote_any = False  # bu görevde herhangi bir dosya yazıldı mı (ya da komut çalıştı mı)
         self.nudges = 0
-        self.fired: list[str] = []  # tetiklenen kurallar (Lab izi için)
+        self.fired: list[str] = []  # tetiklenen kurallar (Lab kaydı için)
 
     @staticmethod
     def _norm(path: str) -> str:
@@ -113,8 +102,7 @@ class FinishCheck:
                 self.pages.append(args["path"])
         if executed and tool in (*WRITE_TOOLS, "run"):
             self.wrote_any = True
-        # komutla yazma ("echo 3 > count.txt"): hedef adı geçen bir komut çalıştıysa yeniden yazmaya itilmez
-        # (Lab izi: hatırlatma komutla yazılmış dosyayı model uzun bir cümleyle yeniden yazdırdı)
+        # komutla yazma ("echo 3 > count.txt"): hedef adı geçen bir komut çalıştıysa dosya yazılmış sayılır
         if executed and tool == "run" and isinstance(args.get("command"), str):
             cmd = args["command"].replace("\\", "/").lower()
             self.written.update(self._norm(t) for t in self.targets if self._norm(t) in cmd)

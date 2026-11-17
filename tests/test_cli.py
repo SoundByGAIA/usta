@@ -588,7 +588,7 @@ def test_run_turns_on_taint_gate_and_finish_check_by_default(tmp_path, monkeypat
 def test_think_off_sends_reasoning_effort_none_and_warns_about_ignored_think_field(
     tmp_path, endpoint, capsys
 ):
-    # Lab izi: Ollama'nın OpenAI ucu {"think": false}'u yok sayıyor; 1.7B gizlice düşünmeye devam etti
+    # Ollama'nın OpenAI ucu {"think": false}'u yok sayar; düşünmeyi kapatan reasoning_effort'tur
     base = ["run", "x", "-w", str(tmp_path), "--endpoint", endpoint.url, "--model", "m"]
     endpoint.responses = [text_reply("ok"), text_reply("ok"), text_reply("ok")]
     assert main([*base, "--think", "off"]) == 0
@@ -601,7 +601,7 @@ def test_think_off_sends_reasoning_effort_none_and_warns_about_ignored_think_fie
 
 
 def test_run_quarantines_git_dirs_created_during_the_task(tmp_path, monkeypatch, home, capsys):
-    # Kırma testi (16 Kasım): portal görev sonunda yeni .git'i karantinaya alıyordu, `usta run` almıyordu.
+    # `usta run` da portal gibi görevde oluşan yeni .git'i karantinaya alır.
     # Kutudaki komutun yazdığı .git/config (core.fsmonitor) kullanıcı git çalıştırınca ana makinede kod çalıştırır.
     from usta import cli
     from usta.agent import AgentResult

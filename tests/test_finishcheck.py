@@ -1,4 +1,4 @@
-"""Söz–eylem denetimi: bugünkü gerçek Lab izlerinden (DeepSeek-V4-Pro-Qwen3.5-9B) alınmış yanıtlarla."""
+"""Söz–eylem denetimi: gerçek küçük model yanıtlarına benzeyen örneklerle."""
 
 from pathlib import Path
 
@@ -62,7 +62,7 @@ def test_a_real_write_satisfies_the_target():
 
 
 def test_a_command_that_names_the_target_counts_as_writing_it():
-    # Lab izi: model sonucu `run` ile yazmıştı; hatırlatma onu uzun bir cümleyle yeniden yazdırdı
+    # sonuç `run` ile yazıldıysa dosya yazılmış sayılır
     fc = FinishCheck("Cevabı sonuc.txt dosyasına yaz.")
     fc.observe("run", {"command": "echo Paris > sonuc.txt"}, executed=True)
     assert fc.on_finish("sonuc.txt dosyasına yazıldı.") is None
@@ -92,7 +92,7 @@ PASTANE = (
 
 
 def test_site_request_without_a_file_name_answered_with_code_gets_a_reminder():
-    # 16 Kasım ölçümü (9B): HTML yanıta döküldü, "Menüleriniz artık webde mevcut!" dendi, dosya yazılmadı
+    # HTML yanıta dökülüp "Menüleriniz artık webde mevcut!" denir, dosya yazılmaz
     msg = FinishCheck(PASTANE).on_finish(
         "```html\n<!DOCTYPE html>\n<html>...</html>\n```\nMenüleriniz artık webde mevcut!"
     )
@@ -153,7 +153,7 @@ def test_normal_final_answers_pass_through():
 
 
 def test_source_files_named_in_the_answer_are_not_treated_as_unwritten():
-    # Lab izinde ilk sürümün yanlış alarmı: okunan todo.md "yazılmadı" sanılıyordu.
+    # yalnız okunan todo.md hedef dosya sayılmaz
     fc = FinishCheck("todo.md içindeki madde sayısını count.txt dosyasına yaz.")
     fc.observe("write_file", {"path": "count.txt", "content": "1"}, executed=True)
     assert (
@@ -257,7 +257,7 @@ def test_missing_facts_tolerate_case_spelling_of_dates_and_prices():
         "<p>Nilüfer / BURSA</p>"
     )
     assert missing(PASTANE, [page]) == []
-    # gerçek 9B sayfası: "Süt Laç" yazmıştı; CSS'teki 80px fiyat sayılmaz
+    # "Süt Laç" sütlaç sayılmaz; CSS'teki 80px fiyat sayılmaz
     bad = page.replace("Sütlaç ₺80", "Süt Laç <span style='width:80px'>")
     assert missing(PASTANE, [bad]) == ["sütlaç", "80 TL"]
     assert "120 TL" in missing(

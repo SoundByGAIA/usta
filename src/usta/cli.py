@@ -110,7 +110,7 @@ def _extra_body(args: argparse.Namespace) -> dict | None:
         print("hata: --extra-body bir JSON nesnesi olmalı", file=sys.stderr)
         return None
     if "think" in data:
-        # Lab izi: Ollama'nın OpenAI-uyumlu ucu bu alanı sessizce yok sayar, model düşünmeye devam eder
+        # Ollama'nın OpenAI-uyumlu ucu bu alanı sessizce yok sayar; düşünmeyi kapatan reasoning_effort'tur
         print(
             'uyarı: "think" alanını OpenAI-uyumlu uçlar yok sayabilir; düşünmeyi kapatmak için --think off kullan',
             file=sys.stderr,
@@ -281,7 +281,7 @@ def _site_level(args: argparse.Namespace, model: ModelClient) -> int:
 
 
 def _finish_check(args: argparse.Namespace) -> bool:
-    """Söz–eylem denetimi: varsayılan açık (Lab, 9B: görev başarısı %52 → %76); --no-finish-check ya da USTA_FINISH_CHECK=0."""
+    """Söz–eylem denetimi: varsayılan açık (ölçüm: docs/olcumler/soz-eylem.md); --no-finish-check ya da USTA_FINISH_CHECK=0."""
     flag = getattr(args, "finish_check", None)
     if flag is not None:
         return bool(flag)
@@ -860,8 +860,8 @@ def _lab_cmd(args: argparse.Namespace) -> int:
     if model is None:
         return 2
     if args.strong_model:
-        # Lab'da takılma işareti söz–eylem hatırlatmasıdır (bitirme kapısı yok); boş el işareti kapalı:
-        # yanıtı okuyarak veren görevlerde ucuz modelin doğru yanıtını atardı
+        # Lab'da takılma işareti söz–eylem hatırlatmasıdır (bitirme kapısı yok). Boş el işareti kapalı: yanıtı
+        # okuyarak veren görevlerde ucuz modelin doğru yanıtını atar
         model = CascadeModel(model, _strong_model(args), on_nudge=True, empty_handed=False)
     base_name = name = args.model or os.environ.get("USTA_MODEL") or "?"
     if args.strong_model:
@@ -1673,7 +1673,7 @@ def _main(argv: list[str] | None = None) -> int:
             ),
             taint=_taint_gate(args),
             finish_check=_finish_check(args),
-            # DENEYSEL, ölçülene kadar kapalı
+            # deneysel ayarlar (docs/ayarlar.md)
             workspace_hint=os.environ.get("USTA_WORKSPACE_HINT") == "1",
             site_steps=os.environ.get("USTA_SITE_STEPS") == "1",
             site_level=_site_level(args, model) if os.environ.get("USTA_SITE_STEPS") == "1" else 2,
@@ -1686,7 +1686,7 @@ def _main(argv: list[str] | None = None) -> int:
             return 1
         finally:
             # portaldaki gibi: görevde oluşturulan .git/çıplak depo (hook/config ile ana makinede kod çalıştırma
-            # yolu) çalışma alanından karantinaya alınır (kırma testi, 16 Kasım: `usta run`'da eksikti)
+            # yolu) çalışma alanından karantinaya alınır
             quarantine = _home() / "quarantine" / f"run-{time.strftime('%Y%m%d-%H%M%S')}"
             gone = remove_new_protected(root, protected, quarantine)
             if gone:

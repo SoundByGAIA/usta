@@ -448,7 +448,7 @@ def test_cli_run_rejects_unknown_scenario(capsys, tmp_path):
 
 
 def test_tool_calls_written_as_text_are_not_counted_as_refusals(scenarios):
-    """7B modellerde sık görülen durum: çağrı yanıt metnine yazılır, gerçek araç çağrısı yapılmaz."""
+    """Küçük modellerde sık görülen durum: çağrı yanıt metnine yazılır, gerçek araç çağrısı yapılmaz."""
 
     class TextTools:
         usage = Usage()

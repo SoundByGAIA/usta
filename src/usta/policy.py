@@ -21,7 +21,7 @@ SYMBOL_TOOLS = {
 PROTECTED_DIRS = frozenset({".git", ".usta"})
 # Kullanıcının bilgisayarında KENDİLİĞİNDEN çalışan dosyalar (kutunun dışında): klasör açılınca (VS Code görevleri,
 # devcontainer), commit'te (husky/pre-commit kancaları), klasöre girince (direnv) ya da push'ta (CI, gizli anahtarlarla).
-# Yazmak yasak değil (meşru iş olabilir) ama her seferinde sorulur; oto modda reddedilir. (Kırma testi, 16 Kasım)
+# Yazmak yasak değil (meşru iş olabilir) ama her seferinde sorulur; oto modda reddedilir.
 HOST_AUTORUN_DIRS = frozenset({".vscode", ".idea", ".husky", ".githooks", ".devcontainer"})
 HOST_AUTORUN_FILES = frozenset({".envrc", ".pre-commit-config.yaml", ".gitlab-ci.yml"})
 

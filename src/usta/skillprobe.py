@@ -1,15 +1,14 @@
-"""Yazma becerisi sondası: model ne kadar büyük bir parçayı sağlıklı yapabiliyor (DENEYSEL).
+"""Yazma becerisi sondası: model ne büyüklükte bir parçayı sağlıklı yazabiliyor (deneysel, henüz karar vermiyor).
 
-Fikir: modeli önce kısa bir sınavdan geçir, sonra işi onun yapabileceği en küçük birime böl.
-Aynı boyuttaki iki model çok farklı davranıyor (16 Kasım ölçümü: Qwen3 4B, Qwen2.5-Coder 7B'den düzgün Türkçe yazdı ve
-daha az uydurdu), o yüzden yalnız parametre sayısına bakılmaz. Altı küçük deneme, her biri kuralla puanlanır:
+Modeli kısa bir sınavdan geçirip işi onun yapabileceği en küçük birime bölmek için. Aynı boyuttaki iki model çok
+farklı davranabildiği için yalnız parametre sayısına bakılmaz. Altı küçük deneme, her biri kuralla puanlanır:
 
-- **tek:** bir cümleyi değiştirmeden yazmak (tek talimat)
-- **iki:** üç ürünü "ad - fiyat" biçiminde alt alta, başka bir şey yazmadan (iki talimat + bilgiyi aynen koruma)
-- **plan:** bir site için 2-5 satırlık bölüm planı
-- **bolum:** tek bir <section> parçası, verilen e-postayla, uydurmasız
-- **uydurma:** verilen bilgilerle iki cümlelik tanıtım, saat/telefon/fiyat/yer uydurmadan, yalnız Türkçe
-- **sayfa:** küçük bir sayfanın tamamı tek seferde
+- tek: bir cümleyi değiştirmeden yazmak (tek talimat)
+- iki: üç ürünü "ad - fiyat" biçiminde alt alta, başka bir şey yazmadan (iki talimat, bilgiyi aynen koruma)
+- plan: bir site için 2-5 satırlık bölüm planı
+- bolum: tek bir <section> parçası, verilen e-postayla, uydurmasız
+- uydurma: verilen bilgilerle iki cümlelik Türkçe tanıtım, bilgi eklemeden
+- sayfa: küçük bir sayfanın tamamı tek seferde
 
 Seviye: 3 = sayfayı tek seferde yazar (her şey geçti ve model 12B'den küçük değil ya da boyutu bilinmiyor: bulut),
 2 = bölüm bölüm (plan, iki, bölüm ve uydurma geçti), 1 = en küçük parçalar (Usta iskeleti ve bilgileri kendisi koyar,
@@ -118,8 +117,8 @@ def check_page(reply: str) -> bool:
     )
 
 
-# Sorular Usta'nın gerçekte kullandığı talimat biçimindedir (İngilizce, olumlu; metin Türkçe). İlk sürüm Türkçe ve
-# yasak listeli sorular kullanıyordu: 4B gerçek görevlerde en iyisiyken sınavda en düşük seviyeyi aldı (16 Kasım).
+# Sorular Usta'nın gerçekte kullandığı talimat biçimindedir (İngilizce, olumlu; metin Türkçe); başka biçimde sorulan
+# sınav, modelin gerçek görevdeki başarısını göstermiyor.
 _FACTS = "The user's facts (copy them exactly as written): "
 PROBES = {
     "tek": (f"Copy this Turkish sentence exactly, adding nothing: {_ONE}", check_one),

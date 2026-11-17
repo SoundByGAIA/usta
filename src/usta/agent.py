@@ -72,19 +72,19 @@ class Agent:
         site_steps: bool = False,
         site_level: int = 2,
     ):
-        # DENEYSEL: yeni site isteği bölüm bölüm kurulur, her bölüm denetlenir (sitebuild.py)
+        # deneysel: yeni site isteği parça parça kurulur, her parça denetlenir (sitebuild.py)
         self.site_steps = site_steps
         self.site_level = (
             site_level  # 3: tek seferde (olağan döngü), 2: bölüm bölüm, 1: en küçük parçalar
         )
-        # DENEYSEL: görev başında çalışma klasöründeki dosyaların adları modele söylenir (16 Kasım: 9B "sitemin rengini
-        # değiştir" isteğinde klasördeki index.html'e bakmadan "hangi dosya?" diye sordu)
+        # deneysel: görev başında klasördeki dosya adları modele söylenir; "sitemin rengini değiştir" gibi isteklerde
+        # modelin hangi dosyayı kastettiğini bulmasına yardım eder
         self.workspace_hint = workspace_hint
-        # DENEYSEL (varsayılan kapalı): bitirirken söz–eylem uyuşmazlığına hatırlatma (finishcheck.py)
+        # bitirirken söz–eylem uyuşmazlığına hatırlatma (finishcheck.py); komut satırı ve portal varsayılan açık verir
         self.finish_check = finish_check
         self._finish: FinishCheck | None = None
         self.taint = (
-            taint  # DENEYSEL: güvenilmeyen içerikten türeyen yazma/komut hedefleri onay ister
+            taint  # güvenilmeyen içerikten türeyen yazma/komut hedefleri onay ister (taint.py)
         )
         self._taint: Taint | None = None
         self.approval_note = ""  # onay istenirken gerekçe (görev yöneticisi onay olayına ekler)

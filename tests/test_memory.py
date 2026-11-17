@@ -219,7 +219,7 @@ def test_plan_mode_tasks_are_not_recorded_in_project_history(tmp_path):
     assert threading.active_count() >= 1
 
 
-# --- kırma testi (16 Kasım): kalıcı nota gizlenen talimatlar onay ister ---------------------------------
+# --- kalıcı nota gizlenen talimatlar onay ister ---------------------------------
 @pytest.mark.parametrize(
     "note",
     [

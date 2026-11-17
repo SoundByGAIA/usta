@@ -1,6 +1,6 @@
 """Başarısızlık sınıflandırması (Failure Taxonomy): bir koşunun NEDEN başarısız olduğunu olay izinden çıkarır.
 
-Amaç: "7B modelde başarı 0/30" gibi bir sonucu, modelin işi yapamamasından mı (araç şemasını anlamama, yanlış dosya,
+Amaç: "başarı 0/30" gibi bir sonucu, modelin işi yapamamasından mı (araç şemasını anlamama, yanlış dosya,
 yanlış çözüm), harness'ın şişirmesinden mi (bağlam dolması, tekrar döngüsü) yoksa altyapıdan mı kaynaklandığını
 ayırmak. Sınıflandırma deterministiktir: aynı iz her zaman aynı kategoriyi verir. Kurallar öncelik sırasıyla işlenir;
 ilk eşleşen BİRİNCİL kategoridir, tespit edilen diğer işaretler `signals` içinde ayrıca listelenir.

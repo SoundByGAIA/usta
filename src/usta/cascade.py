@@ -5,7 +5,7 @@ başarısız saydıysa ya da devre kesici açıldıysa konuşmanın geri kalanı
 olduğu gibi taşınır; yükseltme geri alınmaz (görev başına en fazla bir geçiş). Ek işaret: ucuz model hiç düzenleme yapmadan araç
 çağırmayı bırakıp "bitti" derse (zayıf modellerde sık) o yanıt atılır ve aynı istek güçlü modele sorulur.
 Sınır: kapı yalnız deponun kendi testlerini görür; test yoksa ya da ucuz model yanlış çözümü doğrulatamıyorsa
-yükseltme tetiklenmez. Bu yüzden fayda ölçümle gösterilmeden varsayılan olmaz (bkz. docs/bench-orta-olcum.md).
+yükseltme tetiklenmez. Bu yüzden fayda ölçümle gösterilmeden varsayılan olmaz (bkz. docs/olcumler/bench-7b.md).
 """
 
 from __future__ import annotations

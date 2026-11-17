@@ -1,6 +1,6 @@
 """Evdeki ortak hafıza: aynı evdeki bilgisayarlar arasında "Seni tanıyayım" bilgileri ve ortak notlar.
 
-Tasarım: `docs/ortak-hafiza-tasarim.md`. Özet:
+Tasarım: `docs/ortak-hafiza.md`. Özet:
 
 - Bir bilgisayar **ev sahibi** olur ve portaldan ayrı, küçük bir dinleyici açar (yalnız `/ortak/*`; portalın hiçbir ucu bu
   kapıdan erişilemez). Diğerleri 6 haneli kodla eşleşir ve **bağlı** olur.

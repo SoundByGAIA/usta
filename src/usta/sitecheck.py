@@ -1,9 +1,8 @@
 """Site/sayfa isteğinde kullanıcının verdiği bilgiler sayfaya girdi mi (kural; model çağrısı yok).
 
-Kodsuz kullanıcı isteğine somut bilgiler yazar: adı, e-postası, ürün ve fiyatları, tarih, şehir. 16 Kasım ölçümünde
-(DeepSeek-V4-Pro-Qwen3.5-9B, kodsuz kullanıcı gibi üç site isteği) küçük model sayfayı yazdı ama bilgileri eksik ya da
-değiştirerek koydu ("Sütlaç" yerine "Süt Laç"), bitti dedi. Bu modül istekten bilgileri çıkarır ve yazılan sayfada
-arar; eksik olanlar söz–eylem denetimi (finishcheck.py) üzerinden modele bir kez söylenir.
+Kodsuz kullanıcı isteğine somut bilgiler yazar: adı, e-postası, ürün ve fiyatları, tarih, şehir. Küçük modeller bu
+bilgileri sayfaya eksik ya da değiştirerek koyabilir ("Sütlaç" yerine "Süt Laç"). Bu modül istekten bilgileri çıkarır
+ve yazılan sayfada arar; eksik olanlar söz–eylem denetimi (finishcheck.py) üzerinden modele bir kez söylenir.
 
 Sezgiseldir: özel isimleri büyük harfle başlayan (cümle başında olmayan) kelimelerden çıkarır. Eşleşme büyük/küçük harf
 ve Türkçe İ/ı farkını yok sayar; sayfanın kaynağında (metin ya da betik) geçmesi yeter. Fiyat yalnız para

@@ -51,8 +51,8 @@ class HarnessConfig:
 
     id: str = "base"
     breaker: bool = False
-    taint: bool = False  # DENEYSEL kaynak izi kapısı (taint.py)
-    finish_check: bool = False  # DENEYSEL söz–eylem denetimi (finishcheck.py)
+    taint: bool = False  # kaynak izi kapısı (taint.py)
+    finish_check: bool = False  # söz–eylem denetimi (finishcheck.py)
     protocol: str = "native"
     approver: str = "deny"  # ölçümde insan yok: onay isteyen eylemler reddedilir
 

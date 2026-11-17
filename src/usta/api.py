@@ -662,7 +662,7 @@ def create_app(
             raise HTTPException(500, "profil silinemedi") from None
         return asdict(kisi.Kisi())
 
-    # --- evdeki ortak hafıza (tasarım: docs/ortak-hafiza-tasarim.md) ---------------------------
+    # --- evdeki ortak hafıza (tasarım: docs/ortak-hafiza.md) ---------------------------
     ohost = ortak.HostServer(home)
 
     def ortak_role() -> str:

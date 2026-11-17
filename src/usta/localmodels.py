@@ -259,7 +259,7 @@ def memory_gb() -> float | None:
 
 
 # Önerilen modeller: bu depoda gerçekten çalıştırdığımız, Ollama kütüphanesinde bulunan etiketler.
-# Büyük modeller denenmediği için önerilmez (bkz. docs/bench-orta-olcum.md).
+# Büyük modeller denenmediği için önerilmez (bkz. docs/olcumler/bench-7b.md).
 MODEL_SMALL = {"name": "qwen3:4b-instruct-2507-q4_K_M", "size_gb": 2.5}
 MODEL_MEDIUM = {"name": "qwen2.5-coder:7b", "size_gb": 4.7}
 MIN_RAM_LOCAL = 6.0  # bunun altında yerel model önerilmez

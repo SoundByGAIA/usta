@@ -146,7 +146,7 @@ class Recording(Scripted):
 
 
 def test_prompts_name_no_forbidden_items(tmp_path):
-    """Yasak listesi ("telefon, saat, adres ekleme") 4B'ye tam onları yazdırdı (0/5); talimatlar olumlu kalmalı."""
+    """Yasak listesi ("telefon, saat, adres ekleme") küçük modele tam onları yazdırır; talimatlar olumlu kalmalı."""
     model = Recording(
         ModelResponse("1. Menü - tatlılar"),
         ModelResponse("Tatlı Köşe"),

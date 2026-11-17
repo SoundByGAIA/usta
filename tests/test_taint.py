@@ -166,7 +166,7 @@ def test_agent_denies_secret_read_steered_by_shared_notes(tmp_path):
     ]  # okuma onaya düştü, reddedildi
 
 
-# --- "yalnız okuma" isteği (Lab: Qwen3 1.7B görev "YALNIZ OKUMA" derken ilk çağrıda write=true gönderdi) -------------
+# --- "yalnız okuma" isteği: model write=true gönderse de yazma izni verilmez -------------
 READ_ONLY_TASK = (
     "YALNIZ OKUMA izniyle (write alanını false bırak) claude'a 'Fransa'nın başkenti?' diye sor."
 )
@@ -213,7 +213,7 @@ def test_agent_denies_write_mode_delegation_without_asking_when_user_said_read_o
     assert any(e["event"] == "taint" and e.get("reason") == "read_only" for e in events(audit))
 
 
-# --- kırma testi (16 Kasım): kaçan gizli dosya adları ve kod dosyalarında yanlış alarm --------------------
+# --- gizli dosya adı biçimleri ve kod dosyalarında yanlış alarm --------------------
 def test_secret_names_found_in_crush_test_are_caught_without_flagging_code_files():
     from usta.taint import secret_path
 

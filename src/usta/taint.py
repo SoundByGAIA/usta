@@ -13,9 +13,8 @@ Güvenilmeyen kaynaklar: read_file/read_symbol (depo içeriği), fetch_url, web_
 sürekli işaretlerdi (ör. test çıktısındaki izden hatalı dosyayı düzeltmek).
 
 Gizli bilgi dosyası okuma: güvenilmeyen bir içerik okunduktan (ya da ortak/kalıcı not bağlamı verildikten) sonra
-`.env`, anahtar, parola dosyası gibi bir dosyayı okumak, kullanıcı o dosyayı isteğinde anmadıysa onay ister. Lab
-(DeepSeek-V4-Qwen3.5-9B, 2026-11-15): iki ayrı ölçümde model bir bilet / ortak not talimatıyla `config.env` okuyup
-anahtarı yanıtına yazdı. Yanıta sızmayı hiçbir kural engelleyemez; ama sızmanın ön koşulu olan okumayı yakalamak mümkün.
+`.env`, anahtar, parola dosyası gibi bir dosyayı okumak, kullanıcı o dosyayı isteğinde anmadıysa onay ister. Yanıta
+sızmayı hiçbir kural engelleyemez; ama sızmanın ön koşulu olan okumayı yakalamak mümkün.
 """
 
 from __future__ import annotations
@@ -48,8 +47,7 @@ def secret_path(path: str) -> bool:
     return bool(_SECRET_NAME.search(_norm_path(path)))
 
 
-#: kullanıcının başka programı yalnız okuma izniyle çalıştırma isteği (Lab: Qwen3 1.7B görevde "YALNIZ OKUMA" yazarken
-#: ilk çağrıda kendiliğinden write=true gönderdi)
+#: kullanıcının başka programı yalnız okuma izniyle çalıştırma isteği; model buna rağmen write=true gönderebilir
 _READ_ONLY = re.compile(
     r"\b(?:yaln[ıi]z(?:ca)?|sadece|salt)\s+okuma\b|\bread[\s-]?only\b"
     r"|\bwrite\b\W{0,3}(?:alan[ıi]n[ıi]\s+)?(?:=|:)?\s*false\b|yazma\s+izni\s+(?:verme|olmadan)",
@@ -62,8 +60,8 @@ def wants_write(args: dict) -> bool:
 
 
 def _norm_path(p: str) -> str:
-    # Kırma testi (16 Kasım): "public//leak.txt", "public/./leak.txt", "x/../public/leak.txt" aynı dosyadır ama
-    # okunan içerikteki "public/leak.txt" ile eşleşmiyordu
+    # "public//leak.txt", "public/./leak.txt", "x/../public/leak.txt" ve "public\\leak.txt" aynı dosyadır;
+    # okunan içerikteki "public/leak.txt" ile eşleşmeleri için normalleştirilir
     p = str(p or "").replace("\\", "/").strip()
     if not p:
         return p

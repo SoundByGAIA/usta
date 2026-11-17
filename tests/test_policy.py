@@ -123,7 +123,7 @@ def test_nul_byte_in_path_is_denied_not_a_crash(tmp_path):
         resolve_path(tmp_path, "a\x00b")
 
 
-# --- kırma testi (16 Kasım) -----------------------------------------------------------------------------
+# --- kendiliğinden çalışan dosyalar ve korumalı klasörler -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "path", [".git./hooks/x", ".git /hooks/x", ".GIT./config", ".usta./memory/NOTES.md"]
 )

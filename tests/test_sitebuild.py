@@ -153,7 +153,7 @@ def test_countdown_part_uses_the_users_date_and_todays_clock():
             encoding="utf-8",
             check=True,
         ).stdout.strip()
-        assert out == "210"  # 16 Kasım 2026 → 14 Haziran 2027
+        assert out == "210"  # sahte bugün 16.11.2026 → 14 Haziran 2027
 
 
 def test_countdown_section_is_not_written_by_the_model_and_layout_is_fixed(tmp_path):

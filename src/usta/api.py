@@ -25,6 +25,8 @@ from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from usta import (
+    api_mcp,
+    api_ortak,
     apis,
     attachments,
     compat,
@@ -32,9 +34,6 @@ from usta import (
     harnesses,
     kisi,
     localmodels,
-    mcp_runtime,
-    mcpcatalog,
-    mcpconfig,
     memory,
     ortak,
     privacy,
@@ -48,7 +47,6 @@ from usta.api_models import (
     ApiIn,
     ApprovalIn,
     CodeIn,
-    EnabledIn,
     FileIn,
     FsOp,
     HarnessToggleIn,
@@ -60,22 +58,19 @@ from usta.api_models import (
     LocalScanIn,
     MessageIn,
     ModelIn,
-    OrtakConnectIn,
-    OrtakHostIn,
-    OrtakNoteIn,
     ProfileIn,
-    SecretIn,
+    ServerName,
     SettingsIn,
     SkillIn,
     SkillProposalIn,
     SystemInstallIn,
     TaskIn,
+    WorkspaceId,
     WorkspaceIn,
     friendly_model_error,
 )
 from usta.audit import AuditLog
 from usta.auth import LoginCodes
-from usta.mcp import McpClient, McpError
 from usta.modelctl import ModelSwitchError
 from usta.models import Message, ModelError
 from usta.policy import PathEscapeError, resolve_path
@@ -102,9 +97,6 @@ UI_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
 }
-
-WorkspaceId = Annotated[str, PathParam(pattern=ID_PATTERN)]
-ServerName = Annotated[str, PathParam(pattern=r"^[a-z0-9][a-z0-9_-]{0,29}$")]
 
 
 PREVIEW_MAX = 5_000_000
@@ -490,133 +482,7 @@ def create_app(
             raise HTTPException(500, "profil silinemedi") from None
         return asdict(kisi.Kisi())
 
-    # --- evdeki ortak hafıza (tasarım: docs/ortak-hafiza.md) ---------------------------
-    ohost = ortak.HostServer(home)
-
-    def ortak_role() -> str:
-        if ortak.load_link(home) is not None:
-            return "bagli"
-        return "ev-sahibi" if ortak.Store(home).enabled else "yok"
-
-    def ortak_host_only() -> ortak.Store:
-        store = ortak.Store(home)
-        if ortak_role() != "ev-sahibi":
-            raise HTTPException(409, "Bunu yalnız ev sahibi bilgisayar yapabilir.")
-        return store
-
-    @api.get("/ortak")
-    def ortak_status() -> dict:
-        role = ortak_role()
-        store = ortak.Store(home)
-        out: dict = {"rol": role, "bilgisayar": ortak.pc_name()}
-        if role == "ev-sahibi":
-            out.update(
-                ad=store.name,
-                adres=ohost.address,
-                calisiyor=ohost.running,
-                eslesmeler=store.peers_public(),
-                notlar=store.approved(),
-                bekleyen=store.pending(),
-            )
-        elif role == "bagli":
-            link = ortak.load_link(home) or {}
-            out["baglanti"] = {"ad": link.get("ad"), "adres": link.get("adres")}
-            try:
-                data = ortak.fetch(home)
-                out.update(ulasilamiyor=False, profil=data["profil"], notlar=data["notlar"])
-            except ortak.OrtakError as e:
-                data = ortak.cached(home) or {"profil": asdict(kisi.Kisi()), "notlar": []}
-                out.update(
-                    ulasilamiyor=True, hata=str(e), profil=data["profil"], notlar=data["notlar"]
-                )
-        return out
-
-    @api.post("/ortak/ev-sahibi")
-    def ortak_set_host(body: OrtakHostIn) -> dict:
-        store = ortak.Store(home)
-        if body.acik:
-            if ortak.load_link(home) is not None:
-                raise HTTPException(
-                    409, "Bu bilgisayar başka bir ortak hafızaya bağlı. Önce bağlantıyı kes."
-                )
-            store.configure(True, body.ad)
-            try:
-                ohost.start()
-            except ortak.OrtakError as e:
-                store.configure(False)
-                raise HTTPException(409, str(e)) from None
-        else:
-            store.configure(False)
-            ohost.stop()
-        return ortak_status()
-
-    @api.post("/ortak/kod")
-    def ortak_code() -> dict:
-        ortak_host_only()
-        if not ohost.running:
-            try:
-                ohost.start()
-            except ortak.OrtakError as e:
-                raise HTTPException(409, str(e)) from None
-        return {"kod": ohost.codes.issue(), "adres": ohost.address, "sure": 300}
-
-    @api.post("/ortak/baglan")
-    def ortak_join(body: OrtakConnectIn) -> dict:
-        if ortak.Store(home).enabled:
-            raise HTTPException(
-                409, "Bu bilgisayar ortak hafızayı kendisi tutuyor. Önce onu kapat."
-            )
-        try:
-            res = ortak.connect(home, body.adres, body.kod, body.ad or ortak.pc_name())
-        except ortak.OrtakError as e:
-            raise HTTPException(400, str(e)) from None
-        return {"ad": res["ad"], "adres": res["adres"]}
-
-    @api.post("/ortak/ayril")
-    def ortak_leave() -> dict:
-        ortak.disconnect(home)
-        return {"rol": ortak_role()}
-
-    @api.delete("/ortak/eslesmeler/{key_id}")
-    def ortak_unpair(key_id: str) -> dict:
-        store = ortak_host_only()
-        try:
-            store.remove_peer(key_id)
-        except KeyError:
-            raise HTTPException(404, "böyle bir bilgisayar yok") from None
-        return {"eslesmeler": store.peers_public()}
-
-    @api.post("/ortak/notlar")
-    def ortak_add_note(body: OrtakNoteIn) -> dict:
-        role = ortak_role()
-        try:
-            if role == "bagli":
-                res = ortak.post_note(home, body.text)
-                return {"durum": res.get("durum", "bekliyor")}
-            if role == "ev-sahibi":
-                note = ortak.Store(home).add(body.text, ortak.Store(home).name, approved=True)
-                return {"durum": note["durum"]}
-        except ortak.OrtakError as e:
-            raise HTTPException(422, str(e)) from None
-        raise HTTPException(
-            409, "Ortak hafıza kapalı. Önce ev sahibi ol ya da bir ev sahibine bağlan."
-        )
-
-    @api.post("/ortak/notlar/{note_id}/onayla")
-    def ortak_approve(note_id: str) -> dict:
-        try:
-            ortak_host_only().approve(note_id)
-        except KeyError:
-            raise HTTPException(404, "böyle bir not yok") from None
-        return {"tamam": True}
-
-    @api.delete("/ortak/notlar/{note_id}")
-    def ortak_delete(note_id: str) -> dict:
-        try:
-            ortak_host_only().delete(note_id)
-        except KeyError:
-            raise HTTPException(404, "böyle bir not yok") from None
-        return {"tamam": True}
+    ohost = api_ortak.register(api, home)
 
     @api.get("/settings")
     def get_settings() -> dict:
@@ -668,126 +534,7 @@ def create_app(
             "context_window": new.context_window or 0,
         }
 
-    # --- MCP: yalnız katalogdan ekleme; serbest komut yok (bkz. mcpcatalog) -------------------
-    def mcp_servers() -> dict[str, mcpconfig.Server]:
-        try:
-            return mcpconfig.load(home)
-        except mcpconfig.McpConfigError as e:
-            raise HTTPException(500, f"MCP yapılandırması: {e}") from None
-
-    def mcp_server(name: str) -> mcpconfig.Server:
-        server = mcp_servers().get(name)
-        if server is None:
-            raise HTTPException(404, "sunucu yok")
-        return server
-
-    @api.get("/mcp")
-    def mcp_list() -> dict:
-        servers = mcp_servers()
-        out = []
-        for s in servers.values():
-            have = mcpconfig.resolve_env(home, s, os.environ)
-            out.append(
-                {
-                    "name": s.name,
-                    "enabled": s.enabled,
-                    "approve": s.approve,
-                    "command": list(s.command),
-                    "env": [{"name": k, "set": k in have} for k in s.env],
-                    "isolation": s.isolation,
-                    "image": s.image,
-                    "allow_hosts": list(s.allow_hosts),
-                    "pinned": bool(s.pin_image and s.pin_cache),
-                }
-            )
-        catalog = [
-            {
-                "id": e.id,
-                "title": e.title,
-                "description": e.description,
-                "homepage": e.homepage,
-                "command": list(e.command),
-                "env": list(e.env),
-                "image": e.image,
-                "allow_hosts": list(e.allow_hosts),
-                "added": e.id in servers,
-            }
-            for e in mcpcatalog.CATALOG
-        ]
-        return {"servers": out, "catalog": catalog}
-
-    @api.post("/mcp/catalog/{entry_id}", status_code=201)
-    def mcp_add_from_catalog(entry_id: str) -> dict:
-        entry = mcpcatalog.get(entry_id)
-        if entry is None:
-            raise HTTPException(404, "katalogda yok")
-        try:
-            mcpconfig.add_server(
-                home,
-                entry.id,
-                list(entry.command),
-                list(entry.env),
-                "ask",
-                isolation="container",  # katalog sunucuları her zaman yalıtılmış çalışır
-                image=entry.image,
-                allow_hosts=list(entry.allow_hosts),
-            )
-        except mcpconfig.McpConfigError as e:
-            raise HTTPException(409 if "zaten" in str(e) else 400, str(e)) from None
-        return {"name": entry.id}
-
-    @api.put("/mcp/{name}/secrets/{key}")
-    def mcp_set_secret(name: ServerName, key: str, body: SecretIn) -> dict:
-        mcp_server(name)
-        try:
-            mcpconfig.set_secret(home, name, key, body.value)
-        except mcpconfig.McpConfigError as e:
-            raise HTTPException(404 if "tanımlı değil" in str(e) else 400, str(e)) from None
-        return {"set": True}
-
-    @api.post("/mcp/{name}/enabled")
-    def mcp_enable(name: ServerName, body: EnabledIn) -> dict:
-        mcp_server(name)
-        mcpconfig.set_enabled(home, name, body.enabled)
-        return {"enabled": body.enabled}
-
-    @api.delete("/mcp/{name}")
-    def mcp_remove(name: ServerName) -> dict:
-        mcp_server(name)
-        mcpconfig.remove_server(home, name)
-        return {"removed": name}
-
-    @api.post("/mcp/{name}/test")
-    def mcp_test(name: ServerName) -> dict:
-        server = mcp_server(name)
-        env = mcpconfig.resolve_env(home, server, os.environ)
-        try:
-            if server.isolation == "host":  # yalnız CLI'dan açıkça eklenmiş uyumluluk modu
-                with McpClient(list(server.command), env, timeout=90) as client:
-                    tools = client.list_tools()
-            else:
-                handle = mcp_runtime.start(server, home=home, env=env, workspace=None, timeout=90)
-                try:
-                    tools = handle.client.list_tools()
-                finally:
-                    handle.close()
-        except McpError as e:
-            raise HTTPException(502, str(e)) from None
-        return {"tools": [{"name": t.name, "description": t.description[:200]} for t in tools]}
-
-    @api.post("/mcp/{name}/prepare")
-    def mcp_prepare(name: ServerName) -> dict:
-        server = mcp_server(name)
-        if server.isolation != "container":
-            raise HTTPException(400, "yalnız konteyner izolasyonlu sunucular hazırlanır")
-        try:
-            iid, digest = mcp_runtime.prepare(
-                server, home=home, env=mcpconfig.resolve_env(home, server, os.environ)
-            )
-            mcpconfig.set_pin(home, name, iid, digest)
-        except McpError as e:
-            raise HTTPException(502, str(e)) from None
-        return {"pinned": True}
+    api_mcp.register(api, home)
 
     @api.post("/workspaces/{workspace}/tasks", status_code=202)
     def create_task(workspace: WorkspaceId, body: TaskIn) -> dict:

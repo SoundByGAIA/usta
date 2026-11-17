@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Literal
+from typing import Annotated, Literal
 
+from fastapi import Path as PathParam
 from pydantic import BaseModel, Field
 
 from usta import attachments, filetree, skills
@@ -13,6 +14,9 @@ ID_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,39}$"
 
 
 MAX_FILE = 1_000_000
+
+WorkspaceId = Annotated[str, PathParam(pattern=ID_PATTERN)]
+ServerName = Annotated[str, PathParam(pattern=r"^[a-z0-9][a-z0-9_-]{0,29}$")]
 
 
 class WorkspaceIn(BaseModel):

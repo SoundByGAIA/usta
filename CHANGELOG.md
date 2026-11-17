@@ -19,7 +19,10 @@ tanıyor. Bölüm bölüm site kurma deneysel ve kapalı.
 - Deneysel klasör bilgisi (`USTA_WORKSPACE_HINT=1`): görev başında klasördeki dosya adları modele söylenir.
 - Beceri sondası (`skillprobe.py`): modelin ne büyüklükte bir parçayı sağlıklı yazabildiğini ölçer. Henüz kararlı
   değil (aynı model üç denemenin birinde farklı seviye aldı), karar vermek için kullanılmıyor.
-- README'ler yeniden yazıldı. CI her itmede tüm geçmişi gitleaks ile sır için tarıyor.
+- README'ler yeniden yazıldı; bütün ayarlar ve deneysel seçenekler tek listede: [docs/ayarlar.md](docs/ayarlar.md).
+  Ölçüm belgeleri `docs/olcumler/` altında.
+- Büyük dosyalar bölündü (komut satırı, HTTP API, panel, Ofis); davranış değişmedi.
+- CI her itmede tüm geçmişi gitleaks ile sır için tarıyor.
 
 ## 0.8.6: kırma testi: kalıcı hafızaya not ekleme açığı kapatıldı, kendiliğinden çalışan dosyalar onaylı
 

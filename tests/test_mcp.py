@@ -88,7 +88,7 @@ def test_environment_is_minimal_plus_explicit(monkeypatch):
     monkeypatch.setenv("BASKA_SIR", "x")
     with client(env={"BRAVE_KEY": "k"}) as c:
         names = c.call_tool("env", {}).split(",")
-    assert "BRAVE_KEY" in names and "PATH" in names
+    assert "BRAVE_KEY" in names and "PATH" in names and "PYTHONIOENCODING" in names
     assert "USTA_API_KEY" not in names and "BASKA_SIR" not in names
 
 

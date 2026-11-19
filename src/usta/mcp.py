@@ -90,7 +90,12 @@ class McpClient:
         self.close()
 
     def start(self) -> None:
-        env = {k: os.environ[k] for k in BASE_ENV if k in os.environ} | self.env
+        # MCP stdio UTF-8 ister; Python sunucuları İngilizce Windows'ta yoksa cp1252 yazar ve Türkçede çöker
+        env = (
+            {k: os.environ[k] for k in BASE_ENV if k in os.environ}
+            | {"PYTHONIOENCODING": "utf-8"}
+            | self.env
+        )
         try:
             self._proc = subprocess.Popen(
                 self.command,

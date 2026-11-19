@@ -15,6 +15,8 @@
 - MCP: Windows'ta sunucunun hata mesajı sistemin kod sayfasıyla yazılmışsa da Türkçe karakterleri doğru okunur.
 - MCP, Windows: sunucu kapanınca açtığı alt süreçler de kapanır (iş nesnesi; önce `npx → node` gibi torunlar arkada
   kalabiliyordu). Sürücü harfli çalışma klasörü kaba bağlanabilir (önce `C:` yüzünden reddediliyordu).
+  Python ile yazılmış sunuculara `PYTHONIOENCODING=utf-8` verilir; MCP stdio'da UTF-8 ister, İngilizce Windows'ta
+  Python sunucusu Türkçe yazınca çöküyordu.
 - Windows: sembol araçları yolları `/` ile verir, modelin `\` ya da `./` ile yazdığı yolu da tanır; önizleme `.js` ve
   `.css` türlerini sistemin kayıt defterinden okumaz (bazı makinelerde yanlış tür betiği engelliyordu); proje notları
   her sistemde aynı satır sonuyla yazılır.

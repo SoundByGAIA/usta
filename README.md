@@ -93,6 +93,7 @@ Terminalde en çok kullanılan komutlar:
 | `/token` | harcanan token ve bağlam doluluğu |
 
 Tek bir görev için: `usta run "not.txt dosyasını özetle" -w ./klasor`. API sunucusu için: `usta serve`.
+Denetim kaydı için: `usta audit show <kayıt>` son işlemleri gösterir, `usta audit verify` kaydın sonradan değiştirilmediğini denetler.
 
 ## Ölçüm araçları
 

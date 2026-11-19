@@ -109,6 +109,12 @@ Ayrıntı: [docs/design.md](docs/design.md) §5. Özet ve bilinçli sınırlar:
   görev sonunda `~/.usta/quarantine/<görev>/` altına taşınır ve uyarı verilir. Sınırlar: `node_modules`/`.venv` içinde yalnız 3 seviye taranır;
   Docker kapalıyken sandbox yoktur. Ek önlem olarak `git config --global safe.bareRepository explicit` önerilir.
 - Anlık görüntü (geri alma) bellekte tutulur: çalışma alanı başına son 5 görev, görev başına en çok 200 MB; çok sayıda çalışma alanında toplam bellek artar.
+- Denetim kaydı (`~/.usta/audit/`, çalışma alanının dışında, sandbox içinden yazılamaz): her satır önceki satırın sha256'sını taşır;
+  `usta audit verify` aradan silinen, eklenen ya da değiştirilen satırı bulur. Ajanın ve panelin dosya değişiklikleri önce/sonra hash'iyle,
+  görev modu ve tetikleyiciyle (`görev`, `okunan içerik`, `kullanıcı`; ajan için yalnız kaynak izi kapısı açıkken) yazılır.
+  Sınırlar: zincir imzasızdır ve kayıt Usta ile aynı kullanıcı yetkisiyle yazılır; dosyayı değiştirebilen biri zinciri baştan yeniden
+  üretebilir, sondan satır silmek ya da son satırı değiştirmek de zincirde görünmez. Bunu yakalamak için `usta audit verify` çıktısındaki
+  son hash'i başka bir yerde (ayrı makine, kâğıt) saklayın ve sonra `usta audit verify <kayıt> --anchor <hash>` ile denetleyin.
 - Sır maskeleme bilinen desenlerle çalışır (özel anahtar blokları, `sk-…`, JWT, `Bearer …` vb.); tanınmayan biçimler maskelenmez.
 
 ## Bağımlılıklar

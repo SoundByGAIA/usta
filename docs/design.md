@@ -47,6 +47,7 @@ Bileşenler:
 | Dış dünyaya yazma (POST, e-posta, push vb.) | her seferinde onay |
 - Değişiklikler diff/yama olarak sunulur; uygula/geri al (çalışma alanı git deposu).
 - Denetim kaydı: eklemeli JSONL + SQLite (kim, ne, hangi argüman, karar, sonuç özeti). Sır desenleri maskelenir.
+  Satırlar hash zinciriyle bağlıdır (`prev`); dosya değişiklikleri önce/sonra hash'i ve tetikleyiciyle yazılır (`usta audit`).
 - Onay akışı: API `approval_required` olayı yollar; istemci `POST /approvals/{id}`.
 
 ## 5. Tehdit modeli (özet)

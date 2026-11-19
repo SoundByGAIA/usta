@@ -1,5 +1,14 @@
 # Değişiklik günlüğü
 
+## Yayınlanmadı
+
+- Denetim kaydı hash zinciriyle bağlı: her satır önceki satırın sha256'sını taşır. `usta audit verify` aradan silinen ya da
+  değiştirilen satırı bulur; dışarıda saklanan son hash `--anchor` ile verilirse sondan silmeyi de görür. `usta audit show`
+  son kayıtları gösterir. Eski kayıtlar bozulmaz, zincirsiz satırlar ayrıca sayılır.
+- Dosya değişiklikleri kayda önce/sonra hash'iyle girer: ajanın `write_file`/`edit_file` çağrıları ve paneldeki dosya düzenlemeleri.
+  Tetikleyici yazılır (`görev`, `okunan içerik`, `kullanıcı`); görev başında mod (manual/auto/plan) kaydedilir.
+- NVIDIA anahtarları (`nvapi-…`) denetim ve oturum kayıtlarında maskelenir.
+
 ## 0.8.7: kodsuz kullanıcının site isteği
 
 Varsayılan model davranışında tek değişiklik: söz–eylem denetimi artık dosya adı vermeyen site isteklerini de

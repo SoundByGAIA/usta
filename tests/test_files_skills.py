@@ -210,6 +210,19 @@ def preview_base(c, ws):
     return c.get(f"/workspaces/{ws}/preview", headers=AUTH).json()["base"]
 
 
+def test_preview_script_and_style_types_do_not_depend_on_the_os(tmp_path, monkeypatch):
+    # Windows'ta türler kayıt defterinden gelir; .js bazı makinelerde text/plain çıkar ve nosniff betiği engeller
+    import mimetypes
+
+    c, _, ws, root = setup(tmp_path)
+    (root / "app.js").write_text("1")
+    (root / "s.css").write_text("body{}")
+    monkeypatch.setattr(mimetypes, "guess_type", lambda *a, **k: ("text/plain", None))
+    base = preview_base(c, ws)
+    assert c.get(base + "app.js").headers["content-type"].startswith("text/javascript")
+    assert c.get(base + "s.css").headers["content-type"].startswith("text/css")
+
+
 def test_preview_serves_static_files_sandboxed(tmp_path):
     c, _, ws, root = setup(tmp_path)
     (root / "index.html").write_text("<h1>Selam</h1>")

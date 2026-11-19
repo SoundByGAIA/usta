@@ -88,6 +88,14 @@ UI_HEADERS = {
 
 
 PREVIEW_MAX = 5_000_000
+# Windows bu türleri kayıt defterinden okur ve bazı makinelerde yanlış verir; nosniff yanlış türdeki betiği/stili engeller
+WEB_TYPES = {
+    ".html": "text/html",
+    ".htm": "text/html",
+    ".css": "text/css",
+    ".js": "text/javascript",
+    ".mjs": "text/javascript",
+}
 PREVIEW_HEADERS = {
     # Ajanın yazdığı içerik güvenilmezdir: opak kaynakta (sandbox, allow-same-origin YOK) çalışır,
     # portalın jetonuna/oturumuna erişemez ve ağa çıkamaz.
@@ -507,7 +515,11 @@ def create_app(
             raise HTTPException(404, "yok")
         if full.stat().st_size > PREVIEW_MAX:
             raise HTTPException(413, "dosya çok büyük")
-        ctype = mimetypes.guess_type(full.name)[0] or "application/octet-stream"
+        ctype = (
+            WEB_TYPES.get(full.suffix.lower())
+            or mimetypes.guess_type(full.name)[0]
+            or "application/octet-stream"
+        )
         if ctype.startswith("text/") or ctype in ("application/javascript", "application/json"):
             ctype += "; charset=utf-8"
         return Response(full.read_bytes(), media_type=ctype, headers=PREVIEW_HEADERS)

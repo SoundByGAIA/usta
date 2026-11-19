@@ -3,7 +3,8 @@ import threading
 import pytest
 
 from usta.models import ModelError, ModelResponse, ToolCall
-from usta.tasks import TaskManager, WorkspaceBusy
+from usta.task import WorkspaceBusy
+from usta.tasks import TaskManager
 
 
 class Scripted:
@@ -510,7 +511,8 @@ def test_auto_mode_does_not_auto_approve_fetch_to_unlisted_host(tmp_path):
 def test_only_the_latest_task_can_be_reverted_and_old_snapshots_are_dropped(tmp_path):
     import pytest
 
-    from usta.tasks import KEEP_SNAPSHOTS, RevertRefused
+    from usta.task import RevertRefused
+    from usta.tasks import KEEP_SNAPSHOTS
 
     ws = tmp_path / "ws"
     ws.mkdir()

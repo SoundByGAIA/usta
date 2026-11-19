@@ -16,7 +16,8 @@ from pathlib import Path
 from usta import compat, mcpconfig, memory, projectcfg, skills, theme
 from usta import settings as st
 from usta.modelctl import ModelSwitchError
-from usta.tasks import RevertRefused, Task, TaskManager, WorkspaceBusy
+from usta.task import RevertRefused, Task, WorkspaceBusy
+from usta.tasks import TaskManager
 
 MODE_LABELS = {"manual": "manuel", "auto": "oto onay", "plan": "plan"}
 MODE_ALIASES = {

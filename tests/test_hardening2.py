@@ -318,7 +318,7 @@ def test_revert_preserves_file_modes_and_survives_very_long_names(tmp_path):
 
 def test_failed_diff_counts_as_change_for_revert_rule(tmp_path, monkeypatch):
     import usta.tasks as tasks_mod
-    from usta.tasks import RevertRefused
+    from usta.task import RevertRefused
 
     ws = tmp_path / "ws"
     ws.mkdir()

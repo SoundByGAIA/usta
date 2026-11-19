@@ -4,7 +4,8 @@ import pytest
 
 from test_api import AUTH, make_client, new_ws
 from usta.models import ModelError, ModelResponse, ToolCall
-from usta.tasks import PHASE_PROMPT, plan_checklist
+from usta.task import plan_checklist
+from usta.tasks import PHASE_PROMPT
 
 PLAN_MD = "# Plan\n\n## Aşamalar\n- [ ] A1 — iskelet: test geçer\n- [ ] A2 — ürünler: test geçer\n- [ ] A3 — sepet: test geçer\n"
 

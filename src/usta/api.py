@@ -51,7 +51,8 @@ from usta.api_models import (
 )
 from usta.auth import LoginCodes
 from usta.policy import PathEscapeError, resolve_path
-from usta.tasks import PlanNotFound, RevertRefused, TaskFinished, TaskManager, WorkspaceBusy
+from usta.task import PlanNotFound, RevertRefused, TaskFinished, WorkspaceBusy
+from usta.tasks import TaskManager
 
 KEEPALIVE = 15.0
 

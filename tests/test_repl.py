@@ -434,7 +434,7 @@ def test_banner_shows_workspace_folder_and_warns_for_home(tmp_path, monkeypatch)
 
 def test_phased_plan_apply_runs_all_phases_in_terminal(tmp_path):
     from test_phased import Phased
-    from usta.tasks import plan_checklist
+    from usta.task import plan_checklist
 
     repl, out, ws, _ = make(tmp_path, Phased(), "/mod plan", "pet shop yap", "a")
     repl.run()

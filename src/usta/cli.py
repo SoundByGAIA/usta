@@ -19,6 +19,7 @@ from usta import (
     apis,
     bench,
     capability,
+    cli_audit,
     cli_mcp,
     cli_olcum,
     compat,
@@ -559,6 +560,7 @@ def _parser() -> argparse.ArgumentParser:
         ("disable", "sunucuyu kapat (silmeden)"),
     ):
         ms.add_parser(name, help=text).add_argument("name")
+    cli_audit.add_parser(sub)
     return p
 
 
@@ -1012,6 +1014,8 @@ def _main(argv: list[str] | None = None) -> int:
         return _chat_cmd(args)
     if args.cmd == "mcp":
         return cli_mcp.mcp_cmd(args, command)
+    if args.cmd == "audit":
+        return cli_audit.audit_cmd(args, _home())
     if args.cmd == "sandbox":
         return cli_mcp.sandbox_cmd(args)
     if args.cmd == "lab":

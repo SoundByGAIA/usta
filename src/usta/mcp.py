@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import locale
 import os
 import subprocess
 import tempfile
@@ -40,6 +41,15 @@ class McpTool:
     name: str
     description: str
     schema: dict
+
+
+def _decode_tail(raw: bytes) -> str:
+    """Sunucunun hata çıktısı: çoğu UTF-8 yazar; Windows'ta Python ve eski araçlar sistemin kod sayfasıyla yazar."""
+    raw = raw.lstrip(bytes(range(0x80, 0xC0)))  # 2 KB sınırında kesilen yarım UTF-8 karakter
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode(locale.getpreferredencoding(False), errors="replace")
 
 
 class McpClient:
@@ -182,7 +192,7 @@ class McpClient:
             except subprocess.TimeoutExpired:
                 code = None
         self._join_stderr()
-        tail = self._stderr.decode(errors="replace").strip().splitlines()
+        tail = _decode_tail(self._stderr).strip().splitlines()
         extra = f": {_clean(tail[-1])[:200]}" if tail else ""
         self._mark_dead(f"sunucu kapandı (kod {code}){extra}")
 

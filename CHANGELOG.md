@@ -11,6 +11,9 @@
   araştırma ve ajan modelleri (Gemini'de `lyria`, `nano-banana`, `deep-research`…) model seçiminde çıkmaz; model
   seçilmeden üst çubukta "Bu bilgisayarda" yazmaz. Sonuç sekmesinde teknik açıklama ve dosya yolu kutusu yalnız
   geliştirici modunda görünür, önizleme büyür.
+- `usta serve` da ortak hafıza ev sahibiyse dinleyiciyi açar (önce yalnız portal açıyordu).
+- MCP: Windows'ta sunucunun hata mesajı sistemin kod sayfasıyla yazılmışsa da Türkçe karakterleri doğru okunur.
+- `usta audit show` kayıt adı verilmezse en son değişen kaydı gösterir.
 
 ## 0.9.0: şifreli ortak hafıza, zincirli denetim kaydı
 

@@ -163,3 +163,13 @@ def test_oversized_line_is_fatal():
     with pytest.raises(McpError):
         c.start()
     assert not alive(c.pid)
+
+
+def test_stderr_tail_reads_windows_code_page_too(monkeypatch):
+    from usta import mcp
+
+    monkeypatch.setattr(mcp.locale, "getpreferredencoding", lambda do_setlocale=True: "cp1254")
+    assert mcp._decode_tail("eksik bağımlılık".encode("cp1254")) == "eksik bağımlılık"
+    assert mcp._decode_tail("eksik bağımlılık".encode()) == "eksik bağımlılık"
+    # 2 KB sınırında kesilen yarım UTF-8 karakter sonucu bozmaz
+    assert mcp._decode_tail("ğ".encode()[1:] + "tamam ç".encode()) == "tamam ç"

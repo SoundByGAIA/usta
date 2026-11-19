@@ -7,8 +7,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from usta import mcp_runtime, mcpcatalog, mcpconfig
-from usta.api_models import EnabledIn, SecretIn, ServerName
+from usta import mcp_runtime, mcpcatalog, mcpconfig, mcpimport
+from usta.api_models import EnabledIn, FoundAddIn, SecretIn, ServerName
 from usta.mcp import McpClient, McpError
 
 
@@ -81,6 +81,54 @@ def register(api: APIRouter, home: Path) -> None:
         except mcpconfig.McpConfigError as e:
             raise HTTPException(409 if "zaten" in str(e) else 400, str(e)) from None
         return {"name": entry.id}
+
+    @api.get("/mcp/bulunanlar")
+    def mcp_found() -> list[dict]:
+        """Claude Desktop, Cursor gibi uygulamalara kurulmuş MCP sunucuları (anahtar değerleri olmadan)."""
+        servers = mcp_servers()
+        added = {s.command[:3] for s in servers.values()}
+        out = []
+        for f in mcpimport.discover():
+            d = f.public()
+            d["added"] = f.usta_name in servers or (bool(f.command) and f.command[:3] in added)
+            out.append(d)
+        return out
+
+    @api.post("/mcp/bulunanlar", status_code=201)
+    def mcp_add_found(body: FoundAddIn) -> dict:
+        f = next(
+            (x for x in mcpimport.discover() if (x.app, x.name) == (body.app, body.name)), None
+        )
+        if f is None:
+            raise HTTPException(404, "bu sunucu artık bulunamadı")
+        if f.kind is None:
+            raise HTTPException(400, f"eklenemez: {f.reason}")
+        try:
+            command = mcpimport.pinned_command(f, mcpimport.latest_version)
+        except (OSError, ValueError):
+            raise HTTPException(
+                502, "paketin sürümü öğrenilemedi; internet bağlantını kontrol et"
+            ) from None
+        try:
+            mcpconfig.add_server(
+                home,
+                f.usta_name,
+                list(command),
+                list(f.env),
+                "ask",
+                isolation="container",
+                image=f.image,
+                allow_hosts=[
+                    mcpconfig.PUBLIC_INTERNET
+                ],  # çalışma alanını görmez; internete çıkabilir
+                workspace=body.workspace,
+            )
+        except mcpconfig.McpConfigError as e:
+            raise HTTPException(409 if "zaten" in str(e) else 400, str(e)) from None
+        if body.copy_secrets:
+            for key, value in mcpimport.secret_values(f).items():
+                mcpconfig.set_secret(home, f.usta_name, key, value)
+        return {"name": f.usta_name}
 
     @api.put("/mcp/{name}/secrets/{key}")
     def mcp_set_secret(name: ServerName, key: str, body: SecretIn) -> dict:

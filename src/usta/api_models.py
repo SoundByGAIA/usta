@@ -207,6 +207,15 @@ class SecretIn(BaseModel):
     value: str = Field(min_length=1, max_length=8192)
 
 
+class FoundAddIn(BaseModel):
+    """Başka bir uygulamada bulunan MCP sunucusunu ekleme isteği (komutu Usta kendisi kurar)."""
+
+    app: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=200)
+    copy_secrets: bool = False
+    workspace: Literal["none", "ro", "rw"] = "none"
+
+
 class EnabledIn(BaseModel):
     enabled: bool
 

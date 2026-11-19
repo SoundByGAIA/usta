@@ -22,6 +22,8 @@ def test_requires_auth_everywhere(tmp_path):
         ("delete", "/mcp/x"),
         ("post", "/mcp/x/test"),
         ("post", "/mcp/x/prepare"),
+        ("get", "/mcp/bulunanlar"),
+        ("post", "/mcp/bulunanlar"),
     ]:
         assert getattr(c, method)(url).status_code == 401, url
 
@@ -191,3 +193,77 @@ def test_prepare_endpoint_refuses_host_mode_servers_and_reports_isolation_proble
     t = c.post("/mcp/kap/test", headers=AUTH)  # test de aynı kuralla: ana makineye düşmez
     assert t.status_code == 502 and "geri düşülmez" in t.json()["detail"]
     assert c.post("/mcp/yok/prepare", headers=AUTH).status_code == 404
+
+
+def _found_setup(tmp_path, monkeypatch):
+    import json
+
+    from usta import mcpimport
+
+    user = tmp_path / "kullanici"
+    cfg = user / ".cursor" / "mcp.json"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text(
+        json.dumps(
+            {
+                "mcpServers": {
+                    "Brave": {
+                        "command": "npx",
+                        "args": ["-y", "@brave/brave-search-mcp-server"],
+                        "env": {"BRAVE_API_KEY": "gizli-deger"},
+                    },
+                    "betik": {"command": "node", "args": ["/x/index.js"]},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(user))
+    monkeypatch.setenv("USERPROFILE", str(user))
+    monkeypatch.setattr(mcpimport.sys, "platform", "linux")
+    monkeypatch.setattr(mcpimport, "latest_version", lambda kind, package: "2.1.5")
+    return setup(tmp_path)
+
+
+def test_found_servers_are_listed_without_secret_values(tmp_path, monkeypatch):
+    c, _, _ = _found_setup(tmp_path, monkeypatch)
+    r = c.get("/mcp/bulunanlar", headers=AUTH)
+    assert r.status_code == 200 and "gizli-deger" not in r.text
+    found = {f["name"]: f for f in r.json()}
+    assert found["Brave"]["kind"] == "npm" and found["Brave"]["added"] is False
+    assert found["Brave"]["env"] == [{"name": "BRAVE_API_KEY", "has_value": True}]
+    assert found["betik"]["kind"] is None and found["betik"]["reason"]
+
+
+def test_adding_a_found_server_pins_isolates_and_copies_keys_only_when_asked(tmp_path, monkeypatch):
+    c, home, _ = _found_setup(tmp_path, monkeypatch)
+    body = {"app": "Cursor", "name": "Brave", "copy_secrets": True}
+    r = c.post("/mcp/bulunanlar", json=body, headers=AUTH)
+    assert r.status_code == 201 and r.json() == {"name": "brave"}
+    s = mcpconfig.load(home)["brave"]
+    assert s.command == ("npx", "-y", "@brave/brave-search-mcp-server@2.1.5")
+    assert (s.isolation, s.image, s.allow_hosts, s.workspace, s.approve) == (
+        "container",
+        "node:22-slim",
+        ("*",),
+        "none",
+        "ask",
+    )
+    assert mcpconfig.resolve_env(home, s, {}) == {"BRAVE_API_KEY": "gizli-deger"}
+    assert c.get("/mcp/bulunanlar", headers=AUTH).json()[0]["added"] is True
+    assert c.post("/mcp/bulunanlar", json=body, headers=AUTH).status_code == 409
+
+
+def test_found_server_keys_stay_behind_unless_copied(tmp_path, monkeypatch):
+    c, home, _ = _found_setup(tmp_path, monkeypatch)
+    body = {"app": "Cursor", "name": "Brave", "copy_secrets": False}
+    assert c.post("/mcp/bulunanlar", json=body, headers=AUTH).status_code == 201
+    assert mcpconfig.resolve_env(home, mcpconfig.load(home)["brave"], {}) == {}
+
+
+def test_found_server_that_cannot_be_boxed_is_refused(tmp_path, monkeypatch):
+    c, _, _ = _found_setup(tmp_path, monkeypatch)
+    for body in ({"app": "Cursor", "name": "betik"}, {"app": "Cursor", "name": "yok"}):
+        r = c.post("/mcp/bulunanlar", json=body, headers=AUTH)
+        assert r.status_code in (400, 404) and r.json()["detail"]
+    assert c.get("/mcp/bulunanlar").status_code == 401

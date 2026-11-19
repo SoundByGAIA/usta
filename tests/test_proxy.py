@@ -20,6 +20,9 @@ from usta.proxy import AllowlistProxy, host_allowed, is_public_ip
         ("1.2.3.4", ["1.2.3.4"], False),  # IP literal hiçbir zaman izinli değil
         ("::1", ["::1"], False),
         ("", ["x.test"], False),
+        ("herhangi.ornek.com", ["*"], True),  # MCP "genel internet" kipi
+        ("1.2.3.4", ["*"], False),  # IP literal yine izinli değil
+        ("", ["*"], False),
     ],
 )
 def test_host_allowed(host, allowed, ok):
@@ -156,6 +159,22 @@ def test_private_resolution_is_blocked_by_default():
             assert "özel" in e.decisions[0]["reason"]
 
     run(go())
+
+
+def test_public_internet_mode_still_blocks_private_addresses():
+    async def go():
+        async with Env(allow_private=False, allowed=["*"]) as e:
+            resp = await e.raw(f"CONNECT allowed.test:{e.up_port} HTTP/1.1\r\n\r\n".encode())
+            assert status(resp) == 403 and "özel" in e.decisions[0]["reason"]
+
+    run(go())
+
+
+def test_cli_allowlist_never_accepts_everything():
+    from usta.proxy import validate_allowed_host
+
+    with pytest.raises(ValueError):
+        validate_allowed_host("*")
 
 
 def test_unresolvable_host_is_502():

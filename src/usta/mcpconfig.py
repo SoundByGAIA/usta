@@ -29,6 +29,8 @@ IMAGE = re.compile(
 )
 MEMORY = re.compile(r"[1-9][0-9]{1,4}[mg]")
 CPUS = re.compile(r"(?:0\.[1-9][0-9]?|[1-4](?:\.[0-9])?)")
+# tek başına "*": sunucu herhangi bir genel adrese çıkabilir (özel ağ ve bu bilgisayar yine kapalı)
+PUBLIC_INTERNET = "*"
 HOST = re.compile(r"(?:\*\.)?[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?")
 
 
@@ -74,9 +76,11 @@ def validate_runtime(
     if isolation == "container" and image is None:
         raise McpConfigError("konteyner izolasyonu için imaj gerekir (--image, ör. node:22-slim)")
     if not isinstance(allow_hosts, (list, tuple)) or not all(
-        isinstance(h, str) and HOST.fullmatch(h) for h in allow_hosts
+        isinstance(h, str) and (HOST.fullmatch(h) or h == PUBLIC_INTERNET) for h in allow_hosts
     ):
         raise McpConfigError("allow_hosts, alan adlarının listesi olmalı")
+    if PUBLIC_INTERNET in allow_hosts and len(allow_hosts) > 1:
+        raise McpConfigError("'*' (genel internet) tek başına verilir")
     if isolation == "host" and allow_hosts:
         raise McpConfigError("allow_hosts yalnız konteyner izolasyonunda anlamlıdır")
     if workspace not in WORKSPACE_MODES:

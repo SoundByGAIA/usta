@@ -119,3 +119,14 @@ def test_symlinked_config_is_refused(tmp_path):
     (home / "mcp.json").symlink_to(target)
     with pytest.raises(cfg.McpConfigError):
         cfg.load(home)
+
+
+def test_public_internet_is_a_single_star_entry(tmp_path):
+    srv = cfg.add_server(
+        tmp_path, "arama", ["npx", "-y", "p@1"], image="node:22-slim", allow_hosts=["*"]
+    )
+    assert srv.allow_hosts == ("*",)
+    with pytest.raises(cfg.McpConfigError):
+        cfg.add_server(
+            tmp_path, "karisik", ["npx"], image="node:22-slim", allow_hosts=["*", "a.com"]
+        )

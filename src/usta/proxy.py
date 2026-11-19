@@ -64,6 +64,10 @@ def host_allowed(host: str, allowed: Iterable[str]) -> bool:
     host = _norm(host)
     if not host or _is_ip(host):
         return False
+    if (
+        "*" in allowed
+    ):  # MCP "genel internet" kipi; özel adresler çözümlemeden sonra yine reddedilir
+        return True
     for entry in allowed:
         entry = _norm(entry)
         if entry.startswith("*."):

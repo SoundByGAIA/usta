@@ -72,7 +72,8 @@ Ayrıntı: [docs/design.md](docs/design.md) §5. Özet ve bilinçli sınırlar:
 - Oto onay modu onay isteyen eylemleri sormadan çalıştırır. Yasaklar (DENY) ve sandbox sınırları geçerlidir; izinli olmayan alan adlarına
   `fetch_url` oto modda da reddedilir. Eklediğiniz MCP araçları oto modda sorulmadan çağrılır: güvenmediğiniz sunucu eklemeyin.
 - MCP sunucuları varsayılan olarak yalıtılmış konteynerde çalışır (0.2.0'dan beri): kök dosya sistemi salt okunur, root olmayan kullanıcı,
-  `cap_drop=ALL`, `no-new-privileges`, CPU/RAM/PID sınırı, ağ kapalı (yalnız `--allow-host` ile allowlist proxy), ev dizini ve Docker soketi
+  `cap_drop=ALL`, `no-new-privileges`, CPU/RAM/PID sınırı, ağ kapalı (yalnız `--allow-host` ile allowlist proxy; panelden bilgisayarda bulunan bir MCP eklenirse
+  "genel internet": herhangi bir genel adres, özel ağ ve bu bilgisayar yine kapalı), ev dizini ve Docker soketi
   bağlanmaz, çalışma alanı yalnız istenirse bağlanır (`.git`/`.usta` yine salt okunur), sunucuya yalnız kendi tanımlı sırları verilir.
   Docker/imaj/sabitleme yoksa sunucu başlamaz; ana makineye sessizce düşülmez. `usta mcp prepare` paketleri bir kez, yalnız paket kayıtlarına açık
   bir ağda (kurulum betikleri kapalı) önbelleğe indirir ve imaj kimliğiyle önbellek özetini sabitler; sonra ağ kapalı çalışır, her başlatmada

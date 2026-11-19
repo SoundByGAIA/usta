@@ -6,6 +6,7 @@ tüm yetkileriyle (ev dizini, jetonlar, ssh anahtarları) çalışır. Burada su
 - kök dosya sistemi salt okunur, yazma yalnız sınırlı `tmpfs`; root olmayan kullanıcı, `cap_drop=ALL`,
   `no-new-privileges`, CPU/RAM/PID sınırı, `--init` (artık süreçler toplanır);
 - ağ kapalı; `allow_hosts` verilirse yalnız o alan adlarına allowlist proxy (sandbox ile aynı) üzerinden çıkar;
+  tek başına `*` herhangi bir genel adres demektir (özel ağ, bu bilgisayar ve çıplak IP yine reddedilir);
 - Docker soketi, ev dizini ve ana makine ortamı BAĞLANMAZ; çalışma alanı yalnız açıkça istenirse (`ro`/`rw`);
 - sunucuya yalnız kendi tanımlı sır adları verilir (değerler komut satırına değil, docker istemcisinin
   ortamına yazılır; `ps` çıktısında görünmez);

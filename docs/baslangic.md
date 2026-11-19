@@ -7,8 +7,8 @@ Usta, ne istediğini yazdığında bunu senin için yapan bir yapay zekâ yardı
 
 ### En kolay yol (tek tık)
 
-1. `kurulum/Usta-Kur.bat` dosyasını indir: bu sayfadaki bağlantıya sağ tıkla → "Bağlantıyı farklı kaydet" (adres: `https://raw.githubusercontent.com/SoundByGAIA/usta/main/kurulum/Usta-Kur.bat`).
-2. İndirdiğin dosyaya **çift tıkla**. Windows "bilinmeyen yayıncı" derse "Yine de çalıştır"a bas.
+1. Tarayıcıda **soundbygaia.com/usta** adresine git ve **"Usta'yı indir (Windows)"** düğmesine bas. `Usta-Kur.bat` dosyası İndirilenler klasörüne iner.
+2. İndirdiğin dosyaya **çift tıkla**. Windows "bilinmeyen yayıncı" derse **"Ek bilgi"**ye, sonra **"Yine de çalıştır"**a bas.
 3. Dosya Python'u kontrol eder (yoksa nasıl kuracağını söyler), Usta'yı kurar ve masaüstüne **"Usta"** simgesi koyar. Sonunda Usta kendiliğinden açılır. Siyah pencerede bir süre yazı çıkmayabilir; kapatma, çalışıyor.
 4. Bundan sonra Usta'yı açmak için **masaüstündeki "Usta" simgesine çift tıkla**. Siyah pencere açılmaz; tarayıcın açılır. İşin bitince Usta'daki **Ayarlar → "Usta'yı kapat"** düğmesine bas.
 

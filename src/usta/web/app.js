@@ -368,6 +368,8 @@
   $("wizard-btn").addEventListener("click", () => U.togglePanel("wizard"));
   $("tablet-btn").addEventListener("click", () => U.togglePanel("tablet"));
   $("glossary-btn").addEventListener("click", () => U.togglePanel("glossary"));
+  document.querySelector(".brand").addEventListener("click", () => U.closePanels());
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && U.openPanel() && $("gloss-tip").hidden) U.closePanels(); });
   $("gloss-q").addEventListener("input", U.renderGlossary);
   $("settings-btn").addEventListener("click", () => U.togglePanel("settings"));
   $("tablet-renew").addEventListener("click", U.loadTablet);

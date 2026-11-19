@@ -457,6 +457,13 @@
     for (const p of U.PANELS) {
       const on = p === name;
       const btn = $(`${p}-btn`);
+      // üst çubuktaki "Sayfaya dön" kalabalıkta görülmüyor: bölümün kendi başında da geri düğmesi olur
+      if (on && !$(p).querySelector(".panel-back")) {
+        const back = U.h("button", "panel-back", "← Geri dön");
+        back.type = "button";
+        back.addEventListener("click", () => togglePanel(p));
+        $(p).prepend(back);
+      }
       $(p).hidden = !on;
       btn.setAttribute("aria-pressed", String(on));
       if (!btn.dataset.label) btn.dataset.label = btn.textContent;

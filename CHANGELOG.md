@@ -13,6 +13,8 @@
   Plan kipinde yazma aracı olmadığı için denetim çalışmaz.
 - Yoğun bulut servisi (429/503) için yeniden deneme 2, 4, 8, 16 sn aralıkla; kapalı yerel sunucu yine hemen söylenir.
 - Sözlük kutusu "sana en kolay yoldan açıklayayım" der.
+- Açılan bölümlerin (Sözlük, Ayarlar, Gizlilik…) başında "← Geri dön" düğmesi var; "Usta" yazısına basmak ya da Esc ana
+  sayfaya döndürür. Üst çubuktaki "Sayfaya dön" kalabalıkta görülmüyordu.
 - Kurulum sihirbazı: Gemini'de uzun model listesi yerine üç model, öneri `gemini-3.1-flash-lite`; ücretsiz iki servisin
   kartında bir cümlelik fark; Gemini anahtarı için adım adım anlatım; model tanıma bekleme yazısı gerçek süreyi söyler.
 

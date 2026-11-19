@@ -62,7 +62,8 @@ class SymbolIndex:
                         elif e.is_file(follow_symlinks=False):
                             st = e.stat(follow_symlinks=False)
                             if st.st_size <= MAX_FILE_BYTES:
-                                seen[os.path.relpath(e.path, self.root)] = (
+                                # Usta her yerde "/" kullanır; Windows'un "\\" yolu modelin verdiği yolla eşleşmez
+                                seen[Path(os.path.relpath(e.path, self.root)).as_posix()] = (
                                     st.st_mtime_ns,
                                     st.st_size,
                                 )

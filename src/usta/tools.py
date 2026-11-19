@@ -181,6 +181,7 @@ def build_registry(ctx: ToolContext, extra: list[Tool] | tuple[Tool, ...] = ()) 
         expand = a.get("expand") is True
         defs = index.definitions(name.strip())
         if isinstance(only, str) and only:
+            only = only.replace("\\", "/").removeprefix("./")
             defs = [(r, s) for r, s in defs if r == only]
         if not defs:
             return f"sembol bulunamadı: {name}. find_symbol / related_files ile ara ya da read_file kullan."

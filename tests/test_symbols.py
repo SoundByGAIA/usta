@@ -211,6 +211,11 @@ def test_symbol_context_lists_candidates_when_ambiguous_and_path_disambiguates(r
     assert "return amount * 0.2" in reg.call(
         "symbol_context", {"name": "vat", "path": "shop/tax.py"}
     )
+    for written in (
+        "shop\\tax.py",
+        "./shop/tax.py",
+    ):  # model Windows biçiminde ya da ./ ile yazabilir
+        assert "return amount * 0.2" in reg.call("symbol_context", {"name": "vat", "path": written})
 
 
 def test_symbol_context_budget_truncates_and_expand_widens(tmp_path):

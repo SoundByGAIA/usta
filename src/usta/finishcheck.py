@@ -12,7 +12,8 @@ Küçük modeller sık sık şunları yapar:
 çıkarılır; yalnız okunan kaynak dosyalar ("X dosyasındaki") ve modelin yanıtında geçen başka dosyalar hedef sayılmaz.
 
 Dosya adı vermeyen site/sayfa isteklerinde ("web sitesi yap") hiç dosya yazılmadan kod yanıta dökülür, "oluşturdum"
-denir ya da izin sorulursa; sayfa yazılmışsa da kullanıcının verdiği bilgiler sayfada yoksa bir kez hatırlatılır.
+denir ya da izin sorulursa; sayfa yazılmışsa da kullanıcının verdiği bilgiler sayfada yoksa ya da bir yazı zeminiyle
+aynı renkte olduğu için görünmüyorsa (`sitecontrast.py`) bir kez hatırlatılır.
 
 Okunan bir içeriğin uydurduğu dosyayı yazmaya itilmez; hatırlatmalar izin ve onay kurallarını değiştirmez. Görev başına
 en çok iki hatırlatma. Ölçüm: docs/olcumler/soz-eylem.md. Kapatmak: `--no-finish-check` ya da `USTA_FINISH_CHECK=0`.
@@ -23,7 +24,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from usta import sitecheck
+from usta import sitecheck, sitecontrast
 
 WRITE_TOOLS = ("write_file", "edit_file")
 _P = r"[\w.-]+(?:/[\w.-]+)*\.[A-Za-z0-9]{1,6}"
@@ -114,20 +115,41 @@ class FinishCheck:
         self.nudges += 1
         return message
 
-    def _missing_facts(self) -> list[str]:
-        """Site isteğindeki bilgilerden yazılan sayfalarda geçmeyenler (kök verilmediyse ya da sayfa yoksa boş)."""
+    def _read(self, rel: str) -> str | None:
+        """Çalışma klasöründeki bir dosya (dışarısı ya da okunamayan dosya için None)."""
+        root = Path(self.root).resolve()
+        try:
+            f = (root / rel).resolve()
+            if f.is_relative_to(root) and f.is_file():
+                return f.read_text(encoding="utf-8", errors="replace")[:200_000]
+        except OSError:
+            pass
+        return None
+
+    def _page_texts(self) -> list[str]:
         if self.root is None:
             return []
-        root = Path(self.root).resolve()
-        texts: list[str] = []
-        for rel in self.pages[:5]:
-            try:
-                f = (root / rel).resolve()
-                if f.is_relative_to(root) and f.is_file():
-                    texts.append(f.read_text(encoding="utf-8", errors="replace")[:200_000])
-            except OSError:
-                continue
+        return [t for t in (self._read(rel) for rel in self.pages[:5]) if t is not None]
+
+    def _missing_facts(self) -> list[str]:
+        """Site isteğindeki bilgilerden yazılan sayfalarda geçmeyenler (kök verilmediyse ya da sayfa yoksa boş)."""
+        texts = self._page_texts()
         return sitecheck.missing(self.task, texts) if texts else []
+
+    def _hidden_texts(self) -> list[str]:
+        """Yazılan sayfalarda zemin rengiyle aynı renkte olduğu için görünmeyen metinler."""
+        found: list[str] = []
+        for rel in self.pages[:5] if self.root is not None else []:
+            html = self._read(rel)
+            if html is None:
+                continue
+            css = []
+            for href in re.findall(
+                r"<link[^>]+href=[\"']([^\"':?#]+\.css)[\"']", html, re.IGNORECASE
+            )[:5]:
+                css.append(self._read(str(Path(rel).parent / href)) or "")
+            found += [t for t in sitecontrast.hidden_texts(html, "\n".join(css)) if t not in found]
+        return found
 
     def on_finish(self, answer: str) -> str | None:
         """Model araç çağırmadan bitirmek istiyor: hatırlatma mesajı ya da None (bitir)."""
@@ -157,6 +179,14 @@ class FinishCheck:
                 f"Kullanıcının verdiği şu bilgiler yazdığın sayfada yok ya da değişmiş: {', '.join(lack[:8])}. "
                 "Sayfayı oku, bunları kullanıcının yazdığı gibi ekle; kullanıcının vermediği bilgi (ürün, fiyat, isim) "
                 "uydurma.",
+            )
+        hidden = self._hidden_texts() if self.artifact and self.wrote_any else []
+        if hidden:
+            quoted = ", ".join(f'"{t}"' for t in hidden[:3])
+            return self._nudge(
+                "contrast",
+                f"Sayfada şu yazılar zeminle aynı renkte, kullanıcı onları görünmüyor: {quoted}. "
+                "Yazı rengini ya da zemin rengini değiştir ki okunsun.",
             )
         intent_only = len(text) <= MAX_INTENT_CHARS and "?" not in text and not _CLAIM.search(text)
         if text and intent_only and _INTENT.search(text):

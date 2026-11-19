@@ -1,5 +1,11 @@
 # Değişiklik günlüğü
 
+## Yayınlanmadı
+
+- Görünmeyen yazı denetimi: site isteğinde model bir yazıyı zeminiyle aynı renge boyarsa (pembe şerit üstüne pembe
+  dükkân adı) bir kez hatırlatılır (`sitecontrast.py`). Önceki site ölçümünde küçük modellerin yazdığı 95 sayfanın
+  12'sinde başlık bu yüzden görünmüyordu. Görsel ya da gradyan zemin, `@media` ve `:hover` için karar verilmez.
+
 ## 0.9.0: şifreli ortak hafıza, zincirli denetim kaydı
 
 Model davranışı değişmedi. Ortak hafıza kullanan evlerde bağlı bilgisayarlar bir kez yeniden bağlanmalı.

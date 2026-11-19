@@ -1,4 +1,4 @@
-"""Evdeki ortak hafıza: imzalı istek, tekrar oynatma, onay kapısı, sınırlar, model için yazma yolu yok."""
+"""Evdeki ortak hafıza: SPAKE2 eşleşme, şifreli istek, tekrar oynatma, onay kapısı, sınırlar, model için yazma yolu yok."""
 
 import time
 from pathlib import Path
@@ -6,8 +6,10 @@ from pathlib import Path
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from spake2 import SPAKE2_A
 
 from usta import kisi, ortak
+from usta import ortak_dinleyici as dinleyici
 from usta.auth import LoginCodes
 
 # Gizli bilgi tarayıcısı (test_no_secrets) dosyada gerçek anahtar kalıbı görmesin diye çalışma anında birleştirilir.
@@ -24,7 +26,7 @@ class Env:
         self.codes = LoginCodes(ttl=300.0, digits=6)
         self.store = ortak.Store(self.a)
         self.store.configure(True, "Ana-PC")
-        self.app = ortak.make_app(
+        self.app = dinleyici.make_app(
             self.a, self.codes, allowed_hosts=[HOST_IP], source_ok=source_ok, clock=clock
         )
         self.http = TestClient(self.app, base_url=f"http://{ADDR}")
@@ -33,29 +35,47 @@ class Env:
         return ortak.connect(self.b, ADDR, self.codes.issue(), name, client=self.http)
 
 
+def _spake_msg(code: str) -> str:
+    return SPAKE2_A(code.encode(), idA=ortak._ID_A, idB=ortak._ID_B).start().hex()
+
+
 @pytest.fixture
 def env(tmp_path):
     return Env(tmp_path)
 
 
-# --- imza ---------------------------------------------------------------------------------------
-def test_signature_depends_on_every_field():
+# --- şifreleme -------------------------------------------------------------------------------------
+def test_sealed_message_is_bound_to_key_and_context():
     k = b"k" * 32
-    base = ortak.sign(k, "GET", "/ortak/hafiza", "100", "n1", b"")
-    assert base == ortak.sign(k, "GET", "/ortak/hafiza", "100", "n1", b"")
-    for changed in (
-        ortak.sign(b"x" * 32, "GET", "/ortak/hafiza", "100", "n1", b""),
-        ortak.sign(k, "POST", "/ortak/hafiza", "100", "n1", b""),
-        ortak.sign(k, "GET", "/ortak/not", "100", "n1", b""),
-        ortak.sign(k, "GET", "/ortak/hafiza", "101", "n1", b""),
-        ortak.sign(k, "GET", "/ortak/hafiza", "100", "n2", b""),
-        ortak.sign(k, "GET", "/ortak/hafiza", "100", "n1", b"x"),
+    aad = ortak.request_aad("GET", "/ortak/hafiza", "100", "id1")
+    n, box = ortak.seal(k, aad, b"gizli")
+    assert b"gizli" not in box and ortak.unseal(k, n, aad, box) == b"gizli"
+    for key, ctx in (
+        (b"x" * 32, aad),
+        (k, ortak.request_aad("POST", "/ortak/hafiza", "100", "id1")),
+        (k, ortak.request_aad("GET", "/ortak/not", "100", "id1")),
+        (k, ortak.request_aad("GET", "/ortak/hafiza", "101", "id1")),
+        (k, ortak.request_aad("GET", "/ortak/hafiza", "100", "id2")),
+        (k, ortak.reply_aad(n)),  # istek ve cevap karışmaz
     ):
-        assert changed != base
-    assert ortak.sign_reply(k, "n1", b"a") != ortak.sign_reply(k, "n1", b"b")
-    assert ortak.sign_reply(k, "n1", b"a") != ortak.sign(
-        k, "GET", "/", "1", "n1", b"a"
-    )  # istek/cevap karışmaz
+        with pytest.raises(ValueError):
+            ortak.unseal(key, n, ctx, box)
+    with pytest.raises(ValueError):
+        ortak.unseal(k, n, aad, box[:-1] + bytes([box[-1] ^ 1]))
+    with pytest.raises(ValueError):
+        ortak.unseal(k, "zz", aad, box)
+
+
+def test_login_codes_peek_fail_consume():
+    codes = LoginCodes(ttl=300.0, digits=6, max_failures=2)
+    assert codes.peek() is None
+    code = codes.issue()
+    assert codes.peek() == code and not codes.consume("000000" if code != "000000" else "111111")
+    assert codes.consume(code) and codes.peek() is None and not codes.consume(code)
+    code = codes.issue()
+    codes.fail()
+    codes.fail()
+    assert codes.peek() is None and not codes.consume(code)  # kilitli: doğru kod bile geçmez
 
 
 # --- eşleşme ve okuma -----------------------------------------------------------------------------
@@ -73,17 +93,87 @@ def test_pair_then_fetch_profile_and_approved_notes(env):
     assert (env.b / "ortak-baglanti.json").stat().st_mode & 0o777 == 0o600
 
 
-def test_pairing_code_is_single_use_and_locks_after_wrong_tries(env):
+def test_both_sides_derive_the_same_key_and_the_code_is_not_stored(env):
+    code = env.codes.issue()
+    ortak.connect(env.b, ADDR, code, "Salon-PC", client=env.http)
+    link = ortak.load_link(env.b)
+    peer = env.store.peer(link["key_id"])
+    assert peer["secret"] == link["secret"] and peer["ad"] == "Salon-PC"
+    for f in (env.b / "ortak-baglanti.json", env.a / "ortak" / "eslesmeler.json"):
+        assert code not in f.read_text()
+
+
+def test_wrong_code_fails_and_adds_no_peer(env):
+    code = env.codes.issue()
+    wrong = "000000" if code != "000000" else "111111"
+    with pytest.raises(ortak.OrtakError, match="Kod yanlış"):
+        ortak.connect(env.b, ADDR, wrong, "X", client=env.http)
+    assert env.store.peers() == [] and ortak.load_link(env.b) is None
+
+
+def test_pairing_code_is_single_use(env):
     code = env.codes.issue()
     assert ortak.connect(env.b, ADDR, code, "A", client=env.http)
     with pytest.raises(ortak.OrtakError, match="Kod yanlış"):
-        ortak.connect(env.b, ADDR, code, "B", client=env.http)  # ikinci kullanım
-    env.codes.issue()
-    for _ in range(5):
+        ortak.connect(env.b, ADDR, code, "B", client=env.http)
+
+
+def test_three_tries_per_address_then_locked(tmp_path):
+    now = [1000.0]
+    env = Env(tmp_path, clock=lambda: now[0])
+    code = env.codes.issue()
+    wrong = "000000" if code != "000000" else "111111"
+    for _ in range(dinleyici.PAIR_TRIES):
         with pytest.raises(ortak.OrtakError, match="Kod yanlış"):
-            ortak.connect(env.b, ADDR, "000000", "C", client=env.http)
-    with pytest.raises(ortak.OrtakError, match="Kod yanlış"):
-        ortak.connect(env.b, ADDR, env.codes._code, "D", client=env.http)  # doğru kod bile kilitli
+            ortak.connect(env.b, ADDR, wrong, "X", client=env.http)
+    code = env.codes.issue()
+    with pytest.raises(ortak.OrtakError, match="Çok fazla"):
+        ortak.connect(env.b, ADDR, code, "X", client=env.http)  # doğru kod bile kilitli
+    now[0] += dinleyici.PAIR_LOCK + 1
+    assert ortak.connect(env.b, ADDR, code, "X", client=env.http)
+
+
+def test_every_started_pairing_counts_as_a_try(env):
+    env.codes.issue()
+    for _ in range(dinleyici.PAIR_TRIES):
+        r = env.http.post("/ortak/eslesme/baslat", json={"msg": _spake_msg("123456"), "ad": "X"})
+        assert r.status_code == 200 and "onay" not in r.json()  # ev sahibi önce kendini kanıtlamaz
+    r = env.http.post("/ortak/eslesme/baslat", json={"msg": _spake_msg("123456"), "ad": "X"})
+    assert r.status_code == 429
+
+
+def test_successful_pairing_resets_the_address_tries(env):
+    code = env.codes.issue()
+    wrong = "000000" if code != "000000" else "111111"
+    for _ in range(dinleyici.PAIR_TRIES - 1):
+        with pytest.raises(ortak.OrtakError):
+            ortak.connect(env.b, ADDR, wrong, "X", client=env.http)
+    assert ortak.connect(env.b, ADDR, code, "X", client=env.http)
+    for _ in range(dinleyici.PAIR_TRIES - 1):
+        with pytest.raises(ortak.OrtakError, match="Kod yanlış"):
+            ortak.connect(env.b, ADDR, wrong, "Y", client=env.http)
+    assert ortak.connect(env.b, ADDR, env.codes.issue(), "Y", client=env.http)
+
+
+def test_unknown_or_expired_pairing_session_is_refused(tmp_path):
+    now = [1000.0]
+    env = Env(tmp_path, clock=lambda: now[0])
+    env.codes.issue()
+    assert (
+        env.http.post("/ortak/eslesme/onay", json={"sid": "yok", "onay": "0" * 64}).status_code
+        == 401
+    )
+    sid = env.http.post(
+        "/ortak/eslesme/baslat", json={"msg": _spake_msg("123456"), "ad": "X"}
+    ).json()["sid"]
+    now[0] += dinleyici.PAIR_TTL + 1
+    r = env.http.post("/ortak/eslesme/onay", json={"sid": sid, "onay": "0" * 64})
+    assert r.status_code == 401 and env.store.peers() == []
+
+
+def test_pairing_without_a_code_is_refused(env):
+    r = env.http.post("/ortak/eslesme/baslat", json={"msg": _spake_msg("123456"), "ad": "X"})
+    assert r.status_code == 401
 
 
 def test_connect_refuses_addresses_outside_the_home_network(env):
@@ -92,58 +182,75 @@ def test_connect_refuses_addresses_outside_the_home_network(env):
             ortak.connect(env.b, bad, "123456", "x", client=env.http)
 
 
-# --- imzasız / sahte / eski / tekrar -------------------------------------------------------------------
-def _raw(env, path="/ortak/hafiza", method="GET", body=b"", **hdr):
+# --- dinleyen biri, sahte / eski / tekrar istek --------------------------------------------------------
+def test_eavesdropper_sees_no_profile_or_note_text(env):
+    kisi.save(env.a, kisi.check({"ad": "Ayşe"}))
+    env.store.add("Kedimin adı Pamuk", "Ana-PC", approved=True)
+    wire = []
+
+    class Tap(httpx.Client):
+        def request(self, *a, **k):
+            r = env.http.request(*a, **k)
+            wire.append(bytes(k.get("content") or b"") + r.content)
+            return r
+
+    tap = Tap()
+    ortak.connect(env.b, ADDR, env.codes.issue(), "Salon-PC", client=tap)
+    ortak.fetch(env.b, tap)
+    ortak.post_note(env.b, "Annem salı gelir", tap)
+    seen = b"".join(wire)
+    for secret in ("Ayşe", "Pamuk", "Annem"):
+        assert secret.encode() not in seen
+    assert ortak.load_link(env.b)["secret"].encode() not in seen
+
+
+def _raw(env, path="/ortak/hafiza", method="GET", body=b"", ts=None, **hdr):
     link = ortak.load_link(env.b)
-    ts, nonce = str(int(time.time())), "n" + str(time.time_ns())
-    h = {
-        "X-Usta-Key": link["key_id"],
-        "X-Usta-Ts": ts,
-        "X-Usta-Nonce": nonce,
-        "X-Usta-Sig": ortak.sign(ortak._unb64(link["secret"]), method, path, ts, nonce, body),
-    }
+    ts = ts or str(int(time.time()))
+    aad = ortak.request_aad(method, path, ts, link["key_id"])
+    nonce, sealed = ortak.seal(ortak._unb64(link["secret"]), aad, body)
+    h = {"X-Usta-Key": link["key_id"], "X-Usta-Ts": ts, "X-Usta-Nonce": nonce}
     h.update(hdr)
-    return env.http.request(method, path, content=body, headers=h)
+    return env.http.request(method, path, content=sealed, headers=h)
 
 
-def test_unsigned_wrong_and_stale_requests_get_the_same_401(env):
+def test_unsealed_wrong_and_stale_requests_get_the_same_401(env):
     env.pair()
-    assert env.http.get("/ortak/hafiza").status_code == 401  # imzasız
-    assert _raw(env, **{"X-Usta-Sig": "0" * 64}).status_code == 401  # yanlış imza
+    assert _raw(env).status_code == 200
+    plain = env.http.get("/ortak/hafiza")
+    assert plain.status_code == 401  # şifresiz
     assert _raw(env, **{"X-Usta-Key": "yok"}).status_code == 401  # tanınmayan bilgisayar
-    old = str(int(time.time()) - 3600)
-    link = ortak.load_link(env.b)
-    sig = ortak.sign(ortak._unb64(link["secret"]), "GET", "/ortak/hafiza", old, "z", b"")
-    r = env.http.get(
-        "/ortak/hafiza",
-        headers={
-            "X-Usta-Key": link["key_id"],
-            "X-Usta-Ts": old,
-            "X-Usta-Nonce": "z",
-            "X-Usta-Sig": sig,
-        },
-    )
-    assert r.status_code == 401  # zaman damgası eski
-    assert {env.http.get("/ortak/hafiza").text} == {r.text}  # hata ayrıntı sızdırmaz
+    assert _raw(env, **{"X-Usta-Nonce": "0" * 24}).status_code == 401  # başka kimlik: çözülmez
+    stale = _raw(env, ts=str(int(time.time()) - 3600))
+    assert stale.status_code == 401  # zaman damgası eski
+    assert {plain.text} == {stale.text}  # hata ayrıntı sızdırmaz
 
 
 def test_a_replayed_request_is_refused(env):
     env.pair()
     link = ortak.load_link(env.b)
-    ts, nonce = str(int(time.time())), "tekrar-1"
-    sig = ortak.sign(ortak._unb64(link["secret"]), "GET", "/ortak/hafiza", ts, nonce, b"")
-    h = {"X-Usta-Key": link["key_id"], "X-Usta-Ts": ts, "X-Usta-Nonce": nonce, "X-Usta-Sig": sig}
-    assert env.http.get("/ortak/hafiza", headers=h).status_code == 200
-    assert env.http.get("/ortak/hafiza", headers=h).status_code == 401  # aynı istek ikinci kez
+    ts = str(int(time.time()))
+    nonce, sealed = ortak.seal(
+        ortak._unb64(link["secret"]),
+        ortak.request_aad("GET", "/ortak/hafiza", ts, link["key_id"]),
+        b"",
+    )
+    h = {"X-Usta-Key": link["key_id"], "X-Usta-Ts": ts, "X-Usta-Nonce": nonce}
+    assert env.http.request("GET", "/ortak/hafiza", content=sealed, headers=h).status_code == 200
+    assert env.http.request("GET", "/ortak/hafiza", content=sealed, headers=h).status_code == 401
 
 
-def test_signature_does_not_transfer_to_another_path_or_body(env):
+def test_request_does_not_transfer_to_another_path(env):
     env.pair()
     link = ortak.load_link(env.b)
-    ts, nonce = str(int(time.time())), "yol-1"
-    sig = ortak.sign(ortak._unb64(link["secret"]), "GET", "/ortak/hafiza", ts, nonce, b"")
-    h = {"X-Usta-Key": link["key_id"], "X-Usta-Ts": ts, "X-Usta-Nonce": nonce, "X-Usta-Sig": sig}
-    assert env.http.post("/ortak/not", content=b'{"text":"x"}', headers=h).status_code == 401
+    ts = str(int(time.time()))
+    nonce, sealed = ortak.seal(
+        ortak._unb64(link["secret"]),
+        ortak.request_aad("GET", "/ortak/hafiza", ts, link["key_id"]),
+        b'{"text":"x"}',
+    )
+    h = {"X-Usta-Key": link["key_id"], "X-Usta-Ts": ts, "X-Usta-Nonce": nonce}
+    assert env.http.post("/ortak/not", content=sealed, headers=h).status_code == 401
 
 
 def test_forged_reply_is_not_used(env):
@@ -152,15 +259,25 @@ def test_forged_reply_is_not_used(env):
     class Tamper(httpx.Client):
         def request(self, *a, **k):
             r = env.http.request(*a, **k)
-            body = r.content.replace(
-                b'"notlar":[]', b'"notlar":[{"id":"x","text":"sahte","kaynak":"x"}]'
-            )
-            return httpx.Response(
-                200, content=body, headers={"x-usta-sig": r.headers["x-usta-sig"]}
-            )
+            body = r.content[:-1] + bytes([r.content[-1] ^ 1])
+            return httpx.Response(200, content=body, headers=dict(r.headers))
 
-    with pytest.raises(ortak.OrtakError, match="imzası yanlış"):
+    with pytest.raises(ortak.OrtakError, match="doğrulanamadı"):
         ortak.fetch(env.b, Tamper())
+
+
+def test_old_unencrypted_link_asks_to_pair_again(env):
+    env.pair()
+    link = ortak.load_link(env.b)
+    del link["v"]
+    ortak._write_json(env.b / "ortak-baglanti.json", link)
+    with pytest.raises(ortak.OrtakError, match="yeniden bağlan"):
+        ortak.fetch(env.b, env.http)
+    peers = ortak._read_json(env.a / "ortak" / "eslesmeler.json", [])
+    del peers[0]["v"]
+    ortak._write_json(env.a / "ortak" / "eslesmeler.json", peers)
+    assert env.store.peer(link["key_id"]) is None
+    assert env.store.peers_public()[0]["eski"] is True
 
 
 # --- onay kapısı: yalnız dışarıdan gelen notlar ---------------------------------------------------------
@@ -211,31 +328,33 @@ def test_note_and_peer_limits(env):
     with pytest.raises(ortak.OrtakError, match="En çok"):
         env.store.add("bir tane daha", "Ana-PC", approved=True)
     for i in range(20):
-        env.store.add_peer(f"pc{i}")
+        env.store.add_peer(f"pc{i}", b"k" * 32)
     with pytest.raises(ortak.OrtakError, match="En çok 20"):
-        env.store.add_peer("fazla")
+        env.store.add_peer("fazla", b"k" * 32)
 
 
 # --- kapı: kaynak, Origin, Host, boyut, hız ------------------------------------------------------------
 def test_gate_refuses_foreign_source_origin_host_size_and_floods(tmp_path):
     env = Env(
-        tmp_path, source_ok=ortak.private_source
+        tmp_path, source_ok=dinleyici.private_source
     )  # TestClient kaynağı "testclient": özel ağ değil
-    assert env.http.post("/ortak/eslesme", json={"code": "123456"}).status_code == 403
+    assert env.http.post("/ortak/eslesme/baslat", json={"msg": "00"}).status_code == 403
 
     env = Env(tmp_path / "b")
     assert (
         env.http.post(
-            "/ortak/eslesme", json={"code": "1"}, headers={"Origin": "http://kotu.example"}
+            "/ortak/eslesme/baslat", json={"msg": "00"}, headers={"Origin": "http://kotu.example"}
         ).status_code
         == 403
     )
     bad_host = TestClient(env.app, base_url="http://kotu.example")
-    assert bad_host.post("/ortak/eslesme", json={"code": "1"}).status_code == 400  # DNS rebinding
-    big = env.http.post("/ortak/eslesme", content=b"x" * (ortak.MAX_BODY + 1))
+    assert (
+        bad_host.post("/ortak/eslesme/baslat", json={"msg": "00"}).status_code == 400
+    )  # DNS rebinding
+    big = env.http.post("/ortak/eslesme/baslat", content=b"x" * (ortak.MAX_BODY + 1))
     assert big.status_code == 413
     flood = [
-        env.http.post("/ortak/eslesme", json={"code": "0"}).status_code
+        env.http.post("/ortak/eslesme/onay", json={"sid": "x", "onay": "0"}).status_code
         for _ in range(ortak.RATE[0] + 5)
     ]
     assert 429 in flood
@@ -243,9 +362,9 @@ def test_gate_refuses_foreign_source_origin_host_size_and_floods(tmp_path):
 
 def test_private_source_accepts_only_private_ipv4():
     for ok in ("192.168.1.5", "10.0.0.2", "172.16.4.4", "127.0.0.1"):
-        assert ortak.private_source(ok)
+        assert dinleyici.private_source(ok)
     for bad in ("8.8.8.8", "::1", "0.0.0.0", "testclient", "", "fe80::1"):
-        assert not ortak.private_source(bad)
+        assert not dinleyici.private_source(bad)
 
 
 # --- ev sahibi kapalıysa ve model tarafı ---------------------------------------------------------------
@@ -297,13 +416,13 @@ def test_the_model_has_no_way_to_reach_shared_memory(tmp_path):
 
 def test_host_server_refuses_to_bind_outside_the_home_network(tmp_path):
     with pytest.raises(ortak.OrtakError, match="evdeki ağ adresini"):
-        ortak.HostServer(tmp_path).start(bind="8.8.8.8")
+        dinleyici.HostServer(tmp_path).start(bind="8.8.8.8")
     with pytest.raises(ortak.OrtakError):
-        ortak.HostServer(tmp_path).start(bind="0.0.0.0")
+        dinleyici.HostServer(tmp_path).start(bind="0.0.0.0")
 
 
 def test_real_listener_end_to_end_over_loopback(tmp_path):
-    host = ortak.HostServer(tmp_path / "ev")
+    host = dinleyici.HostServer(tmp_path / "ev")
     host.store.configure(True, "Ana-PC")
     kisi.save(tmp_path / "ev", kisi.check({"ad": "Ayşe"}))
     addr = host.start(bind="127.0.0.1", port=18766)
@@ -311,7 +430,7 @@ def test_real_listener_end_to_end_over_loopback(tmp_path):
         assert addr.startswith("127.0.0.1:")
         ortak.connect(tmp_path / "salon", addr, host.codes.issue(), "Salon-PC")
         assert ortak.fetch(tmp_path / "salon")["profil"]["ad"] == "Ayşe"
-        assert httpx.get(f"http://{addr}/ortak/hafiza").status_code == 401  # imzasız
+        assert httpx.get(f"http://{addr}/ortak/hafiza").status_code == 401  # şifresiz
         assert httpx.get(f"http://{addr}/ayarlar").status_code == 404  # portalın uçları yok
         assert httpx.get(f"http://{addr}/docs").status_code == 404
     finally:

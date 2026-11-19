@@ -225,7 +225,7 @@
     if (d.rol === "ev-sahibi") {
       $("ortak-durum").textContent = d.calisiyor ? `Bu bilgisayar ortak hafızayı tutuyor (${d.adres}). Adı: ${d.ad}.` : "Ortak hafıza açık ama şu an dinlemiyor (ağa bağlı mısın?).";
       $("ortak-sahip").hidden = false;
-      $("ortak-esler").replaceChildren(...((d.eslesmeler || []).length ? d.eslesmeler.map((e) => ortakRow(e.ad, "", [["Kaldır", async () => { if (await ortakCall(`/ortak/eslesmeler/${e.id}`, "DELETE")) loadOrtak(); }]])) : [U.h("li", "wiz-note", "Henüz bağlı bilgisayar yok.")]));
+      $("ortak-esler").replaceChildren(...((d.eslesmeler || []).length ? d.eslesmeler.map((e) => ortakRow(e.ad, e.eski ? "eski bağlantı: kaldırıp yeniden eşleştir" : "", [["Kaldır", async () => { if (await ortakCall(`/ortak/eslesmeler/${e.id}`, "DELETE")) loadOrtak(); }]])) : [U.h("li", "wiz-note", "Henüz bağlı bilgisayar yok.")]));
       $("ortak-bekleyen").replaceChildren(...((d.bekleyen || []).length ? d.bekleyen.map((n) => ortakRow(n.text, `${n.kaynak} ekledi`, [
         ["Onayla", async () => { if (await ortakCall(`/ortak/notlar/${n.id}/onayla`)) loadOrtak(); }],
         ["Reddet", async () => { if (await ortakCall(`/ortak/notlar/${n.id}`, "DELETE")) loadOrtak(); }],

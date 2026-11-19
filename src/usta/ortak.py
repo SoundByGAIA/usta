@@ -2,11 +2,13 @@
 
 Tasarım: `docs/ortak-hafiza.md`. Özet:
 
-- Bir bilgisayar **ev sahibi** olur ve portaldan ayrı, küçük bir dinleyici açar (yalnız `/ortak/*`; portalın hiçbir ucu bu
-  kapıdan erişilemez). Diğerleri 6 haneli kodla eşleşir ve **bağlı** olur.
-- Eşleşmede ev sahibi bu bilgisayara özel 32 baytlık bir anahtar üretir. Anahtar ağda GİTMEZ: her istek ve her cevap
-  anahtardan türetilmiş HMAC-SHA256 ile imzalanır (zaman damgası + tek kullanımlık sayaç: tekrar oynatılamaz).
-  İçerik şifrelenmez; arayüz bunu söyler.
+- Bir bilgisayar **ev sahibi** olur ve portaldan ayrı, küçük bir dinleyici açar (`ortak_dinleyici.py`; yalnız `/ortak/*`,
+  portalın hiçbir ucu bu kapıdan erişilemez). Diğerleri 6 haneli kodla eşleşir ve **bağlı** olur.
+- Eşleşme SPAKE2 ile yapılır: 6 haneli kod iki tarafın ortak anahtar üretmesini doğrular ama anahtar ağda hiç gitmez
+  ve koddan türemez. Ağı dinleyen biri kodu çevrimdışı deneyemez; araya giren biri her denemede tek bir kod tahmin
+  edebilir ve adres başına 3 denemeden sonra kilitlenir.
+- Eşleşmeden sonraki her istek ve cevap ChaCha20-Poly1305 ile şifrelenir ve doğrulanır. İstekler zaman damgası
+  (±30 sn) ve tek kullanımlık kimlik taşır; aynı istek ikinci kez kabul edilmez.
 - Ortak hafızaya yalnız KULLANICI yazar (arayüzden). Modelin bu modüle ulaşan bir aracı yoktur.
 - Ev sahibi dışından gelen not, ev sahibinde onaylanana kadar hiçbir modele girmez (çalınmış anahtarla enjeksiyon yapılamasın).
 - Dinleyici yalnız özel ağ adresine bağlanır; özel ağ dışından gelen istek, `Origin` taşıyan istek ve yanlış `Host` reddedilir.
@@ -25,28 +27,27 @@ import secrets
 import socket
 import threading
 import time
-from collections import deque
-from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field
-from starlette.middleware.trustedhost import TrustedHostMiddleware
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from spake2 import SPAKE2_A, SPAKEError
 
 from usta import compat, kisi, localmodels
 from usta.audit import mask
-from usta.auth import LoginCodes
 from usta.memory import _clean, suspicious
 
 PORT = 8766
 MAX_NOTE = 300
 MAX_NOTES = 50
 MAX_BODY = 8192
-SKEW = 60.0  # sn: istek zaman damgası bu kadar sapabilir
-NONCE_TTL = 180.0
+SKEW = 30.0  # sn: istek zaman damgası bu kadar sapabilir
+NONCE_TTL = 90.0  # SKEW'in iki katından uzun: pencere içindeki her kimlik hatırlanır
+PROTO = 2
 RATE = (60, 60.0)  # dakikada en çok 60 istek (kaynak adres başına)
 TIMEOUT = 3.0
 
@@ -55,19 +56,47 @@ class OrtakError(Exception):
     """Kullanıcıya gösterilebilir ortak hafıza hatası."""
 
 
-# --- imza ------------------------------------------------------------------------------------------
-def _digest(body: bytes) -> str:
-    return hashlib.sha256(body).hexdigest()
+# --- anahtar ve şifreleme -----------------------------------------------------------------------------
+_ID_A, _ID_B = b"usta-bagli", b"usta-ev"
 
 
-def sign(secret: bytes, method: str, path: str, ts: str, nonce: str, body: bytes) -> str:
-    msg = "\n".join(("istek", method.upper(), path, ts, nonce, _digest(body)))
-    return hmac.new(secret, msg.encode(), hashlib.sha256).hexdigest()
+def _kdf(key: bytes, info: bytes) -> bytes:
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info).derive(key)
 
 
-def sign_reply(secret: bytes, nonce: str, body: bytes) -> str:
-    msg = "\n".join(("cevap", nonce, _digest(body)))
-    return hmac.new(secret, msg.encode(), hashlib.sha256).hexdigest()
+def confirm(key: bytes, who: str, sid: str) -> str:
+    """Eşleşme onayı: iki taraf aynı anahtarı (yani aynı kodu) kullandığını anahtarı göstermeden kanıtlar."""
+    return hmac.new(
+        _kdf(key, b"usta-ortak-onay"), f"{who}\n{sid}".encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def session_secret(key: bytes) -> bytes:
+    return _kdf(key, b"usta-ortak-anahtar")
+
+
+def request_aad(method: str, path: str, ts: str, key_id: str) -> bytes:
+    return f"istek\n{method.upper()}\n{path}\n{ts}\n{key_id}".encode()
+
+
+def reply_aad(request_nonce: str) -> bytes:
+    return f"cevap\n{request_nonce}".encode()
+
+
+def seal(secret: bytes, aad: bytes, plain: bytes) -> tuple[str, bytes]:
+    nonce = secrets.token_bytes(12)
+    return nonce.hex(), ChaCha20Poly1305(secret).encrypt(nonce, plain, aad)
+
+
+def unseal(secret: bytes, nonce_hex: str, aad: bytes, sealed: bytes) -> bytes:
+    """Şifreyi çözer ve doğrular; değiştirilmiş, başka anahtarla ya da başka istek için yazılmış içerikte ValueError."""
+    try:
+        nonce = bytes.fromhex(nonce_hex)
+        if len(nonce) != 12:
+            raise ValueError
+        return ChaCha20Poly1305(secret).decrypt(nonce, sealed, aad)
+    except (InvalidTag, ValueError):
+        raise ValueError("şifre çözülemedi") from None
 
 
 def _b64(b: bytes) -> str:
@@ -229,10 +258,10 @@ class Store:
             and all(isinstance(p.get(k), str) for k in ("id", "ad", "secret"))
         ]
 
-    def add_peer(self, ad: str) -> tuple[str, str]:
-        """Yeni bilgisayar için (anahtar_kimliği, anahtar) üretir. Anahtar yalnız bu iki taraftadır."""
+    def add_peer(self, ad: str, secret: bytes) -> str:
+        """Eşleşmede iki tarafın ayrı ayrı türettiği anahtarı kaydeder; anahtar kimliğini döndürür."""
         with self._lock:
-            key_id, secret = secrets.token_hex(6), secrets.token_bytes(32)
+            key_id = secrets.token_hex(6)
             peers = self.peers()
             if len(peers) >= 20:
                 raise OrtakError("En çok 20 bilgisayar eşleştirilebilir. Birini kaldır.")
@@ -242,13 +271,22 @@ class Store:
                     "ad": safe_name(ad),
                     "secret": _b64(secret),
                     "ts": int(time.time()),
+                    "v": PROTO,
                 }
             )
             _write_json(self.dir / "eslesmeler.json", peers)
-        return key_id, _b64(secret)
+        return key_id
 
     def peer(self, key_id: str) -> dict | None:
-        return next((p for p in self.peers() if hmac.compare_digest(p["id"], str(key_id))), None)
+        """Eşleşmiş bilgisayar; eski (şifresiz) eşleşmeler tanınmaz, yeniden eşleşmek gerekir."""
+        return next(
+            (
+                p
+                for p in self.peers()
+                if p.get("v") == PROTO and hmac.compare_digest(p["id"], str(key_id))
+            ),
+            None,
+        )
 
     def remove_peer(self, key_id: str) -> None:
         with self._lock:
@@ -259,204 +297,10 @@ class Store:
             _write_json(self.dir / "eslesmeler.json", keep)
 
     def peers_public(self) -> list[dict]:
-        return [{"id": p["id"], "ad": p["ad"], "ts": p.get("ts", 0)} for p in self.peers()]
-
-
-# --- ev sahibi: dinleyici uygulaması ---------------------------------------------------------------
-class _CodeIn(BaseModel):
-    code: str = Field(min_length=1, max_length=20)
-    ad: str = Field(default="", max_length=80)
-
-
-class _NoteIn(BaseModel):
-    text: str = Field(min_length=1, max_length=2000)
-
-
-def private_source(ip: str) -> bool:
-    import ipaddress
-
-    try:
-        addr = ipaddress.ip_address(ip)
-    except ValueError:
-        return False
-    return addr.version == 4 and addr.is_private and not addr.is_unspecified
-
-
-def make_app(
-    home: Path,
-    codes: LoginCodes,
-    *,
-    allowed_hosts: list[str],
-    source_ok: Callable[[str], bool] = private_source,
-    clock: Callable[[], float] = time.time,
-) -> FastAPI:
-    store = Store(home)
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)  # DNS rebinding
-    seen: dict[str, float] = {}
-    hits: dict[str, deque] = {}
-    lock = threading.Lock()
-
-    def gate(request: Request) -> str:
-        """Her istekte: özel ağ kaynağı, `Origin` yok, hız sınırı. Kaynak adresi döndürür."""
-        ip = request.client.host if request.client else ""
-        if not source_ok(ip):
-            raise HTTPException(403, "yalnız evdeki ağdan")
-        if "origin" in request.headers:  # tarayıcı sayfası başka bir siteden istek attıramaz
-            raise HTTPException(403, "tarayıcıdan erişilemez")
-        n, window = RATE
-        now = clock()
-        with lock:
-            q = hits.setdefault(ip, deque())
-            while q and q[0] < now - window:
-                q.popleft()
-            if len(q) >= n:
-                raise HTTPException(429, "çok fazla istek")
-            q.append(now)
-        return ip
-
-    async def read_body(request: Request) -> bytes:
-        declared = request.headers.get("content-length")
-        if declared and declared.isdigit() and int(declared) > MAX_BODY:
-            raise HTTPException(413, "istek çok büyük")
-        body = b""
-        async for chunk in request.stream():
-            body += chunk
-            if len(body) > MAX_BODY:
-                raise HTTPException(413, "istek çok büyük")
-        return body
-
-    async def verified(request: Request) -> tuple[dict, bytes, str]:
-        """İmzayı doğrular: (eşleşmiş bilgisayar, gövde, sayaç). Hata hep aynı 401: ayrıntı sızdırılmaz."""
-        gate(request)
-        body = await read_body(request)
-        h = request.headers
-        key_id, ts, nonce, sig = (
-            h.get(k, "") for k in ("x-usta-key", "x-usta-ts", "x-usta-nonce", "x-usta-sig")
-        )
-        bad = HTTPException(401, "imza geçersiz")
-        peer = store.peer(key_id) if key_id else None
-        if peer is None or not nonce or len(nonce) > 64 or len(sig) != 64:
-            raise bad
-        try:
-            if abs(clock() - float(ts)) > SKEW:
-                raise bad
-        except ValueError:
-            raise bad from None
-        want = sign(_unb64(peer["secret"]), request.method, request.url.path, ts, nonce, body)
-        if not hmac.compare_digest(want, sig):
-            raise bad
-        now = clock()
-        with lock:  # imza doğru olduktan sonra: aynı sayaç ikinci kez kabul edilmez
-            for k in [k for k, t in seen.items() if t < now - NONCE_TTL]:
-                del seen[k]
-            if f"{key_id}:{nonce}" in seen:
-                raise bad
-            seen[f"{key_id}:{nonce}"] = now
-        return peer, body, nonce
-
-    def reply(peer: dict, nonce: str, payload: dict) -> Response:
-        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
-        sig = sign_reply(_unb64(peer["secret"]), nonce, body)
-        return Response(content=body, media_type="application/json", headers={"X-Usta-Sig": sig})
-
-    @app.post("/ortak/eslesme")
-    async def pair(request: Request) -> JSONResponse:
-        gate(request)
-        try:
-            data = _CodeIn.model_validate_json(await read_body(request))
-        except ValueError:
-            raise HTTPException(422, "istek geçersiz") from None
-        if not codes.redeem(data.code):
-            raise HTTPException(401, "kod geçersiz, süresi dolmuş veya kullanılmış")
-        try:
-            key_id, secret = store.add_peer(data.ad)
-        except OrtakError as e:
-            raise HTTPException(409, str(e)) from None
-        return JSONResponse({"key_id": key_id, "secret": secret, "ad": store.name})
-
-    @app.get("/ortak/hafiza")
-    async def memory(request: Request) -> Response:
-        peer, _, nonce = await verified(request)
-        notes = [
-            {"id": n["id"], "text": n["text"], "kaynak": n["kaynak"]} for n in store.approved()
+        return [
+            {"id": p["id"], "ad": p["ad"], "ts": p.get("ts", 0), "eski": p.get("v") != PROTO}
+            for p in self.peers()
         ]
-        return reply(
-            peer, nonce, {"profil": asdict(kisi.load(home)), "notlar": notes, "ad": store.name}
-        )
-
-    @app.post("/ortak/not")
-    async def add_note(request: Request) -> Response:
-        peer, body, nonce = await verified(request)
-        try:
-            data = _NoteIn.model_validate_json(body)
-            note = store.add(data.text, peer["ad"], approved=False)  # dışarıdan: onay bekler
-        except ValueError:
-            raise HTTPException(422, "istek geçersiz") from None
-        except OrtakError as e:
-            raise HTTPException(422, str(e)) from None
-        return reply(peer, nonce, {"id": note["id"], "durum": note["durum"]})
-
-    return app
-
-
-# --- ev sahibi: dinleyiciyi çalıştırma --------------------------------------------------------------
-class HostServer:
-    """Ev sahibinin ikinci dinleyicisi (uvicorn, ayrı iş parçacığı). Yalnız özel ağ adresine bağlanır."""
-
-    def __init__(self, home: Path):
-        self.home = Path(home)
-        self.store = Store(home)
-        self.codes = LoginCodes(ttl=300.0, digits=6)
-        self._server = None
-        self._thread: threading.Thread | None = None
-        self.address: str | None = None
-
-    @property
-    def running(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
-
-    def start(self, bind: str | None = None, port: int = PORT) -> str:
-        import uvicorn
-
-        if self.running:
-            return self.address or ""
-        ip = bind or localmodels.own_ip() or ""
-        if not private_source(ip):
-            raise OrtakError(
-                "Bu bilgisayarın evdeki ağ adresini bulamadım. Wi-Fi ya da kabloya bağlı mısın?"
-            )
-        for p in range(port, port + 10):  # meşgulse sıradaki port
-            with socket.socket() as s, contextlib.suppress(OSError):
-                s.bind((ip, p))
-                break
-        else:
-            raise OrtakError("Ortak hafıza için boş bir kapı bulamadım.")
-        name = socket.gethostname().lower()
-        hosts = [ip, name, f"{name}.local", "localhost"]
-        app = make_app(self.home, self.codes, allowed_hosts=hosts)
-        self._server = uvicorn.Server(uvicorn.Config(app, host=ip, port=p, log_level="warning"))
-        self._thread = threading.Thread(target=self._server.run, daemon=True)
-        self._thread.start()
-        deadline = time.monotonic() + 10
-        while not self._server.started:
-            if not self._thread.is_alive() or time.monotonic() > deadline:
-                raise OrtakError("Ortak hafıza dinleyicisi başlatılamadı.")
-            time.sleep(0.05)
-        self.address = f"{ip}:{p}"
-        return self.address
-
-    def stop(self) -> None:
-        if self._server is not None:
-            self._server.should_exit = True
-        if self._thread is not None:
-            self._thread.join(timeout=5)
-        self._server, self._thread, self.address = None, None, None
-
-    def start_if_enabled(self) -> None:
-        if self.store.enabled and not self.running:
-            with contextlib.suppress(OrtakError):  # ağ yoksa Usta yine açılır
-                self.start()
 
 
 # --- bağlı bilgisayar: istemci -----------------------------------------------------------------------
@@ -494,31 +338,51 @@ def parse_address(text: object) -> str:
 def connect(
     home: Path, adres: str, code: str, my_name: str, client: httpx.Client | None = None
 ) -> dict:
-    """Ev sahibine kodla eşleşir; anahtarı 0600 dosyaya yazar. Ev sahibinin adını döndürür."""
+    """Ev sahibine kodla eşleşir (SPAKE2); türetilen anahtarı 0600 dosyaya yazar. Ev sahibinin adını döndürür."""
     target = parse_address(adres)
+    http = _client(client)
+    side = SPAKE2_A(str(code).strip().encode(), idA=_ID_A, idB=_ID_B)
     try:
-        r = _client(client).post(
-            f"{_host_url(target)}/ortak/eslesme", json={"code": str(code).strip(), "ad": my_name}
+        r = http.post(
+            f"{_host_url(target)}/ortak/eslesme/baslat",
+            json={"msg": side.start().hex(), "ad": my_name},
         )
+        if r.status_code == 200:
+            d = r.json()
+            sid = str(d["sid"])
+            key = side.finish(bytes.fromhex(str(d["msg"])))
+            host_name = safe_name(d.get("ad"), target)
+            r = http.post(
+                f"{_host_url(target)}/ortak/eslesme/onay",
+                json={"sid": sid, "onay": confirm(key, "bagli", sid)},
+            )
     except httpx.HTTPError:
         raise OrtakError(
             "Ev sahibi bilgisayara ulaşamadım. Açık mı, adres doğru mu, ortak hafıza açık mı?"
         ) from None
+    except (ValueError, KeyError, TypeError, SPAKEError):
+        raise OrtakError("Ev sahibinin cevabı anlaşılmadı.") from None
     if r.status_code == 401:
         raise OrtakError("Kod yanlış ya da süresi dolmuş. Ev sahibi bilgisayarda yeni kod al.")
+    if r.status_code == 429:
+        raise OrtakError("Çok fazla deneme oldu. 15 dakika sonra yeni kodla tekrar dene.")
     if r.status_code != 200:
         raise OrtakError(_detail(r) or "Eşleşme olmadı.")
     try:
         d = r.json()
-        link = {
-            "adres": target,
-            "key_id": str(d["key_id"]),
-            "secret": str(d["secret"]),
-            "ad": safe_name(d.get("ad"), target),
-        }
-        _unb64(link["secret"])
+        ok = hmac.compare_digest(str(d["onay"]), confirm(key, "ev", sid))
+        key_id = str(d["key_id"])
     except (ValueError, KeyError, TypeError):
         raise OrtakError("Ev sahibinin cevabı anlaşılmadı.") from None
+    if not ok:  # kodu bilmeyen biri ev sahibi gibi davranamaz
+        raise OrtakError("Ev sahibi doğrulanamadı; bağlantı kurulmadı.")
+    link = {
+        "adres": target,
+        "key_id": key_id,
+        "secret": _b64(session_secret(key)),
+        "ad": host_name,
+        "v": PROTO,
+    }
     _write_json(_link_path(home), link)
     with contextlib.suppress(OSError):
         (Path(home) / "ortak-onbellek.json").unlink(missing_ok=True)
@@ -537,24 +401,28 @@ def _detail(r: httpx.Response) -> str:
         return ""
 
 
-def _signed(
-    home: Path, method: str, path: str, body: bytes, client: httpx.Client | None
-) -> tuple[dict, httpx.Response, str]:
+def _request(home: Path, method: str, path: str, body: bytes, client: httpx.Client | None) -> dict:
+    """Şifreli istek atar, cevabı çözüp doğrular ve JSON olarak döndürür."""
     link = load_link(home)
     if link is None:
         raise OrtakError("Bu bilgisayar bir ortak hafızaya bağlı değil.")
-    ts, nonce = str(int(time.time())), secrets.token_hex(16)
+    if link.get("v") != PROTO:
+        raise OrtakError(
+            "Ortak hafıza bağlantısı eski, şifresiz yöntemle kurulmuş. Bağlantıyı kesip ev sahibinden yeni kod "
+            "alarak yeniden bağlan."
+        )
     secret = _unb64(link["secret"])
+    ts = str(int(time.time()))
+    nonce, sealed = seal(secret, request_aad(method, path, ts, link["key_id"]), body)
     headers = {
         "X-Usta-Key": link["key_id"],
         "X-Usta-Ts": ts,
         "X-Usta-Nonce": nonce,
-        "X-Usta-Sig": sign(secret, method, path, ts, nonce, body),
-        "Content-Type": "application/json",
+        "Content-Type": "application/octet-stream",
     }
     try:
         r = _client(client).request(
-            method, f"{_host_url(link['adres'])}{path}", content=body, headers=headers
+            method, f"{_host_url(link['adres'])}{path}", content=sealed, headers=headers
         )
     except httpx.HTTPError:
         raise OrtakError("Ev sahibi bilgisayara ulaşamadım.") from None
@@ -564,19 +432,17 @@ def _signed(
         )
     if r.status_code != 200:
         raise OrtakError(_detail(r) or f"Ev sahibi hata verdi ({r.status_code}).")
-    got = r.headers.get("x-usta-sig", "")
-    if not hmac.compare_digest(
-        sign_reply(secret, nonce, r.content), got
-    ):  # araya giren sahte cevap veremez
-        raise OrtakError("Ev sahibinin cevabının imzası yanlış; cevap kullanılmadı.")
-    return link, r, nonce
+    try:  # araya giren sahte ya da değiştirilmiş cevap veremez
+        plain = unseal(secret, r.headers.get("x-usta-nonce", ""), reply_aad(nonce), r.content)
+        return json.loads(plain)
+    except ValueError:
+        raise OrtakError("Ev sahibinin cevabı doğrulanamadı; cevap kullanılmadı.") from None
 
 
 def fetch(home: Path, client: httpx.Client | None = None) -> dict:
     """Ev sahibinden profil ve onaylı notları alır ve önbelleğe yazar. {profil, notlar, ad}."""
-    _, r, _ = _signed(home, "GET", "/ortak/hafiza", b"", client)
+    d = _request(home, "GET", "/ortak/hafiza", b"", client)
     try:
-        d = r.json()
         profil = kisi.check(d.get("profil") or {})
         notes = [
             {
@@ -608,8 +474,7 @@ def cached(home: Path) -> dict | None:
 def post_note(home: Path, text: str, client: httpx.Client | None = None) -> dict:
     line = check_note(text)  # yerelde de aynı kurallar: gereksiz yere ağa gitmesin
     body = json.dumps({"text": line}, ensure_ascii=False).encode()
-    _, r, _ = _signed(home, "POST", "/ortak/not", body, client)
-    return r.json()
+    return _request(home, "POST", "/ortak/not", body, client)
 
 
 # --- modele giriş -------------------------------------------------------------------------------

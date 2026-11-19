@@ -7,13 +7,13 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from usta import kisi, ortak
+from usta import kisi, ortak, ortak_dinleyici
 from usta.api_models import OrtakConnectIn, OrtakHostIn, OrtakNoteIn
 
 
-def register(api: APIRouter, home: Path) -> ortak.HostServer:
+def register(api: APIRouter, home: Path) -> ortak_dinleyici.HostServer:
     """Ortak hafıza uçlarını `api` yönlendiricisine ekler; ev sahibi dinleyicisini döndürür."""
-    ohost = ortak.HostServer(home)
+    ohost = ortak_dinleyici.HostServer(home)
 
     def ortak_role() -> str:
         if ortak.load_link(home) is not None:

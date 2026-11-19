@@ -136,9 +136,9 @@ class FinishCheck:
         texts = self._page_texts()
         return sitecheck.missing(self.task, texts) if texts else []
 
-    def _hidden_texts(self) -> list[str]:
+    def _hidden(self) -> list[sitecontrast.Hidden]:
         """Yazılan sayfalarda zemin rengiyle aynı renkte olduğu için görünmeyen metinler."""
-        found: list[str] = []
+        found: list[sitecontrast.Hidden] = []
         for rel in self.pages[:5] if self.root is not None else []:
             html = self._read(rel)
             if html is None:
@@ -148,7 +148,7 @@ class FinishCheck:
                 r"<link[^>]+href=[\"']([^\"':?#]+\.css)[\"']", html, re.IGNORECASE
             )[:5]:
                 css.append(self._read(str(Path(rel).parent / href)) or "")
-            found += [t for t in sitecontrast.hidden_texts(html, "\n".join(css)) if t not in found]
+            found += [h for h in sitecontrast.hidden(html, "\n".join(css)) if h not in found]
         return found
 
     def on_finish(self, answer: str) -> str | None:
@@ -180,13 +180,25 @@ class FinishCheck:
                 "Sayfayı oku, bunları kullanıcının yazdığı gibi ekle; kullanıcının vermediği bilgi (ürün, fiyat, isim) "
                 "uydurma.",
             )
-        hidden = self._hidden_texts() if self.artifact and self.wrote_any else []
+        hidden = self._hidden() if self.artifact and self.wrote_any else []
         if hidden:
-            quoted = ", ".join(f'"{t}"' for t in hidden[:3])
+            # küçük modeller "rengi değiştir" deyince hangi kuralı tahmin edemiyor; kural ve renk açıkça söylenir
+            lines = []
+            for h in hidden[:3]:
+                where = (
+                    f"`{h.background_rule}` kuralına `color: {h.fix}` ekle"
+                    if h.color_rule == "varsayılan"
+                    else f"`{h.color_rule}` kuralında `color` değerini {h.fix} yap"
+                )
+                lines.append(
+                    f'- "{h.text}": yazı rengi {h.color} (`{h.color_rule}`), zemini {h.background} '
+                    f"(`{h.background_rule}`). Düzeltme: {where}."
+                )
             return self._nudge(
                 "contrast",
-                f"Sayfada şu yazılar zeminle aynı renkte, kullanıcı onları göremiyor: {quoted}. "
-                "Yazı rengini ya da zemin rengini değiştir ki okunsun.",
+                "Sayfada şu yazılar zeminle aynı renkte, kullanıcı onları göremiyor:\n"
+                + "\n".join(lines)
+                + "\nÖnce read_file ile sayfayı oku; edit_file'da eski metni dosyadaki gibi birebir yaz.",
             )
         intent_only = len(text) <= MAX_INTENT_CHARS and "?" not in text and not _CLAIM.search(text)
         if text and intent_only and _INTENT.search(text):

@@ -1,5 +1,5 @@
 from usta.finishcheck import FinishCheck
-from usta.sitecontrast import hidden_texts
+from usta.sitecontrast import Hidden, hidden, hidden_texts
 
 PINK = """<style>
 header { background: #ff69b4; color: white; padding: 2rem; }
@@ -10,6 +10,14 @@ header h1 { color: #ff69b4; }
 
 def test_pink_title_on_pink_header_is_hidden():
     assert hidden_texts(PINK) == ["Ayşe Kuaför"]
+
+
+def test_hidden_names_the_rules_and_suggests_a_readable_colour():
+    assert hidden(PINK) == [Hidden("Ayşe Kuaför", "#ff69b4", "header h1", "#ff69b4", "header")]
+    assert hidden(PINK)[0].fix == "#222222"
+    dark = "<style>.a, .b { background: #003366 } .a p { color: #003366 }</style><div class='a'><p>Ad</p></div>"
+    assert hidden(dark) == [Hidden("Ad", "#003366", ".a p", "#003366", ".a, .b")]
+    assert hidden(dark)[0].fix == "#ffffff"
 
 
 def test_readable_page_has_nothing_hidden():
@@ -65,6 +73,7 @@ def test_finish_check_reminds_once_about_invisible_text(tmp_path):
     fc.observe("write_file", {"path": "index.html", "content": PINK}, True)
     note = fc.on_finish("Siteyi yaptım.")
     assert note and "Ayşe Kuaför" in note and "göremiyor" in note
+    assert "`header h1`" in note and "#222222" in note  # model nereyi düzelteceğini bilsin
     assert fc.on_finish("Siteyi yaptım.") is None
 
 

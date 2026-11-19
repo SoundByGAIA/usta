@@ -9,6 +9,7 @@ yazımlarını, `:root` değişkenlerini ve satır içi stili anlar. Emin olamad
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from html.parser import HTMLParser
 
 INVISIBLE = 1.5  # WCAG karşıtlık oranı; 1.0 = aynı renk, okunur yazı için 4.5 önerilir
@@ -184,8 +185,31 @@ def contrast(a, b) -> float:
     return (la + 0.05) / (lb + 0.05)
 
 
-def hidden_texts(html: str, css: str = "", limit: int = 5) -> list[str]:
-    """Zeminiyle aynı renkte olduğu için görünmeyen metinler (en çok `limit` tane, kısaltılmış)."""
+@dataclass(frozen=True)
+class Hidden:
+    """Görünmeyen bir metin ve onu görünmez yapan kurallar (modele nereyi düzelteceğini söylemek için)."""
+
+    text: str
+    color: str  # #rrggbb
+    color_rule: str  # seçici ya da "style özniteliği"; renk verilmemişse "varsayılan"
+    background: str
+    background_rule: str
+
+    @property
+    def fix(self) -> str:
+        """Zemin üstünde okunur yazı rengi önerisi."""
+        bg = tuple(int(self.background[i : i + 2], 16) for i in (1, 3, 5))
+        return (
+            "#ffffff" if contrast((255, 255, 255), bg) >= contrast((34, 34, 34), bg) else "#222222"
+        )
+
+
+def _hex(rgb) -> str:
+    return "#" + "".join(f"{c:02x}" for c in rgb)
+
+
+def hidden(html: str, css: str = "", limit: int = 5) -> list[Hidden]:
+    """Zeminiyle aynı renkte olduğu için görünmeyen metinler (en çok `limit` tane, metin kısaltılmış)."""
     tree = _Tree()
     tree.feed(html or "")
     sheets = (
@@ -204,47 +228,66 @@ def hidden_texts(html: str, css: str = "", limit: int = 5) -> list[str]:
                 ids = sum(len(p[1]) for p in parts)
                 classes = sum(len(p[2]) for p in parts)
                 tags = sum(p[0] is not None for p in parts)
-                rules.append(((ids, classes, tags), order, parts, decls))
+                rules.append(
+                    ((ids, classes, tags), order, parts, decls, " ".join(sel_list.split()))
+                )
     rules.sort(key=lambda r: (r[0], r[1]))
 
-    computed: dict[int, dict[str, str]] = {}
+    computed: dict[int, tuple[dict[str, str], dict[str, str]]] = {}
 
-    def style(node: _Node) -> dict[str, str]:
+    def style(node: _Node) -> tuple[dict[str, str], dict[str, str]]:
+        """(bildirimler, her bildirimin geldiği kural)."""
         if id(node) not in computed:
             out: dict[str, str] = {}
-            for _spec, _order, parts, decls in rules:
+            src: dict[str, str] = {}
+            for _spec, _order, parts, decls, sel_text in rules:
                 if _selector_matches(node, parts):
                     out.update(decls)
-            out.update(_decls(node.inline))
-            computed[id(node)] = out
+                    src.update(dict.fromkeys(decls, sel_text))
+            inline = _decls(node.inline)
+            out.update(inline)
+            src.update(dict.fromkeys(inline, "style özniteliği"))
+            computed[id(node)] = (out, src)
         return computed[id(node)]
 
-    found: list[str] = []
+    found: list[Hidden] = []
     for node in tree.nodes:
         if not node.texts:
             continue
-        color, bg, n, hidden = None, None, node, False
+        color, bg, n, is_hidden = None, None, node, False
+        color_rule = bg_rule = "varsayılan"
         while n is not None and n is not tree.root:
-            s = style(n)
+            s, src = style(n)
             if (
                 s.get("display") == "none"
                 or s.get("visibility") == "hidden"
                 or s.get("opacity") == "0"
             ):
-                hidden = True
+                is_hidden = True
             if color is None and "color" in s:
                 color = _rgb(s["color"], variables)
                 color = color if color is not None else _UNKNOWN
+                color_rule = src["color"]
             if bg is None:
                 bg = _background(s, variables)
+                if bg is not None:
+                    key = next(
+                        k for k in ("background-color", "background", "background-image") if k in s
+                    )
+                    bg_rule = src[key]
             n = n.parent
         color = (0, 0, 0) if color is None else color
         bg = (255, 255, 255) if bg is None else bg
-        if hidden or color is _UNKNOWN or bg is _UNKNOWN:
+        if is_hidden or color is _UNKNOWN or bg is _UNKNOWN:
             continue
         if contrast(color, bg) < INVISIBLE:
             text = " ".join(node.texts)
-            found.append(text if len(text) <= 60 else text[:57] + "…")
+            text = text if len(text) <= 60 else text[:57] + "…"
+            found.append(Hidden(text, _hex(color), color_rule, _hex(bg), bg_rule))
             if len(found) >= limit:
                 break
     return found
+
+
+def hidden_texts(html: str, css: str = "", limit: int = 5) -> list[str]:
+    return [h.text for h in hidden(html, css, limit)]

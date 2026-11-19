@@ -6,7 +6,7 @@ import stat
 
 import pytest
 
-from usta import capability, cli, profile
+from usta import capability, capability_probes, cli, profile
 from usta.cli import main
 from usta.jsonproto import JsonProtocolClient
 from usta.models import Message, ModelResponse, ToolCall, Usage
@@ -86,7 +86,7 @@ class TextOnly:
     ],
 )
 def test_validate_call(tc, problem):
-    got = capability.validate_call(tc)
+    got = capability_probes.validate_call(tc)
     assert (got is None) if problem is None else (problem in got)
 
 
@@ -129,7 +129,7 @@ def test_long_context_probe_buries_the_needle_in_the_middle():
                 seen["pos"] = user.index("rapor-7421") / len(user)
             return super().chat(messages, tools)
 
-    capability.probe_long_context(Spy(), {"long_chars": 12000})
+    capability_probes.probe_long_context(Spy(), {"long_chars": 12000})
     assert seen["len"] > 12000 and 0.3 < seen["pos"] < 0.7
 
 
@@ -359,11 +359,13 @@ class E2EModel:
 
 
 def test_agent_tasks_probe_runs_real_agent_loop_on_lab_scenarios():
-    good = capability.probe_agent_tasks(E2EModel("compliant"), {})
+    good = capability_probes.probe_agent_tasks(E2EModel("compliant"), {})
     assert (
-        good.ok and good.passes == good.trials == len(capability.E2E_SCENARIOS) and good.calls > 0
+        good.ok
+        and good.passes == good.trials == len(capability_probes.E2E_SCENARIOS)
+        and good.calls > 0
     )
-    bad = capability.probe_agent_tasks(E2EModel("refuser"), {})
+    bad = capability_probes.probe_agent_tasks(E2EModel("refuser"), {})
     assert not bad.ok and bad.passes == 0 and "başarısız" in bad.note or "FALSE_REFUSAL" in bad.note
 
 
@@ -380,7 +382,7 @@ def test_agent_tasks_dominates_the_score_so_a_protocol_that_cannot_finish_tasks_
             return super().chat(messages, tools)
 
     a = capability.run_protocol(SingleShotOnly(), "native", {"repeats": 1})
-    b = capability.probe_agent_tasks(E2EModel("compliant"), {})
+    b = capability_probes.probe_agent_tasks(E2EModel("compliant"), {})
     agent = next(r for r in a.results if r.name == "agent_tasks")
     assert not agent.ok and agent.passes == 0
     assert capability.WEIGHTS["agent_tasks"] == max(capability.WEIGHTS.values())

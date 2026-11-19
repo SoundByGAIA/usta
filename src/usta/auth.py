@@ -43,6 +43,31 @@ class LoginCodes:
             self._failures = 0
             return self._code
 
+    def peek(self) -> str | None:
+        """Geçerli kod (süresi dolmamış, kilitsiz); kodu kendisi kullanan taraf için (ör. SPAKE2 eşleşmesi)."""
+        with self._lock:
+            if self.locked or self._code is None or self.clock() > self._expires:
+                return None
+            return self._code
+
+    def fail(self) -> None:
+        with self._lock:
+            if self._code is not None:
+                self._failures += 1
+
+    def consume(self, code: str) -> bool:
+        """`peek` ile alınan kod hâlâ geçerliyse tek kullanımlık olarak tüketir."""
+        with self._lock:
+            ok = (
+                not self.locked
+                and self._code is not None
+                and hmac.compare_digest(code.encode(), self._code.encode())
+                and self.clock() <= self._expires
+            )
+            if ok:
+                self._code = None
+            return ok
+
     def redeem(self, code: object) -> bool:
         with self._lock:
             if self.locked or self._code is None or not isinstance(code, str) or len(code) > 200:

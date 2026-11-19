@@ -216,6 +216,10 @@ class FoundAddIn(BaseModel):
     workspace: Literal["none", "ro", "rw"] = "none"
 
 
+class SkillLinkIn(BaseModel):
+    url: str = Field(min_length=10, max_length=500)
+
+
 class RegistrySearchIn(BaseModel):
     sorgu: str = Field(min_length=2, max_length=300)
 

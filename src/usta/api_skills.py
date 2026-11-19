@@ -7,9 +7,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from usta import harnesses, skills
+from usta import harnesses, skilllink, skills
 from usta import settings as usta_settings
-from usta.api_models import HarnessToggleIn, SkillIn, SkillProposalIn
+from usta.api_models import HarnessToggleIn, SkillIn, SkillLinkIn, SkillProposalIn
 
 
 def register(api: APIRouter, home: Path) -> None:
@@ -52,6 +52,22 @@ def register(api: APIRouter, home: Path) -> None:
             return skills.check_proposal(home, body.name, body.description, body.instructions)
         except skills.SkillError as e:
             raise HTTPException(422, str(e)) from None
+
+    @api.post("/skills/baglanti")
+    def skill_from_link(body: SkillLinkIn) -> dict:
+        """GitHub bağlantısındaki beceri, öneri kartı için (yazmaz). Depo bağlantısında içindeki beceriler listelenir."""
+        try:
+            if skilllink.is_repo(body.url):
+                return {"secenekler": skilllink.repo_skills(body.url)}
+            name, desc, text = skilllink.from_markdown(skilllink.fetch(body.url))
+            card = skills.check_proposal(home, name, desc, text, limit=skills.MAX_SIZE)
+        except (skilllink.SkillLinkError, skills.SkillError) as e:
+            raise HTTPException(422, str(e)) from None
+        except (OSError, ValueError):
+            raise HTTPException(
+                502, "bağlantıyı açamadım; adresi ve internet bağlantını kontrol et"
+            ) from None
+        return {**card, "kaynak": body.url}
 
     @api.put("/skills/{name}")
     def put_skill(name: str, body: SkillIn) -> dict:

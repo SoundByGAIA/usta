@@ -95,7 +95,9 @@ def _clean_lines(text: str) -> str:
     return "\n".join(lines).strip("\n")
 
 
-def validate_proposal(name: object, description: object, instructions: object) -> dict:
+def validate_proposal(
+    name: object, description: object, instructions: object, limit: int = MAX_PROPOSAL
+) -> dict:
     """Usta'nın önerdiği becerinin temizlenmiş hâli: {name, content}. Yazmaz; geçersizse SkillError.
 
     `content` ilk satırı açıklama olan beceri dosyasıdır (mevcut biçim).
@@ -114,16 +116,16 @@ def validate_proposal(name: object, description: object, instructions: object) -
     if not body:
         raise SkillError("yönerge boş olamaz")
     content = f"{desc}\n\n{body}"
-    if len(content) > MAX_PROPOSAL:
-        raise SkillError(
-            f"beceri en çok {MAX_PROPOSAL} karakter olabilir (kullanıcı hepsini okuyabilsin)"
-        )
+    if len(content) > limit:
+        raise SkillError(f"beceri en çok {limit} karakter olabilir (kullanıcı hepsini okuyabilsin)")
     return {"name": n, "content": content}
 
 
-def check_proposal(home: Path, name: object, description: object, instructions: object) -> dict:
+def check_proposal(
+    home: Path, name: object, description: object, instructions: object, limit: int = MAX_PROPOSAL
+) -> dict:
     """Öneri kartı için: temizlenmiş içerik + UYARILAR (riskli desenler, üzerine yazma). Yazmaz."""
-    d = validate_proposal(name, description, instructions)
+    d = validate_proposal(name, description, instructions, limit)
     warnings = [f"Metinde {why} var." for why in memory.suspicious_all(d["content"])]
     overwrites = read(home, d["name"]) is not None
     if overwrites:

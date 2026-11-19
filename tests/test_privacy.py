@@ -20,6 +20,7 @@ KNOWN_NETWORK_MODULES = {
     "ortak.py": "evdeki ortak hafıza: yalnız özel ağdaki ev sahibi bilgisayar, şifreli istekler",
     "mcpimport.py": "MCP eklerken npm/PyPI kaydından son sürüm (yalnız kullanıcı Ekle'ye basınca)",
     "mcpregistry.py": "MCP kayıt defterinde (registry.modelcontextprotocol.io) arama; yalnız kullanıcı Bul'a basınca",
+    "skilllink.py": "bağlantıdan beceri: yalnız GitHub (github.com, raw.githubusercontent.com, api.github.com), kullanıcı isteyince",
     "ortak_dinleyici.py": "ortak hafıza ev sahibi dinleyicisi: yalnız özel ağ adresine bağlanır",
     "fetch_inner.py": "sandbox içinde, allowlist proxy üzerinden sayfa getirme",
     "proxy.py": "allowlist proxy",

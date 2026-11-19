@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import hmac
 import json
@@ -10,12 +9,10 @@ import mimetypes
 import os
 import re
 import secrets
-import sys
 import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
 
@@ -25,15 +22,17 @@ from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from usta import (
+    api_files,
+    api_llm,
+    api_local,
     api_mcp,
     api_ortak,
-    apis,
+    api_settings,
+    api_skills,
     attachments,
     compat,
     filetree,
     harnesses,
-    kisi,
-    localmodels,
     memory,
     ortak,
     privacy,
@@ -43,36 +42,14 @@ from usta import (
 from usta import settings as usta_settings
 from usta.api_models import (
     ID_PATTERN,
-    MAX_FILE,
-    ApiIn,
     ApprovalIn,
     CodeIn,
-    FileIn,
-    FsOp,
-    HarnessToggleIn,
-    ImportIn,
-    KeyIn,
-    LocalCtxIn,
-    LocalHostIn,
-    LocalPullIn,
-    LocalScanIn,
     MessageIn,
-    ModelIn,
-    ProfileIn,
-    ServerName,
-    SettingsIn,
-    SkillIn,
-    SkillProposalIn,
-    SystemInstallIn,
     TaskIn,
     WorkspaceId,
     WorkspaceIn,
-    friendly_model_error,
 )
-from usta.audit import AuditLog, file_hash
 from usta.auth import LoginCodes
-from usta.modelctl import ModelSwitchError
-from usta.models import Message, ModelError
 from usta.policy import PathEscapeError, resolve_path
 from usta.tasks import PlanNotFound, RevertRefused, TaskFinished, TaskManager, WorkspaceBusy
 
@@ -271,166 +248,15 @@ def create_app(
             raise HTTPException(500, "klasör açılamadı") from None
         return {"opened": str(root)}
 
-    @api.get("/workspaces/{workspace}/tree")
-    def tree(workspace: WorkspaceId, path: str = "") -> dict:
-        root = ws_root(workspace)
-        try:
-            full = resolve_path(root, path or ".")
-        except PathEscapeError:
-            raise HTTPException(400, "geçersiz yol") from None
-        if not full.is_dir():
-            raise HTTPException(404, "klasör yok")
-        try:
-            return {"path": path, "entries": filetree.list_dir(full)}
-        except OSError:
-            raise HTTPException(400, "klasör okunamadı") from None
-
-    @api.post("/workspaces/{workspace}/import")
-    def import_files(workspace: WorkspaceId, body: ImportIn) -> dict:
-        root = idle_ws(workspace)
-        try:
-            decoded = filetree.decode_files([(f.path, f.b64) for f in body.files])
-        except filetree.ImportError_ as e:
-            raise HTTPException(400, str(e)) from None
-        written, skipped = [], []
-        for rel, data in decoded:
-            try:
-                full = resolve_path(root, rel)
-            except PathEscapeError:
-                raise HTTPException(400, f"geçersiz yol: {rel}") from None
-            if full.exists() and not body.overwrite:
-                skipped.append(rel)
-                continue
-            try:
-                full.parent.mkdir(parents=True, exist_ok=True)
-                full.write_bytes(data)
-            except OSError:
-                raise HTTPException(400, f"yazılamadı: {rel}") from None
-            written.append(rel)
-        return {"written": written, "skipped": skipped}
-
-    @api.post("/workspaces/{workspace}/fs")
-    def fs_op(workspace: WorkspaceId, body: FsOp) -> dict:
-        root = idle_ws(workspace)
-        try:
-            if body.op == "create_file":
-                filetree.create(root, body.path, is_dir=False)
-            elif body.op == "create_dir":
-                filetree.create(root, body.path, is_dir=True)
-            elif body.op == "rename":
-                if not body.to:
-                    raise HTTPException(400, "yeni ad gerekli")
-                filetree.rename(root, body.path, body.to)
-            else:
-                filetree.delete(root, body.path)
-        except filetree.FsError as e:
-            raise HTTPException(e.status, str(e)) from None
-        with contextlib.suppress(OSError):
-            AuditLog(home / "audit" / f"{workspace}.jsonl").record(
-                "fs_op", op=body.op, path=body.path, to=body.to, trigger="kullanıcı"
-            )
-        return {"ok": True}
-
-    @api.get("/skills")
-    def list_skills() -> list[dict]:
-        return skills.list_skills(home)
-
-    @api.get("/harnesses")
-    def list_harnesses() -> dict:
-        """Usta'nın yardıma çağırabileceği diğer yapay zekâ programları: kurulu mu, sürüm, açık mı."""
-        cur = usta_settings.load(home)
-        return {"programlar": harnesses.detect(set(cur.delegates))}
-
-    @api.put("/harnesses/{harness_id}")
-    def set_harness(harness_id: str, body: HarnessToggleIn) -> dict:
-        h = harnesses.CATALOG.get(harness_id)
-        if h is None:
-            raise HTTPException(404, "böyle bir program yok")
-        if body.enabled:
-            if harnesses._which(h) is None:
-                raise HTTPException(409, f"{h.label} bu bilgisayarda kurulu değil.")
-            reason = harnesses.usable_here(h)
-            if reason:
-                raise HTTPException(409, f"{h.label}: {reason}")
-        import dataclasses
-
-        cur = usta_settings.load(home)
-        opened = set(cur.delegates)
-        (opened.add if body.enabled else opened.discard)(harness_id)
-        try:
-            usta_settings.save(home, dataclasses.replace(cur, delegates=tuple(sorted(opened))))
-        except (ValueError, OSError):
-            raise HTTPException(500, "ayar kaydedilemedi") from None
-        return {"programlar": harnesses.detect(opened)}
-
-    @api.post("/skills/check")
-    def check_skill_proposal(body: SkillProposalIn) -> dict:
-        """Usta'nın önerdiği becerinin temizlenmiş hâli ve uyarıları (öneri kartı bunu gösterir). Hiçbir şey yazmaz."""
-        try:
-            return skills.check_proposal(home, body.name, body.description, body.instructions)
-        except skills.SkillError as e:
-            raise HTTPException(422, str(e)) from None
-
-    @api.put("/skills/{name}")
-    def put_skill(name: str, body: SkillIn) -> dict:
-        try:
-            skills.put(home, name, body.content)
-        except skills.SkillError as e:
-            raise HTTPException(400, str(e)) from None
-        return {"name": name}
-
-    @api.delete("/skills/{name}")
-    def delete_skill(name: str) -> dict:
-        try:
-            skills.delete(home, name)
-        except skills.SkillError as e:
-            raise HTTPException(404, str(e)) from None
-        return {"removed": name}
-
-    @api.get("/workspaces/{workspace}/files")
-    def read_file(workspace: WorkspaceId, path: str) -> dict:
-        root = ws_root(workspace)
-        try:
-            full = resolve_path(root, path)
-        except PathEscapeError:
-            raise HTTPException(400, "geçersiz yol") from None
-        if not full.exists():
-            raise HTTPException(404, "dosya yok")
-        if not full.is_file():
-            raise HTTPException(400, "dosya değil")
-        if full.stat().st_size > MAX_FILE:
-            raise HTTPException(413, "dosya çok büyük")
-        raw = full.read_bytes()
-        if b"\x00" in raw[:8192]:
-            raise HTTPException(415, "ikili dosya gösterilemez")
-        return {"path": path, "content": raw.decode(errors="replace")}
-
-    @api.put("/workspaces/{workspace}/files")
-    def write_file(workspace: WorkspaceId, path: str, body: FileIn) -> dict:
-        root = ws_root(workspace)
-        try:
-            full = resolve_path(root, path)
-        except PathEscapeError:
-            raise HTTPException(400, "geçersiz yol") from None
-        if manager.is_busy(workspace):
-            raise HTTPException(409, "çalışma alanında görev sürüyor")
-        before = file_hash(full)
-        try:
-            full.parent.mkdir(parents=True, exist_ok=True)
-            full.write_text(body.content, encoding="utf-8")
-        except OSError:
-            raise HTTPException(400, "yazılamadı") from None
-        with contextlib.suppress(OSError):
-            AuditLog(home / "audit" / f"{workspace}.jsonl").record(
-                "file_change", path=path, before=before, after=file_hash(full), trigger="kullanıcı"
-            )
-        return {"path": path, "bytes": len(body.content.encode())}
-
     def idle_ws(workspace: str) -> Path:
         root = ws_root(workspace)
         if manager.is_busy(workspace):
             raise HTTPException(409, "çalışma alanında görev sürüyor")
         return root
+
+    api_files.register(api, home, manager, ws_root, idle_ws)
+    api_skills.register(api, home)
+    api_local.register(api)
 
     @api.get("/workspaces/{workspace}/memory")
     def get_memory(workspace: WorkspaceId) -> dict:
@@ -457,93 +283,11 @@ def create_app(
             raise HTTPException(400, "hafıza yazılamadı") from None
         return {"cleared": True}
 
-    @api.get("/profile")
-    def get_profile() -> dict:
-        """Kullanıcının kendi yazdığı tanışma bilgileri (modelin yazabildiği bir yol yoktur)."""
-        return asdict(kisi.load(home))
-
-    @api.put("/profile")
-    def put_profile(body: ProfileIn) -> dict:
-        if ortak.load_link(home) is not None:
-            raise HTTPException(
-                409,
-                "Bu bilgisayar evdeki ortak hafızaya bağlı. Bilgiler ev sahibi bilgisayardan değiştirilir.",
-            )
-        try:
-            k = kisi.check(body.model_dump())
-            kisi.save(home, k)
-        except kisi.KisiError as e:
-            raise HTTPException(422, str(e)) from None
-        except OSError:
-            raise HTTPException(500, "profil kaydedilemedi") from None
-        return asdict(k)
-
-    @api.delete("/profile")
-    def delete_profile() -> dict:
-        if ortak.load_link(home) is not None:
-            raise HTTPException(
-                409,
-                "Bu bilgisayar evdeki ortak hafızaya bağlı. Bilgiler ev sahibi bilgisayardan değiştirilir.",
-            )
-        try:
-            kisi.delete(home)
-        except OSError:
-            raise HTTPException(500, "profil silinemedi") from None
-        return asdict(kisi.Kisi())
-
     ohost = api_ortak.register(api, home)
 
-    @api.get("/settings")
-    def get_settings() -> dict:
-        cur = usta_settings.load(home)
-        return {
-            "theme": cur.theme,
-            "mode": cur.mode,
-            "guard": cur.guard,
-            "zoom": cur.zoom,
-            "accent": cur.accent,
-            "think": cur.think,
-            "view": cur.view,
-            "context_window": cur.context_window or 0,
-            "background": on_quit is not None,
-            "workspace": workspace,
-        }
-
-    @api.put("/settings")
-    def put_settings(body: SettingsIn) -> dict:
-        import dataclasses
-
-        cur = usta_settings.load(home)
-        changes = {k: v for k, v in body.model_dump().items() if v is not None}
-        if "context_window" in changes:
-            cw = changes["context_window"]
-            if cw == 0:
-                changes["context_window"] = None
-            elif cw < 256:
-                raise HTTPException(422, "bağlam en az 256 token olmalı")
-        try:
-            new = dataclasses.replace(cur, **changes)
-            usta_settings.save(home, new)
-        except ValueError as e:
-            raise HTTPException(422, str(e)) from None
-        except OSError:
-            raise HTTPException(500, "ayar kaydedilemedi") from None
-        if "context_window" in changes:
-            manager.context_window = new.context_window  # bir sonraki görevden itibaren
-        if "think" in changes and manager.model_control is not None:
-            manager.model_control.rebuild()
-        return {
-            "theme": new.theme,
-            "mode": new.mode,
-            "guard": new.guard,
-            "zoom": new.zoom,
-            "accent": new.accent,
-            "think": new.think,
-            "view": new.view,
-            "context_window": new.context_window or 0,
-        }
-
     api_mcp.register(api, home)
+    api_settings.register(api, home, manager, workspace=workspace, background=on_quit is not None)
+    api_rows = api_llm.register(api, home, manager)
 
     @api.post("/workspaces/{workspace}/tasks", status_code=202)
     def create_task(workspace: WorkspaceId, body: TaskIn) -> dict:
@@ -594,79 +338,6 @@ def create_app(
         except TaskFinished:
             raise HTTPException(409, "görev bitti") from None
         return {"queued": True}
-
-    @api.get("/model")
-    def get_model() -> dict:
-        ctl = manager.model_control
-        if ctl is None:
-            raise HTTPException(404, "model değiştirme bu sunucuda yok")
-        return ctl.info()
-
-    @api.put("/model")
-    def put_model(body: ModelIn) -> dict:
-        ctl = manager.model_control
-        if ctl is None:
-            raise HTTPException(404, "model değiştirme bu sunucuda yok")
-        if manager.any_busy():
-            raise HTTPException(409, "görev sürerken model değiştirilemez")
-        try:
-            return ctl.switch(body.model, body.api)
-        except ModelSwitchError as e:
-            raise HTTPException(e.status, e.message) from None
-
-    # --- bağlı API'ler (anahtarlar geri verilmez) --------------------------------------------
-    def api_rows() -> list[dict]:
-        ctl = manager.model_control
-        rows = (
-            [
-                {
-                    "name": "varsayılan",
-                    "endpoint": ctl.default.endpoint if ctl else "",
-                    "has_key": bool(ctl and ctl.default.key),
-                    "builtin": True,
-                }
-            ]
-            if ctl
-            else []
-        )
-        try:
-            stored = apis.load(home)
-        except apis.ApiError as e:
-            raise HTTPException(500, str(e)) from None
-        rows += [
-            {"name": a.name, "endpoint": a.endpoint, "has_key": bool(a.key), "builtin": False}
-            for a in stored.values()
-        ]
-        return rows
-
-    @api.get("/apis")
-    def list_apis() -> list[dict]:
-        return api_rows()
-
-    @api.post("/apis", status_code=201)
-    def add_api(body: ApiIn) -> dict:
-        try:
-            a = apis.add(home, body.name, body.endpoint, body.key)
-        except apis.ApiError as e:
-            raise HTTPException(409 if "zaten" in str(e) else 400, str(e)) from None
-        return {"name": a.name}
-
-    @api.post("/setup/ping")
-    def setup_ping() -> dict:
-        """Sihirbazın son denemesi: seçili modele tek kısa istek atar, anlaşılır bir sonuç döner."""
-        ctl = manager.model_control
-        if ctl is None or not ctl.ready:
-            raise HTTPException(409, "önce bir model seç")
-        t0 = time.monotonic()
-        try:
-            r = ctl.current().chat([Message(role="user", content="Merhaba de, tek kelime yaz.")])
-        except ModelError as e:
-            return {"ok": False, "error": friendly_model_error(str(e))}
-        return {
-            "ok": True,
-            "seconds": round(time.monotonic() - t0, 1),
-            "reply": (r.content or "")[:200],
-        }
 
     @api.post("/quit")
     def quit_app() -> dict:
@@ -734,100 +405,6 @@ def create_app(
             lan=pair is not None,
         )
         return {"filename": f"usta-yardim-{time.strftime('%Y%m%d-%H%M')}.txt", "text": text}
-
-    @api.post("/local/scan")
-    def local_scan(body: LocalScanIn) -> list[dict]:
-        try:
-            return localmodels.scan(body.port)
-        except localmodels.LocalError as e:
-            raise HTTPException(400, str(e)) from None
-
-    @api.post("/local/scan-lan")
-    def local_scan_lan() -> list[dict]:
-        """Evdeki ağda (bu bilgisayarın /24'ü) yaygın portlarda model sunucusu arar."""
-        return localmodels.lan_scan()
-
-    @api.post("/local/probe-host")
-    def local_probe_host(body: LocalHostIn) -> dict:
-        """Kullanıcının yazdığı evdeki adreste model sunucusu var mı (yalnız özel ağ adresleri)."""
-        try:
-            found = localmodels.probe_host(body.host)
-        except localmodels.LocalError as e:
-            raise HTTPException(400, str(e)) from None
-        if not found:
-            raise HTTPException(
-                404,
-                "Bu adreste yapay zekâ bulamadım. Öbür bilgisayar açık mı ve Ollama (ya da LM Studio) "
-                "ağa açık mı? Adresi de kontrol et.",
-            )
-        return found
-
-    @api.get("/system/info")
-    def system_info() -> dict:
-        """Yerel model sihirbazı için: bellek, Ollama durumu, kurulu modeller ve öneri."""
-        ram = localmodels.memory_gb()
-        ollama = localmodels.probe(11434, timeout=1.0)
-        return {
-            "os": sys.platform,
-            "ram_gb": None if ram is None else round(ram, 1),
-            "ollama_running": ollama is not None,
-            "ollama_installed": ollama is not None or compat.safe_which("ollama") is not None,
-            "docker_installed": compat.safe_which("docker") is not None,
-            "can_install": {k: localmodels.can_install(k) for k in localmodels.INSTALLABLE},
-            "installed": ollama["models"] if ollama else [],
-            "recommend": localmodels.recommend(ram),
-        }
-
-    @api.post("/system/install", status_code=202)
-    def system_install(body: SystemInstallIn) -> dict:
-        """Eksik programı (şimdilik yalnız Ollama, yalnız Windows) kullanıcının düğmesiyle kurar."""
-        try:
-            localmodels.INSTALL.start(body.what)
-        except localmodels.LocalError as e:
-            raise HTTPException(409 if "sürüyor" in str(e) else 400, str(e)) from None
-        return {"started": True}
-
-    @api.get("/system/install")
-    def system_install_progress() -> dict:
-        return localmodels.INSTALL.snapshot()
-
-    @api.post("/local/pull", status_code=202)
-    def local_pull(body: LocalPullIn) -> dict:
-        try:
-            localmodels.PULL.start(body.port, body.model)
-        except localmodels.LocalError as e:
-            raise HTTPException(409 if "sürüyor" in str(e) else 400, str(e)) from None
-        return {"started": True}
-
-    @api.get("/local/pull")
-    def local_pull_progress() -> dict:
-        return localmodels.PULL.snapshot()
-
-    @api.post("/local/context")
-    def local_context(body: LocalCtxIn) -> dict:
-        try:
-            return {"model": localmodels.context_variant(body.port, body.model, body.num_ctx)}
-        except localmodels.LocalError as e:
-            raise HTTPException(502 if "oluşturulamadı" in str(e) else 400, str(e)) from None
-
-    @api.put("/apis/{name}/key")
-    def set_api_key(name: ServerName, body: KeyIn) -> dict:
-        try:
-            apis.set_key(home, name, body.key)
-        except apis.ApiError as e:
-            raise HTTPException(404 if "yok" in str(e) else 400, str(e)) from None
-        return {"has_key": bool(body.key)}
-
-    @api.delete("/apis/{name}")
-    def delete_api(name: ServerName) -> dict:
-        ctl = manager.model_control
-        if ctl is not None and ctl.api == name:
-            raise HTTPException(409, "kullanılan API silinemez; önce başka bir model seç")
-        try:
-            apis.remove(home, name)
-        except apis.ApiError as e:
-            raise HTTPException(404, str(e)) from None
-        return {"removed": name}
 
     @api.get("/tasks/{task_id}")
     def task_info(task_id: str) -> dict:

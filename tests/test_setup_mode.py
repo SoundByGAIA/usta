@@ -75,7 +75,7 @@ def test_ping_reports_friendly_result_and_needs_a_model(tmp_path):
 
 
 def test_friendly_errors_cover_common_cases():
-    from usta.api import friendly_model_error as f
+    from usta.api_models import friendly_model_error as f
 
     assert "bakiye" in f("model isteği başarısız: HTTP 402")
     assert "bulunamadı" in f("model isteği başarısız: HTTP 404")
@@ -88,7 +88,7 @@ def test_friendly_errors_match_the_shared_cases():
     import json
     from pathlib import Path
 
-    from usta.api import friendly_model_error as f
+    from usta.api_models import friendly_model_error as f
 
     cases = json.loads((Path(__file__).parent / "web" / "friendly-errors.json").read_text("utf-8"))
     assert len(cases) >= 20

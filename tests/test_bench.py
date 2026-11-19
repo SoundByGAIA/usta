@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from usta import bench
+from usta import bench, bench_report
 from usta.models import ModelResponse, ToolCall
 
 SOL = Path(__file__).parent / "bench_solutions"
@@ -435,13 +435,13 @@ def write_report(path, model, arm, outcomes, tokens=1000):
 
 
 def test_wilson_interval_properties():
-    lo, hi = bench.wilson(0, 15)
+    lo, hi = bench_report.wilson(0, 15)
     assert lo == 0.0 and 0.15 < hi < 0.25
-    lo, hi = bench.wilson(15, 15)
+    lo, hi = bench_report.wilson(15, 15)
     assert hi == 1.0 and lo > 0.75
-    lo, hi = bench.wilson(8, 15)
+    lo, hi = bench_report.wilson(8, 15)
     assert lo < 8 / 15 < hi and hi - lo > 0.4  # 15 koşuda aralık geniştir
-    assert bench.wilson(0, 0) == (0.0, 0.0)
+    assert bench_report.wilson(0, 0) == (0.0, 0.0)
 
 
 def test_compare_groups_by_tier_and_arm_and_marks_overlap(tmp_path):
@@ -451,7 +451,7 @@ def test_compare_groups_by_tier_and_arm_and_marks_overlap(tmp_path):
         write_report(tmp_path / "w-c.json", "kucuk", "C", [True] + [False] * 14, tokens=3500),
     ]
     api = [write_report(tmp_path / "a-b.json", "buyuk", "B", [True] * 14 + [False])]
-    md = bench.compare_markdown({"zayıf": weak, "büyük (API)": api})
+    md = bench_report.compare_markdown({"zayıf": weak, "büyük (API)": api})
     assert "## zayıf" in md and "## büyük (API)" in md
     assert "kucuk" in md and "buyuk" in md
     assert "| A |" in md and "| B |" in md and "| C |" in md
@@ -466,7 +466,7 @@ def test_compare_says_clear_difference_when_intervals_do_not_overlap(tmp_path):
         write_report(tmp_path / "x.json", "m", "B", [False] * 30),
         write_report(tmp_path / "y.json", "m", "C", [True] * 30),
     ]
-    md = bench.compare_markdown({"orta": files})
+    md = bench_report.compare_markdown({"orta": files})
     assert "C, B'den belirgin şekilde yüksek" in md
 
 
@@ -492,7 +492,7 @@ def test_compare_accepts_old_reports_without_arm_field(tmp_path):
     data = json.loads(p.read_text())
     del data["arm"]
     p.write_text(json.dumps(data))
-    assert "| B |" in bench.compare_markdown({"orta": [p]})
+    assert "| B |" in bench_report.compare_markdown({"orta": [p]})
 
 
 # --- D kolu: devre kesici -----------------------------------------------------------------

@@ -7,7 +7,7 @@ import subprocess
 import pytest
 
 from test_bench import Scripted, by_id, solution_calls, write
-from usta import bench, taxonomy
+from usta import bench, bench_report, taxonomy
 from usta.cli import main
 from usta.models import ModelResponse, ToolCall
 
@@ -259,22 +259,22 @@ def test_paired_counts_and_infra_pairs_are_skipped():
     a = results([True, True, False, False, True, False])
     b = results([True, False, True, False, True, False])
     b[5] = bench.TaskResult("c", False, outcome="infra")
-    p = bench.paired(a, b)
+    p = bench_report.paired(a, b)
     assert p == {"pairs": 5, "both": 2, "a_only": 1, "b_only": 1, "neither": 1}
 
 
 def test_paired_verdict_never_claims_significance_on_small_samples():
-    v = bench.paired_verdict(
+    v = bench_report.paired_verdict(
         {"pairs": 10, "both": 3, "a_only": 0, "b_only": 5, "neither": 2}, "B", "C"
     )
     assert "C lehine" in v and "yalnız yön" in v and "anlamlı" not in v
-    assert "aynı sonuç" in bench.paired_verdict(
+    assert "aynı sonuç" in bench_report.paired_verdict(
         {"pairs": 4, "both": 2, "a_only": 0, "b_only": 0, "neither": 2}, "B", "C"
     )
-    assert "yön yok" in bench.paired_verdict(
+    assert "yön yok" in bench_report.paired_verdict(
         {"pairs": 4, "both": 0, "a_only": 2, "b_only": 2, "neither": 0}, "B", "C"
     )
-    assert "eşleşen çift yok" in bench.paired_verdict(
+    assert "eşleşen çift yok" in bench_report.paired_verdict(
         {"pairs": 0, "both": 0, "a_only": 0, "b_only": 0, "neither": 0}, "B", "C"
     )
 
@@ -287,11 +287,11 @@ def test_compare_and_diagnose_reports_include_failures_infra_and_paired_table(tm
 
     b = rep("B", [False, False, True, False, False, False])
     c = rep("C", [True, False, True, False, False, False], failure="NO_CHANGE")
-    md = bench.compare_markdown({"orta": [b, c]})
+    md = bench_report.compare_markdown({"orta": [b, c]})
     assert "Başarısızlık nedenleri" in md and "WRONG_SOLUTION" in md and "NO_CHANGE" in md
     assert "Eşleştirilmiş karşılaştırma" in md and "Yalnız B" in md
     assert "Altyapı hatası" in md and "anlamlılık iddia edilmez" in md
-    diag = bench.diagnose_markdown([b, c])
+    diag = bench_report.diagnose_markdown([b, c])
     assert "Neden | Koşu | Pay" in diag and "onarım denemesi" in diag and "m7b" in diag
 
 
@@ -304,8 +304,8 @@ def test_old_reports_without_new_fields_still_load_and_compare(tmp_path):
         "results": [{"task": "t", "passed": False, "steps": 3, "outcome": "fail"}],
     }
     (tmp_path / "o.json").write_text(json.dumps(old))
-    assert "eski" in bench.compare_markdown({"x": [tmp_path / "o.json"]})
-    assert "eski" in bench.diagnose_markdown([tmp_path / "o.json"])
+    assert "eski" in bench_report.compare_markdown({"x": [tmp_path / "o.json"]})
+    assert "eski" in bench_report.diagnose_markdown([tmp_path / "o.json"])
 
 
 def test_cli_diagnose_and_replay_errors(tmp_path, capsys):
@@ -339,13 +339,13 @@ def test_regress_report_lists_regressions_improvements_and_cost_shift(tmp_path):
 
     old = rep("old.json", {"a": [True, True], "b": [False, False], "c": [True, False]})
     new = rep("new.json", {"a": [True, False], "b": [True, True], "c": [True, False]})
-    md = bench.regress_markdown(old, new)
+    md = bench_report.regress_markdown(old, new)
     assert "Regresyonlar (1)" in md and "- a: 2/2 → 1/2" in md
     assert "İyileşmeler (1)" in md and "- b: 0/2 → 2/2" in md
     assert "Başarısızlık nedeni kayması" in md and "WRONG_SOLUTION" in md and "Token/görev" in md
     assert "UYARI" not in md
     other = rep("o.json", {"a": [True, True]}, model="baska", arm="C")
-    warn = bench.regress_markdown(old, other)
+    warn = bench_report.regress_markdown(old, other)
     assert "model farklı" in warn and "kol farklı" in warn and "görev kümeleri farklı" in warn
 
 

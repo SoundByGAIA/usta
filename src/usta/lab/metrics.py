@@ -9,7 +9,7 @@ from __future__ import annotations
 import statistics
 from collections import Counter, defaultdict
 
-from usta.bench import wilson
+from usta.bench_report import wilson
 
 
 def _rate(k: int, n: int) -> dict:

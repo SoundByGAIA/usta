@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-from usta import bench, capability, cli, profile, projectcfg, settings
+from usta import bench, bench_report, capability, cli, profile, projectcfg, settings
 from usta.agent import Agent
 from usta.cascade import CascadeModel
 
@@ -23,7 +23,7 @@ def bench_compare(args: argparse.Namespace) -> int:
             return 2
         tiers.setdefault(tier.strip(), []).append(Path(path.strip()))
     try:
-        md = bench.compare_markdown(tiers)
+        md = bench_report.compare_markdown(tiers)
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"hata: rapor okunamadı: {e}", file=sys.stderr)
         return 2
@@ -209,14 +209,14 @@ def bench_cmd(args: argparse.Namespace) -> int:
         return 0 if same else 1
     if args.bench_cmd == "regress":
         try:
-            print(bench.regress_markdown(Path(args.old), Path(args.new)))
+            print(bench_report.regress_markdown(Path(args.old), Path(args.new)))
         except (OSError, ValueError, KeyError) as e:
             print(f"hata: {e}", file=sys.stderr)
             return 2
         return 0
     if args.bench_cmd == "diagnose":
         try:
-            print(bench.diagnose_markdown([Path(p) for p in args.reports]))
+            print(bench_report.diagnose_markdown([Path(p) for p in args.reports]))
         except (OSError, ValueError, KeyError) as e:
             print(f"hata: {e}", file=sys.stderr)
             return 2

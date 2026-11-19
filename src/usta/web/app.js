@@ -208,7 +208,8 @@
     }
     sel.value = `${info.api}|${info.model}`;
     sel.dataset.cur = sel.value;
-    updateWhere();
+    if (info.model) updateWhere();
+    else $("where").hidden = true;  // model seçilmeden "nerede çalışıyor" söylenemez
     return info;
   }
   async function switchModel() {

@@ -328,14 +328,16 @@
         const name = U.h("strong", null, svc.label);
         name.appendChild(U.h("span", free ? "wiz-tag" : "wiz-tag paid", free ? "ücretsiz katmanı var" : "ücretli"));
         b.append(name);
-        b.addEventListener("click", () => wizPickService(svc));
+        b.setAttribute("aria-pressed", "false");
+        b.addEventListener("click", () => wizPickService(svc, b));
         row.appendChild(b);
       }
       box.appendChild(row);
     }
   }
-  function wizPickService(svc) {
+  function wizPickService(svc, btn) {
     wizService = svc;
+    for (const c of $("wiz-services").querySelectorAll(".wiz-choice")) c.setAttribute("aria-pressed", String(c === btn));
     const help = $("wiz-service-help");
     const ol = U.h("ol", "wiz-steps");
     for (const t of svc.steps) ol.appendChild(U.h("li", null, t));

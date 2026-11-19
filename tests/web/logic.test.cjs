@@ -162,6 +162,13 @@ test("chatModels drops audio/image/embedding models and puts the preferred one f
   assert.deepEqual(L.chatModels(all, ""), ["models/gemini-2.5-pro", "models/gemini-2.5-flash"]);
 });
 
+test("chatModels drops music, image, research and agent-only models", () => {
+  const all = ["models/gemini-2.5-flash", "models/nano-banana-pro-preview", "models/lyria-3.5",
+    "models/deep-research-preview-04-2026", "models/gemini-2.5-computer-use-preview-10-2025",
+    "models/antigravity-preview-latest", "models/gemini-decision-1", "models/gemini-3.1-pro-preview-customtools"];
+  assert.deepEqual(L.chatModels(all, ""), ["models/gemini-2.5-flash"]);
+});
+
 test("chatModels falls back to the full list when filtering removes everything", () => {
   assert.deepEqual(L.chatModels(["a-embed", "b-tts"], ""), ["a-embed", "b-tts"]);
   assert.deepEqual(L.chatModels([], "x"), []);

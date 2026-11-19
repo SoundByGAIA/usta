@@ -171,7 +171,7 @@
 
   // Servisler ses, görsel ve gömme modellerini de listeler; kodsuz biri yanlışını seçmesin.
   // Süzme tümünü eliyorsa tam liste döner. `prefer` (öneri) varsa başa alınır.
-  const NOT_CHAT = /(embed|tts|image|imagen|veo|audio|whisper|dall-e|moderation|transcribe|realtime|live|aqa|robotics)/i;
+  const NOT_CHAT = /(embed|tts|image|imagen|veo|audio|whisper|dall-e|moderation|transcribe|realtime|live|aqa|robotics|nano-banana|lyria|deep-research|computer-use|antigravity|decision|customtools)/i;
   function chatModels(models, prefer) {
     const chat = models.filter((m) => !NOT_CHAT.test(m));
     const list = chat.length ? chat : models.slice();

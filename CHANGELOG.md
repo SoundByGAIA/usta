@@ -5,6 +5,10 @@
 - Görünmeyen yazı denetimi: site isteğinde model bir yazıyı zeminiyle aynı renge boyarsa (pembe şerit üstüne pembe
   dükkân adı) bir kez hatırlatılır (`sitecontrast.py`). Önceki site ölçümünde küçük modellerin yazdığı 95 sayfanın
   12'sinde başlık bu yüzden görünmüyordu. Görsel ya da gradyan zemin, `@media` ve `:hover` için karar verilmez.
+- Kodsuz kullanıcı denemesinden: kurulumda seçilen servis kartı işaretli görünür; servis listesindeki müzik, görsel,
+  araştırma ve ajan modelleri (Gemini'de `lyria`, `nano-banana`, `deep-research`…) model seçiminde çıkmaz; model
+  seçilmeden üst çubukta "Bu bilgisayarda" yazmaz. Sonuç sekmesinde teknik açıklama ve dosya yolu kutusu yalnız
+  geliştirici modunda görünür, önizleme büyür.
 
 ## 0.9.0: şifreli ortak hafıza, zincirli denetim kaydı
 

@@ -22,7 +22,11 @@ from usta import compat
 from usta.fetch import _clean
 
 PROTOCOL_VERSION = "2025-06-18"
-BASE_ENV = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "USER")
+# Windows'ta SYSTEMROOT olmadan Python/Node açılırken ağı ve rastgele sayıyı başlatamaz; gizli bilgi taşımazlar.
+BASE_ENV = (
+    "PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "USER",
+    "SYSTEMROOT", "TEMP", "TMP", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "PATHEXT",
+)  # fmt: skip
 MAX_TOOLS = 200
 MAX_PAGES = 20
 

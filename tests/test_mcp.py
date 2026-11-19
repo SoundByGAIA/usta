@@ -81,6 +81,13 @@ def test_environment_is_minimal_plus_explicit(monkeypatch):
     assert "USTA_API_KEY" not in names and "BASKA_SIR" not in names
 
 
+def test_windows_system_variables_reach_the_server(monkeypatch):
+    # Windows'ta SYSTEMROOT olmadan sunucu soket açamaz (WinError 10106)
+    monkeypatch.setenv("SYSTEMROOT", r"C:\Windows")
+    with client() as c:
+        assert "SYSTEMROOT" in c.call_tool("env", {}).split(",")
+
+
 def test_startup_timeout_kills_process():
     t0 = time.monotonic()
     c = client("hang", timeout=1.0)

@@ -100,11 +100,13 @@ class OpenAICompatClient:
         self.api_key = api_key
         self.timeout = timeout
         self.usage = Usage()
-        self.retries, self.backoff, self.sleep = 2, 1.5, time.sleep
+        self.retries, self.backoff, self.sleep = 4, 2.0, time.sleep
+        self.connect_retries = 2  # kapalı yerel sunucu hatası beklemeden söylensin
 
     def _post(self, body: dict, headers: dict) -> httpx.Response:
-        """Geçici hatalarda (bağlantı kurulamadı, 429/502/503/504) kısa aralıkla yeniden dener.
+        """Geçici hatalarda (bağlantı kurulamadı, 429/502/503/504) artan aralıkla yeniden dener.
 
+        Yoğun bulut servisi (ücretsiz katmanda 429/503) birkaç saniyede düzelmez: bekleme 2, 4, 8, 16 sn.
         Okuma zaman aşımı yeniden denenmez: istek modele ulaşmış olabilir, tekrarı pahalıdır.
         """
         for attempt in range(self.retries + 1):
@@ -117,12 +119,12 @@ class OpenAICompatClient:
                     timeout=self.timeout,
                 )
             except (httpx.ConnectTimeout, httpx.ConnectError):
-                if last:
+                if last or attempt >= self.connect_retries:
                     raise
             else:
                 if r.status_code not in TRANSIENT_STATUS or last:
                     return r
-            self.sleep(self.backoff * (attempt + 1))
+            self.sleep(self.backoff * 2**attempt)
         raise AssertionError("ulaşılamaz")  # pragma: no cover
 
     def chat(

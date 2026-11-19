@@ -282,10 +282,12 @@ def test_retry_gives_up_and_503_retried_but_400_not(monkeypatch):
 
     monkeypatch.setattr(httpx, "post", always_503)
     c = models.OpenAICompatClient("http://x/v1", "m")
-    c.sleep = lambda s: None
+    waits = []
+    c.sleep = waits.append
     with pytest.raises(models.ModelError):
         c.chat([models.Message("user", "a")])
-    assert len(seq) == 3
+    # yoğun servis birkaç saniyede düzelmez: toplam bekleme yarım dakikaya yakın
+    assert len(seq) == 5 and sum(waits) >= 25
 
     seq.clear()
     monkeypatch.setattr(

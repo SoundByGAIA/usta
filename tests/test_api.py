@@ -253,6 +253,21 @@ def test_panel_file_write_is_audited_as_user_change(tmp_path):
     ]
 
 
+def test_panel_import_is_audited_as_user_change(tmp_path):
+    import base64
+    import hashlib
+
+    c, _ = make_client(tmp_path, Scripted(ModelResponse("ok")))
+    w = new_ws(c)
+    files = [{"path": "a.txt", "b64": base64.b64encode(b"bir").decode()}]
+    c.post(f"/workspaces/{w}/import", json={"files": files}, headers=AUTH)
+    rows = c.get("/audit", params={"workspace": w}, headers=AUTH).json()
+    h = hashlib.sha256(b"bir").hexdigest()
+    assert [(r["event"], r["path"], r["before"], r["after"], r["trigger"]) for r in rows] == [
+        ("file_change", "a.txt", None, h, "kullanıcı")
+    ]
+
+
 def test_prompt_validation(tmp_path):
     c, _ = make_client(tmp_path, Scripted())
     w = new_ws(c)

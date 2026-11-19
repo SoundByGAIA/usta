@@ -54,12 +54,21 @@ def register(
             if full.exists() and not body.overwrite:
                 skipped.append(rel)
                 continue
+            before = file_hash(full)
             try:
                 full.parent.mkdir(parents=True, exist_ok=True)
                 full.write_bytes(data)
             except OSError:
                 raise HTTPException(400, f"yazılamadı: {rel}") from None
             written.append(rel)
+            with contextlib.suppress(OSError):
+                AuditLog(home / "audit" / f"{workspace}.jsonl").record(
+                    "file_change",
+                    path=rel,
+                    before=before,
+                    after=file_hash(full),
+                    trigger="kullanıcı",
+                )
         return {"written": written, "skipped": skipped}
 
     @api.post("/workspaces/{workspace}/fs")

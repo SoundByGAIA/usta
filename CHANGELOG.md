@@ -8,6 +8,7 @@
 - Dosya değişiklikleri kayda önce/sonra hash'iyle girer: ajanın `write_file`/`edit_file` çağrıları ve paneldeki dosya düzenlemeleri.
   Tetikleyici yazılır (`görev`, `okunan içerik`, `kullanıcı`); görev başında mod (manual/auto/plan) kaydedilir.
 - NVIDIA anahtarları (`nvapi-…`) denetim ve oturum kayıtlarında maskelenir.
+- Ölçüm: NVIDIA NIM ücretsiz modelleriyle bench ([docs/olcumler/nim-modelleri.md](docs/olcumler/nim-modelleri.md)).
 
 ## 0.8.7: kodsuz kullanıcının site isteği
 

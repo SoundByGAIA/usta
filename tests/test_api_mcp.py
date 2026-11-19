@@ -267,3 +267,31 @@ def test_found_server_that_cannot_be_boxed_is_refused(tmp_path, monkeypatch):
         r = c.post("/mcp/bulunanlar", json=body, headers=AUTH)
         assert r.status_code in (400, 404) and r.json()["detail"]
     assert c.get("/mcp/bulunanlar").status_code == 401
+
+
+def test_registry_search_and_add_reload_the_entry_on_the_server(tmp_path, monkeypatch):
+    from test_mcpregistry import BRAVE, REMOTE, fake_get
+    from usta import mcpregistry
+
+    get = fake_get([BRAVE, REMOTE])
+    monkeypatch.setattr(mcpregistry, "_get_json", get)
+    c, home, _ = setup(tmp_path)
+    r = c.post(
+        "/mcp/kayit/ara", json={"sorgu": "github.com/brave/brave-search-mcp-server"}, headers=AUTH
+    )
+    assert r.status_code == 200 and [e["verified"] for e in r.json()] == [True]
+    body = {"name": "io.github.brave/brave-search-mcp-server", "version": "2.1.5"}
+    assert c.post("/mcp/kayit", json=body, headers=AUTH).json() == {
+        "name": "brave-search-mcp-server"
+    }
+    s = mcpconfig.load(home)["brave-search-mcp-server"]
+    assert s.command == ("npx", "-y", "@brave/brave-search-mcp-server@2.1.5")
+    assert (s.isolation, s.allow_hosts, s.env) == ("container", ("*",), ("BRAVE_API_KEY",))
+    # aynı sunucu ikinci kez: yeni bir ad alır, üzerine yazmaz
+    assert (
+        c.post("/mcp/kayit", json=body, headers=AUTH).json()["name"] == "brave-search-mcp-server-2"
+    )
+    remote = {"name": "com.ornek/uzak", "version": "1"}
+    assert c.post("/mcp/kayit", json=remote, headers=AUTH).status_code == 400
+    bad = {"name": "../../etc", "version": "1"}
+    assert c.post("/mcp/kayit", json=bad, headers=AUTH).status_code == 422

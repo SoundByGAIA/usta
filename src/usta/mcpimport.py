@@ -80,7 +80,7 @@ def _servers(path: Path, key: str) -> dict:
     return servers if isinstance(servers, dict) else {}
 
 
-def _usta_name(name: str, taken: set[str]) -> str:
+def usta_name(name: str, taken: set[str]) -> str:
     base = re.sub(r"[^a-z0-9_-]+", "-", name.lower()).strip("-_")[:26].replace("__", "_") or "mcp"
     base = base if base[0].isalnum() else "m" + base
     out, n = base, 2
@@ -139,7 +139,7 @@ def discover(home: Path | None = None, env: Mapping[str, str] | None = None) -> 
         for name, spec in _servers(path, key).items():
             if not isinstance(name, str) or not isinstance(spec, dict):
                 continue
-            f = Found(app, name, str(path), _usta_name(name, taken))
+            f = Found(app, name, str(path), usta_name(name, taken))
             values = spec.get("env") if isinstance(spec.get("env"), dict) else {}
             # VS Code'un ${input:...} yer tutucuları gerçek değer değildir
             f.env = {

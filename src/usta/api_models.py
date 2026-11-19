@@ -216,6 +216,15 @@ class FoundAddIn(BaseModel):
     workspace: Literal["none", "ro", "rw"] = "none"
 
 
+class RegistrySearchIn(BaseModel):
+    sorgu: str = Field(min_length=2, max_length=300)
+
+
+class RegistryAddIn(BaseModel):
+    name: str = Field(min_length=3, max_length=200, pattern=r"^[\w.-]+/[\w.-]+$")
+    version: str = Field(min_length=1, max_length=64, pattern=r"^[\w.+!-]+$")
+
+
 class EnabledIn(BaseModel):
     enabled: bool
 

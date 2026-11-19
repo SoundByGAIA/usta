@@ -7,8 +7,15 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from usta import mcp_runtime, mcpcatalog, mcpconfig, mcpimport
-from usta.api_models import EnabledIn, FoundAddIn, SecretIn, ServerName
+from usta import mcp_runtime, mcpcatalog, mcpconfig, mcpimport, mcpregistry
+from usta.api_models import (
+    EnabledIn,
+    FoundAddIn,
+    RegistryAddIn,
+    RegistrySearchIn,
+    SecretIn,
+    ServerName,
+)
 from usta.mcp import McpClient, McpError
 
 
@@ -129,6 +136,44 @@ def register(api: APIRouter, home: Path) -> None:
             for key, value in mcpimport.secret_values(f).items():
                 mcpconfig.set_secret(home, f.usta_name, key, value)
         return {"name": f.usta_name}
+
+    @api.post("/mcp/kayit/ara")
+    def mcp_registry_search(body: RegistrySearchIn) -> list[dict]:
+        """GitHub bağlantısı ya da paket adıyla resmî MCP kayıt defterinde arama."""
+        try:
+            return [e.public() for e in mcpregistry.search(body.sorgu)]
+        except (OSError, ValueError):
+            raise HTTPException(
+                502, "MCP kayıt defterine ulaşamadım; internet bağlantını kontrol et"
+            ) from None
+
+    @api.post("/mcp/kayit", status_code=201)
+    def mcp_registry_add(body: RegistryAddIn) -> dict:
+        try:
+            e = mcpregistry.fetch(body.name, body.version)
+        except (OSError, ValueError):
+            raise HTTPException(
+                502, "MCP kayıt defterine ulaşamadım; internet bağlantını kontrol et"
+            ) from None
+        if not e.command:
+            raise HTTPException(400, f"eklenemez: {e.reason}")
+        name = mcpimport.usta_name(e.name.rsplit("/", 1)[-1], set(mcp_servers()))
+        try:
+            mcpconfig.add_server(
+                home,
+                name,
+                list(e.command),
+                [v["name"] for v in e.env],
+                "ask",
+                isolation="container",
+                image=e.image,
+                allow_hosts=[
+                    mcpconfig.PUBLIC_INTERNET
+                ],  # çalışma alanını görmez; internete çıkabilir
+            )
+        except mcpconfig.McpConfigError as err:
+            raise HTTPException(400, str(err)) from None
+        return {"name": name}
 
     @api.put("/mcp/{name}/secrets/{key}")
     def mcp_set_secret(name: ServerName, key: str, body: SecretIn) -> dict:

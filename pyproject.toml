@@ -16,7 +16,7 @@ classifiers = [
   "Topic :: Software Development",
 ]
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.27", "fastapi>=0.115", "uvicorn>=0.30", "pypdf>=6.21.4"]
+dependencies = ["httpx>=0.27", "fastapi>=0.115", "uvicorn>=0.30", "pypdf>=6.21.4", "cryptography>=44", "spake2>=0.9"]
 
 [project.scripts]
 usta = "usta.cli:main"

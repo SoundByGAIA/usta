@@ -89,7 +89,7 @@ for line in sys.stdin:
         elif name == "die":
             os._exit(9)
         elif name == "child":
-            c = subprocess.Popen(["sleep", "600"])
+            c = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"])
             text = str(c.pid)
         elif name == "probe":
             send({"jsonrpc": "2.0", "id": 900, "method": "sampling/createMessage", "params": {}})

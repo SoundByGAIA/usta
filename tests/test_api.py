@@ -158,7 +158,10 @@ def test_task_end_records_every_changed_file(tmp_path):
         for r in c.get("/audit", params={"workspace": w}, headers=AUTH).json()
         if r["event"] == "task_changes"
     ]
-    after = hashlib.sha256(b"merhaba\n").hexdigest()
+    # write_file metin kipinde yazar (Windows'ta CRLF); kayıt diskteki baytları anlatmalı
+    after = hashlib.sha256(
+        (tmp_path / "home" / "workspaces" / w / "a.txt").read_bytes()
+    ).hexdigest()
     assert [r["files"] for r in rows] == [[{"path": "a.txt", "before": None, "after": after}]]
 
 

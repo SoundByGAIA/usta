@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from usta import fetch, harnesses, memory, outline, skills, symbols
+from usta import fetch, harnesses, memory, outline, skills, symbols, symbols_index
 from usta.models import BAD_ARGS_KEY
 from usta.policy import PathEscapeError, resolve_path
 from usta.sandbox import SandboxConfig, SandboxError, run_command
@@ -151,7 +151,7 @@ def build_registry(ctx: ToolContext, extra: list[Tool] | tuple[Tool, ...] = ()) 
         except (ValueError, LookupError) as e:
             raise ToolError(str(e)) from e
 
-    index = symbols.SymbolIndex(root) if ctx.symbol_tools else None
+    index = symbols_index.SymbolIndex(root) if ctx.symbol_tools else None
     if ctx.symbol_tools and not symbols.available():
         raise ValueError("sembol araçları için `pip install usta[symbols]` gerekli (tree-sitter)")
 

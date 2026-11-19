@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from usta import bench, outline, symbols
+from usta import bench, outline, symbols, symbols_index
 from usta.models import ModelResponse
 from usta.policy import Decision, Policy
 from usta.tools import ToolContext, ToolError, build_registry
@@ -140,7 +140,7 @@ def repo(tmp_path):
 
 
 def test_index_finds_definitions_callers_and_callees_across_files(repo):
-    idx = symbols.SymbolIndex(repo)
+    idx = symbols_index.SymbolIndex(repo)
     defs = idx.definitions("calculate_payment")
     assert [(r, s.kind) for r, s in defs] == [("shop/payment.py", "function")]
     assert ("shop/cart.py", "Cart.checkout") in idx.callers("calculate_payment")
@@ -153,7 +153,7 @@ def test_index_finds_definitions_callers_and_callees_across_files(repo):
 
 
 def test_related_files_ranks_by_symbols_paths_and_references(repo):
-    idx = symbols.SymbolIndex(repo)
+    idx = symbols_index.SymbolIndex(repo)
     ranked = idx.rank_files("calculate payment total")
     names = [r for r, _, _ in ranked]
     assert names[0] == "shop/payment.py" and "shop/cart.py" in names
@@ -162,7 +162,7 @@ def test_related_files_ranks_by_symbols_paths_and_references(repo):
 
 
 def test_index_refreshes_only_changed_files_and_drops_deleted(repo):
-    idx = symbols.SymbolIndex(repo)
+    idx = symbols_index.SymbolIndex(repo)
     idx.refresh()
     first = idx.parse_count
     idx.refresh()
@@ -239,7 +239,7 @@ def test_symbol_context_is_much_cheaper_than_reading_the_whole_file(tmp_path):
 def test_every_symbol_source_is_complete_in_symbol_context(repo):
     """Seçici bağlam hedef kaynağı kesmemeli (bütçe içinde): her sembolün tüm gövdesi çıktıda olmalı."""
     reg = build_registry(ToolContext(root=repo, symbol_tools=True))
-    idx = symbols.SymbolIndex(repo)
+    idx = symbols_index.SymbolIndex(repo)
     for rel in ("shop/payment.py", "shop/tax.py", "shop/cart.py", "web/api.ts"):
         for s in idx.symbols_of(rel).symbols:
             lines = (repo / rel).read_text().splitlines()[s.start - 1 : s.end]
@@ -294,7 +294,7 @@ def test_everything_falls_back_when_tree_sitter_is_unavailable(monkeypatch, repo
     assert "helper" in outline.read_symbol("a.go", GO, "helper")
     with pytest.raises(ValueError, match="usta\\[symbols\\]"):
         build_registry(ToolContext(root=repo, symbol_tools=True))
-    assert symbols.SymbolIndex(repo).definitions("calculate_payment") == []
+    assert symbols_index.SymbolIndex(repo).definitions("calculate_payment") == []
 
 
 def test_unparsable_and_unsupported_files_do_not_break_the_index(tmp_path):
@@ -302,7 +302,7 @@ def test_unparsable_and_unsupported_files_do_not_break_the_index(tmp_path):
     (tmp_path / "bad.py").write_bytes(b"\xff\xfe\x00 def (:::\n")
     (tmp_path / "notes.md").write_text("# not\n")
     (tmp_path / "huge.py").write_text("x = 1\n" * 400_000)
-    idx = symbols.SymbolIndex(tmp_path)
+    idx = symbols_index.SymbolIndex(tmp_path)
     assert idx.definitions("good") and idx.file_count() >= 3
     reg = build_registry(ToolContext(root=tmp_path, symbol_tools=True))
     assert "good" in reg.call("find_symbol", {"name": "good"})

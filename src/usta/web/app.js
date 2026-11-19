@@ -12,6 +12,7 @@
     done: "bitti", cancelled: "durduruldu", failed: "başarısız",
   };
   const MAX_DIFF_LINES = 2000;
+  Object.assign(U, { STATUS, addNode, officeReplay, officeReset, renderEvent, setStatus, showUsage });
 
   function put(k, v) {
     try { if (v == null || v === "") sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (_) { /* gizli mod */ }
@@ -325,8 +326,8 @@
     if (window.Office && typeof window.Office.setVisible === "function") window.Office.setVisible(name === "office");
     $("result-card").hidden = !(state.resultOn && name === "stream");
     updateStarters();
-    if (name === "memory") loadMemory();
-    if (name === "history") loadHistory();
+    if (name === "memory") U.loadMemory();
+    if (name === "history") U.loadHistory();
     if (name === "preview") loadPreview();
   }
 
@@ -344,130 +345,6 @@
     $("preview-frame").src = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
     $("preview-open").href = url;
   }
-  // --- geçmiş oturumlar ---
-  const fmtTs = (ts) => (ts ? new Date(ts * 1000).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : "");
-  const HIST_STATUS = Object.assign({ interrupted: "kesildi" }, STATUS);
-  async function loadHistory() {
-    const list = $("history-list");
-    list.replaceChildren();
-    $("history-msg").textContent = "";
-    if (!state.ws) return;
-    const ws = state.ws;
-    const res = await api(`/workspaces/${encodeURIComponent(ws)}/sessions`);
-    if (!res.ok || state.ws !== ws) { $("history-msg").textContent = await errorText(res); return; }
-    const all = await res.json();
-    if (!all.length) list.appendChild(h("li", "empty", "Henüz oturum yok."));
-    for (const s of all) {
-      const li = h("li");
-      const b = h("button", null);
-      b.type = "button";
-      const st = h("span", "h-st", HIST_STATUS[s.status] || s.status);
-      st.dataset.s = s.status;
-      b.append(h("span", "h-ts", fmtTs(s.ts)), st, h("span", "h-prompt", s.prompt));
-      b.addEventListener("click", () => openSession(s.id));
-      li.appendChild(b);
-      list.appendChild(li);
-    }
-  }
-  async function openSession(id) {
-    if (state.active || !state.ws) return;
-    const ws = state.ws;
-    const res = await api(`/workspaces/${encodeURIComponent(ws)}/sessions/${encodeURIComponent(id)}`);
-    if (!res.ok || state.ws !== ws) { $("history-msg").textContent = await errorText(res); return; }
-    const s = await res.json();
-    state.task = null;
-    state.replay = true;
-    $("stream").replaceChildren();
-    showUsage(null);
-    officeReset(); // geçmiş oturum: sahne baştan aynı olaylarla yeniden oynar
-    const m = s.meta || {};
-    const names = (m.files || []).length ? `\n📎 ${m.files.join(", ")}` : "";
-    addNode(h("div", "msg user", (m.prompt || "") + names));
-    for (const e of s.events) {
-      if (e.type === "done") setStatus(e.data.status);
-      renderEvent(e.type, e.data);
-    }
-    // Ofis sekmesi: olaylar tek tek değil toplu verilir → sahne zaman çubuğuyla gezilebilir
-    officeReplay(s.events.map((e) => ({ type: e.type, data: e.data })));
-    if (s.status === "interrupted") addNode(h("div", "msg warn", "Bu görev yarıda kesilmiş (sunucu kapanmış olabilir)."));
-    $("replay-text").textContent = `Geçmiş oturum · ${fmtTs(m.ts)} · ${HIST_STATUS[s.status] || s.status} (salt okunur)`;
-    showTab("stream");
-    $("stream").scrollTop = 0;
-  }
-  function leaveReplay() {
-    if (!state.replay) return;
-    state.replay = false;
-    $("stream").replaceChildren();
-    showUsage(null);
-    setStatus("");
-    $("replay-bar").hidden = true;
-    officeReset();
-  }
-
-  // --- ekler (metin / Markdown) ---
-  const MAX_ATT = 5, MAX_ATT_BYTES = 100000;
-  Object.assign(U, { MAX_ATT, MAX_ATT_BYTES, renderAttached });
-  function renderAttached() {
-    const box = $("attached");
-    box.replaceChildren();
-    box.hidden = state.files.length === 0;
-    state.files.forEach((f, i) => {
-      const chip = h("span", "att", `${f.name} · ${Math.max(1, Math.round(f.size / 1000))} KB`);
-      const x = h("button", null, "×");
-      x.type = "button";
-      x.setAttribute("aria-label", `${f.name} ekini kaldır`);
-      x.addEventListener("click", () => { state.files.splice(i, 1); renderAttached(); });
-      chip.appendChild(x);
-      box.appendChild(chip);
-    });
-  }
-  async function addFiles(list) {
-    for (const file of Array.from(list)) {
-      if (state.files.length >= MAX_ATT) { addNode(h("div", "msg warn", `En çok ${MAX_ATT} dosya eklenebilir.`)); break; }
-      if (file.size > MAX_ATT_BYTES) { addNode(h("div", "msg warn", `${file.name}: çok büyük (en çok 100 KB).`)); continue; }
-      let content;
-      try { content = await file.text(); } catch (_) { addNode(h("div", "msg warn", `${file.name}: okunamadı.`)); continue; }
-      if (content.includes("\u0000")) { addNode(h("div", "msg warn", `${file.name}: ikili dosya, yalnız metin eklenebilir.`)); continue; }
-      state.files.push({ name: file.name, content, size: file.size });
-    }
-    renderAttached();
-  }
-
-  // --- proje hafızası ---
-  async function loadMemory() {
-    const notes = $("memory-notes"), hist = $("memory-history");
-    notes.replaceChildren();
-    hist.replaceChildren();
-    $("memory-msg").textContent = "";
-    if (!state.ws) return;
-    const ws = state.ws;
-    const res = await api(`/workspaces/${encodeURIComponent(ws)}/memory`);
-    if (!res.ok || state.ws !== ws) { $("memory-msg").textContent = await errorText(res); return; }
-    const mem = await res.json();
-    $("memory-count").textContent = mem.notes.length ? `(${mem.notes.length})` : "";
-    $("clear-history").disabled = mem.history.length === 0;
-    if (!mem.notes.length) notes.appendChild(h("li", "empty", "Not yok."));
-    mem.notes.forEach((text, i) => {
-      const li = h("li", "mem-row");
-      const del = h("button", null, "Sil");
-      del.type = "button";
-      del.addEventListener("click", () => deleteNote(i));
-      li.append(h("span", "mem-text", text), del);
-      notes.appendChild(li);
-    });
-    if (!mem.history.length) hist.appendChild(h("li", "empty", "Geçmiş yok."));
-    for (const r of mem.history.slice().reverse()) {
-      hist.appendChild(h("li", "mem-row", `[${r.ts}] ${STATUS[r.status] || r.status}: ${r.prompt}${r.answer ? " → " + r.answer : ""}`));
-    }
-  }
-  async function memoryAction(path, opts) {
-    const res = await api(`/workspaces/${encodeURIComponent(state.ws)}/memory${path}`, opts);
-    if (!res.ok) $("memory-msg").textContent = await errorText(res);
-    else await loadMemory();
-  }
-  const deleteNote = (i) => state.ws && memoryAction(`/notes/${i}`, { method: "DELETE" });
-  const clearHistory = () => state.ws && memoryAction("/history", { method: "DELETE" });
-
   // --- görev akışı ---
   async function follow(taskId) {
     state.task = taskId;
@@ -626,7 +503,7 @@
     sel.disabled = state.active;
   }
   async function startTask(prompt, mode, files = [], planId = null, phased = false) {
-    leaveReplay();
+    U.leaveReplay();
     const body = { prompt, mode, guard: $("guard").checked, files: files.map((f) => ({ name: f.name, content: f.content })) };
     if (planId) { body.apply_plan = planId; if (phased) body.phased = true; }
     if (state.designSkill && mode !== "plan") body.design_skill = true;
@@ -642,7 +519,7 @@
     $("diff-count").textContent = "";
     $("revert").disabled = true;
     state.files = [];
-    renderAttached();
+    U.renderAttached();
     addNode(h("div", "msg user", files.length ? `${prompt}\n📎 ${files.map((f) => f.name).join(", ")}` : prompt));
     officeReset(); // yeni görev: ofis sahnesi sıfırdan başlar
     showTab("stream");
@@ -768,7 +645,7 @@
     state.replay = false;
     officeReset();
     state.files = [];
-    renderAttached();
+    U.renderAttached();
     $("replay-bar").hidden = true;
     put("usta_ws", id);
     $("ws-title").textContent = id;
@@ -852,16 +729,16 @@
   $("tab-diff").addEventListener("click", () => showTab("diff"));
   $("tab-memory").addEventListener("click", () => showTab("memory"));
   $("tab-history").addEventListener("click", () => showTab("history"));
-  $("replay-close").addEventListener("click", () => { leaveReplay(); showTab("stream"); });
+  $("replay-close").addEventListener("click", () => { U.leaveReplay(); showTab("stream"); });
   $("attach").addEventListener("click", () => $("file-input").click());
-  $("file-input").addEventListener("change", async () => { await addFiles($("file-input").files); $("file-input").value = ""; });
+  $("file-input").addEventListener("change", async () => { await U.addFiles($("file-input").files); $("file-input").value = ""; });
   const comp = $("composer");
   comp.addEventListener("dragover", (ev) => { if (state.ws && !state.active) { ev.preventDefault(); comp.classList.add("drop"); } });
   comp.addEventListener("dragleave", () => comp.classList.remove("drop"));
   comp.addEventListener("drop", (ev) => {
     ev.preventDefault();
     comp.classList.remove("drop");
-    if (state.ws && !state.active && ev.dataTransfer) addFiles(ev.dataTransfer.files);
+    if (state.ws && !state.active && ev.dataTransfer) U.addFiles(ev.dataTransfer.files);
   });
   $("tools-btn").addEventListener("click", () => U.togglePanel("tools"));
   $("apis-btn").addEventListener("click", () => U.togglePanel("apis"));
@@ -1049,7 +926,7 @@
   $("theme").addEventListener("change", () => { applyTheme($("theme").value); saveSetting({ theme: $("theme").value }); });
   $("guard").addEventListener("change", () => saveSetting({ guard: $("guard").checked }));
   $("mode").addEventListener("change", () => { applyMode($("mode").value); saveSetting({ mode: $("mode").value }); });
-  $("clear-history").addEventListener("click", clearHistory);
+  $("clear-history").addEventListener("click", U.clearHistory);
 
   // Terminal portalı `?code=` ile açar: tek kullanımlık kod jetonla takas edilir, URL hemen temizlenir.
   async function exchangeCode(code) {

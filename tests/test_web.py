@@ -22,6 +22,7 @@ def client(tmp_path):
         ("/settings.js", "text/javascript"),
         ("/setup.js", "text/javascript"),
         ("/files.js", "text/javascript"),
+        ("/history.js", "text/javascript"),
         ("/app.css", "text/css"),
         ("/logic.js", "text/javascript"),
         ("/office-logic.js", "text/javascript"),
@@ -78,7 +79,7 @@ def test_html_has_no_inline_script_or_handlers():
     ["innerHTML", "outerHTML", "insertAdjacentHTML", "eval(", "document.write", "new Function"],
 )
 def test_js_never_uses_html_injection_sinks(banned):
-    assert banned not in "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "app.js"))
+    assert banned not in "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
 
 
 OFFICE_JS = ("office-logic.js", "office-scene.js", "office-actors.js", "office.js")
@@ -127,7 +128,7 @@ def test_office_tab_present_and_default_stays_stream():
 
 
 def test_app_forwards_events_to_office_and_resets():
-    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "app.js"))
+    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
     assert "O.onEvent(type, data)" in js and "Office.onEvent(type, data)" in js
     # yeni görev, geçmiş oturum (aç/kapat), alan değişimi, yeniden bağlanma
     assert js.count("officeReset()") >= 4
@@ -140,7 +141,7 @@ def test_office_approval_strip_and_replay_bar_are_wired():
     assert 'id="office-approval"' in html and 'role="group"' in html
     assert 'id="office-approval-allow"' in html and 'id="office-approval-deny"' in html
     assert 'id="office-replay-range"' in html and 'type="range"' in html
-    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "app.js"))
+    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
     # onay kararı tek akışta: Ofis şeridi mevcut akışı çağırır (kopya kod yok)
     assert "Office.onDecide = (id, decision) => decideApproval(id, decision)" in js
     assert "async function decideApproval(" in js
@@ -152,7 +153,7 @@ def test_office_approval_strip_and_replay_bar_are_wired():
 
 
 def test_js_does_not_persist_token_in_localstorage():
-    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "app.js"))
+    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
     assert "localStorage" not in js
 
 
@@ -182,14 +183,14 @@ def test_html_has_theme_and_mode_selectors_with_expected_values():
 
 
 def test_js_exchanges_login_code_and_cleans_url():
-    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "app.js"))
+    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
     assert "/auth/exchange" in js and "history.replaceState" in js
     assert js.index("history.replaceState") < js.index("exchangeCode(loginCode)")
 
 
 def test_html_has_guard_checkbox_and_js_sends_it():
     assert 'id="guard"' in (WEB / "index.html").read_text()
-    assert 'guard: $("guard").checked' in "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "app.js"))
+    assert 'guard: $("guard").checked' in "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
 
 
 def test_every_help_button_points_to_a_glossary_term():

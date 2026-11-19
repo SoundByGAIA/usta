@@ -62,6 +62,7 @@ UI_FILES = {
     "/settings.js": ("settings.js", "text/javascript; charset=utf-8"),
     "/setup.js": ("setup.js", "text/javascript; charset=utf-8"),
     "/files.js": ("files.js", "text/javascript; charset=utf-8"),
+    "/history.js": ("history.js", "text/javascript; charset=utf-8"),
     "/logic.js": ("logic.js", "text/javascript; charset=utf-8"),
     "/office-logic.js": ("office-logic.js", "text/javascript; charset=utf-8"),
     "/glossary.js": ("glossary.js", "text/javascript; charset=utf-8"),

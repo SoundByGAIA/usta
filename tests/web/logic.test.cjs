@@ -294,3 +294,11 @@ test("plainApproval: yazma isteği okunan içerikten sonra gelirse ayrıca uyar�
   assert.match(a.warn, /Reddet/);
   assert.match(a.warn, /dosyalarını değiştirebilir/);  // programın genel uyarısı da durur
 });
+
+test("skillLink finds a GitHub link only when the message is about a skill", () => {
+  assert.equal(L.skillLink("Şu skill iyiymiş: https://github.com/anthropics/skills/tree/main/skills/pdf"), "https://github.com/anthropics/skills/tree/main/skills/pdf");
+  assert.equal(L.skillLink("bu beceriyi ekle github.com/o/r"), "https://github.com/o/r");
+  assert.equal(L.skillLink("Bu repoyu incele: https://github.com/o/r"), null);  // beceri denmedi: olağan görev
+  assert.equal(L.skillLink("skill yaz bana"), null);
+  assert.equal(L.skillLink("skill: https://evil.com/github.com/o/r"), null);
+});

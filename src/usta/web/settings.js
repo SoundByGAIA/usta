@@ -322,19 +322,38 @@
   }
   const rowOf = (...nodes) => { const r = U.h("div", "row"); r.append(...nodes); return r; };  // h() yalnız metin alır
   function skillProposalNode(args) {
+    const body = { name: String(args.name ?? ""), description: String(args.description ?? ""), instructions: String(args.instructions ?? "") };
+    return proposalCard("Usta yeni bir beceri önerdi", () => U.api("/skills/check", { method: "POST", body: JSON.stringify(body) }));
+  }
+  // Bağlantıdaki beceri (GitHub). Depo bağlantısında önce içindeki becerilerden biri seçilir.
+  function skillFromLinkNode(url) {
+    return proposalCard("Bağlantıdaki beceri", () => U.api("/skills/baglanti", { method: "POST", body: JSON.stringify({ url }) }), (choices, box) => {
+      const list = U.h("div", "row");
+      for (const c of choices) {
+        const b = U.h("button", null, c.split("/").slice(-2, -1)[0] || c); b.type = "button";
+        b.addEventListener("click", () => box.replaceWith(skillFromLinkNode(c)));
+        list.append(b);
+      }
+      return choices.length ? [U.h("p", null, "Bu depoda birden çok beceri var. Hangisini alayım?"), list] : [U.h("p", "error", "Bu depoda beceri (SKILL.md) bulamadım.")];
+    });
+  }
+  // Öneri kartı: içerik sunucuda denetlenir (uyarılar), kullanıcı okuyup onaylamadan kaydedilmez
+  function proposalCard(title, request, choose) {
     const box = U.h("div", "msg skill-proposal");
-    box.append(U.h("strong", null, "Usta yeni bir beceri önerdi"), U.h("p", "wiz-note", "Okuyup beğenirsen Kaydet'e bas. Sen onaylamadan hiçbir şey kaydedilmez."));
+    box.append(U.h("strong", null, title), U.h("p", "wiz-note", "Okuyup beğenirsen Kaydet'e bas. Sen onaylamadan hiçbir şey kaydedilmez."));
     const body = U.h("div");
-    body.append(U.h("p", "wiz-note", "Öneri kontrol ediliyor…"));
+    body.append(U.h("p", "wiz-note", "Kontrol ediliyor…"));
     box.append(body);
     (async () => {
       let d;
       try {
-        const r = await U.api("/skills/check", { method: "POST", body: JSON.stringify({ name: String(args.name ?? ""), description: String(args.description ?? ""), instructions: String(args.instructions ?? "") }) });
-        if (!r.ok) { body.replaceChildren(U.h("p", "error", `Bu öneri kaydedilemez: ${await U.errorText(r)}`)); return; }
+        const r = await request();
+        if (!r.ok) { body.replaceChildren(U.h("p", "error", `Bu beceri kaydedilemez: ${await U.errorText(r)}`)); return; }
         d = await r.json();
-      } catch (_) { body.replaceChildren(U.h("p", "error", "Öneri kontrol edilemedi.")); return; }
+      } catch (_) { body.replaceChildren(U.h("p", "error", "Beceri kontrol edilemedi.")); return; }
+      if (d.secenekler && choose) { body.replaceChildren(...choose(d.secenekler, box)); return; }
       const parts = [U.h("p", null, `Adı: /${d.name}`), U.h("pre", "skill-text", d.content)];
+      if (d.kaynak) parts.splice(1, 0, U.h("p", "wiz-note", `Kaynak: ${d.kaynak} (yalnız yönerge metni alındı; yanındaki dosyalar alınmadı)`));
       const ack = U.h("input"); ack.type = "checkbox"; ack.id = `ack-${d.name}-${Math.random().toString(36).slice(2, 7)}`;
       const save = U.h("button", "primary", "Kaydet"); save.type = "button";
       const drop = U.h("button", null, "Vazgeç"); drop.type = "button";
@@ -531,5 +550,5 @@
     if (kisiFacts.length >= 20) { kisiMsg("En çok 20 madde yazabilirsin. Birini silip yenisini ekle.", "error"); return; }
     kisiFacts.push(v); $("kisi-yeni").value = ""; renderKisiFacts(); kisiMsg("Eklendi. Kalıcı olması için Kaydet'e bas.");
   });
-  Object.assign(U, { closePanels, installButton, kisiMsg, loadOrtak, loadProfile, loadTablet, ortakCall, ortakMsg, renderGlossary, saveProfile, setDesignSkill, skillProposalNode, startSkillDesign, togglePanel, uploadSkills });
+  Object.assign(U, { closePanels, installButton, kisiMsg, loadOrtak, loadProfile, loadTablet, ortakCall, ortakMsg, renderGlossary, saveProfile, setDesignSkill, skillFromLinkNode, skillProposalNode, startSkillDesign, togglePanel, uploadSkills });
 })();

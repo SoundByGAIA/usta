@@ -396,3 +396,4 @@ button.q:hover, button.q:focus-visible { background: var(--accent-soft); }
 @media (prefers-reduced-motion: reduce) { #acilis { display: none; } }
 
 #tools-reg-form input { flex: 1; min-width: 0; }
+#skill-link-form input { flex: 1; min-width: 0; }

@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   const U = (window.UstaApp = window.UstaApp || {});
-  Object.assign(U, { api, errorText, fillPrompt, h, loadModels, put, setActive, updateStarters });
+  Object.assign(U, { api, errorText, fillPrompt, h, hideResult, loadModels, put, setActive, updateStarters });
   const L = window.UstaLogic;
   const $ = (id) => document.getElementById(id);
   const state = { token: "", ws: null, task: null, active: false, abort: null, approvals: {}, contextWindow: null, files: [], replay: false, openFile: null, openDirs: new Set(), selDir: "", defaultWs: null, zoom: "auto", fsMode: null, tab: "stream", resultOn: false, panelStack: [], designSkill: false };
@@ -360,6 +360,10 @@
   $("privacy-btn").addEventListener("click", () => U.togglePanel("privacy"));
   $("api-form").addEventListener("submit", U.addApi);
   $("tools-reg-form").addEventListener("submit", (ev) => U.searchRegistry(ev));
+  $("skill-link-form").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    $("skill-link-out").replaceChildren(U.skillFromLinkNode($("skill-link").value.trim()));
+  });
   $("local-scan").addEventListener("click", U.scanLocal);
   $("wizard-btn").addEventListener("click", () => U.togglePanel("wizard"));
   $("tablet-btn").addEventListener("click", () => U.togglePanel("tablet"));

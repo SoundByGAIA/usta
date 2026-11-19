@@ -56,6 +56,11 @@ Hep aynı şekilde yapmasını istediğin bir iş varsa (ör. "haftalık raporu 
 4. Kartta kırmızı bir uyarı varsa (bağlantı, komut, "onay gerekmez" gibi), "Uyarıları okudum"u işaretlemeden Kaydet açılmaz. Emin değilsen Vazgeç.
 5. Kullanmak için **Ayarlar → Becerilerim → Kullan**'a bas ya da kutuya `/beceri-adı` yaz. Beceriler kendiliğinden çalışmaz.
 
+**İnternette beğendiğin bir beceri varsa:** Usta'ya yaz: "Şu beceri iyiymiş: github.com/…" (ya da bağlantıyı **Ayarlar →
+Becerilerim**'deki kutuya yapıştırıp **Getir**'e bas). Usta beceriyi indirir ve aynı öneri kartını gösterir; sen okuyup
+Kaydet'e basmadan kaydedilmez. Depo bağlantısı verirsen içindeki becerileri listeler, birini seçersin. Şimdilik yalnız
+GitHub bağlantıları ve yalnız yönerge metni (yanındaki betik ya da dosyalar alınmaz).
+
 ## Usta başka yapay zekâ programlarından yardım alsın
 
 Bilgisayarında Claude Code, Codex gibi başka yapay zekâ programları kuruluysa Usta işi onlara da verebilir.

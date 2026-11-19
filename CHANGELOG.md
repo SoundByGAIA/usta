@@ -28,6 +28,9 @@
 - MCP, bağlantıyla ekleme: GitHub bağlantısı ya da paket adı yazılınca Usta resmî MCP kayıt defterinde arar; bağlantıda
   yalnız deposu birebir eşleşen kayıt gösterilir, GitHub hesabıyla doğrulanmış yayıncı işaretlenir. Ekle'ye basınca
   kayıt sunucuda yeniden okunur, sürüm sabit kurulur. Geliştirici modunda, Araçlar panelinde.
+- Bağlantıdan beceri: sohbete "şu skill iyiymiş: github.com/…" yazınca (ya da Ayarlar → Becerilerim'e bağlantıyı
+  yapıştırınca) Usta `SKILL.md`'yi indirip beceri öneri kartını açar; modele gitmez. Depo bağlantısında içindeki
+  beceriler listelenir. Yalnız GitHub, yalnız yönerge metni; uyarılar ve onay her zamanki gibi.
 - Masaüstü ve tarayıcı sekmesi simgesi: takım çantası ve kask. Usta açılınca çanta açılır (1,5 sn, tarayıcı oturumunda
   bir kez; hareket azaltma ayarında oynamaz).
 - `usta audit show` kayıt adı verilmezse en son değişen kaydı gösterir.

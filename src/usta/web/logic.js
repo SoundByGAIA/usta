@@ -255,7 +255,15 @@
     return t;
   }
 
-  const api = { plainProgress, plainApproval, friendlyModelError, chatModels, autoScale, createSSEParser, parseDiff, summarize, isActive, authHeaders, formatTokens, usageText };
+  // Kullanıcı "şu skill iyiymiş: github.com/…" yazdıysa bağlantı (beceri kartı modele sormadan açılır); yoksa null
+  function skillLink(text) {
+    const t = String(text || "");
+    if (!/(skill|beceri|yetenek)/i.test(t)) return null;
+    const m = t.match(/(?:^|\s)(?:https?:\/\/)?((?:www\.)?github\.com\/[\w.-]+\/[\w.-]+(?:\/[^\s]*)?)/i);
+    return m ? `https://${m[1].replace(/^www\./i, "").replace(/[.,;:!?)]+$/, "")}` : null;
+  }
+
+  const api = { skillLink, plainProgress, plainApproval, friendlyModelError, chatModels, autoScale, createSSEParser, parseDiff, summarize, isActive, authHeaders, formatTokens, usageText };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.UstaLogic = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -275,6 +275,14 @@
     const prompt = $("prompt").value.trim();
     if (!prompt || !U.state.ws) return;
     if (U.state.active) return steer(prompt);
+    const link = L.skillLink(prompt);
+    if (link) {  // "şu skill iyiymiş: github.com/…": beceri kartı doğrudan açılır, modele gitmez
+      $("prompt").value = "";
+      U.hideResult();
+      addNode(U.h("div", "msg user", prompt));
+      addNode(U.skillFromLinkNode(link));
+      return U.updateStarters();  // başlangıç önerileri kartın üstünde kalmasın
+    }
     return startTask(prompt, $("mode").value, U.state.files);
   }
   async function steer(text) {

@@ -1,7 +1,7 @@
 """Bölüm bölüm site kurma (sitebuild.py, deneysel)."""
 
 from test_api import Scripted
-from usta import sitebuild
+from usta import sitebuild, sitescrub
 from usta.agent import Agent
 from usta.audit import AuditLog
 from usta.models import ModelResponse
@@ -48,25 +48,25 @@ def test_plan_parsing_drops_headers_nested_items_and_repeats():
 
 def test_section_checks_catch_invented_prices_times_phones_and_broken_scripts():
     ok = "<section><h2>Menü</h2><ul><li>Baklava 120 TL</li><li>Sütlaç 80,00 TL</li></ul></section>"
-    assert sitebuild.problems(PASTANE, ok) == []
-    made = sitebuild.problems(PASTANE, "<section><p>Künefe 150 TL</p></section>")
+    assert sitescrub.problems(PASTANE, ok) == []
+    made = sitescrub.problems(PASTANE, "<section><p>Künefe 150 TL</p></section>")
     assert any("150 TL" in p for p in made)
-    hours = sitebuild.problems(
+    hours = sitescrub.problems(
         PASTANE, "<section><p>8:00 ile 18:00 arası açık, tel 0532 123 45 67</p></section>"
     )
     assert any("saat" in p for p in hours) and any("telefon" in p for p in hours)
-    assert sitebuild.problems(PASTANE, "<section><h2></h2></section>") == [
+    assert sitescrub.problems(PASTANE, "<section><h2></h2></section>") == [
         "bölümde başlık dışında metin yok"
     ]
-    if sitebuild.shutil.which("node"):
+    if sitescrub.shutil.which("node"):
         assert any(
             "betik" in p
-            for p in sitebuild.problems(
+            for p in sitescrub.problems(
                 PASTANE, "<section><p>Sayaç</p><script>let a = ;</script></section>"
             )
         )
         assert (
-            sitebuild.problems(
+            sitescrub.problems(
                 PASTANE, "<section><p>Sayaç</p><script>let a = 1;</script></section>"
             )
             == []
@@ -137,16 +137,16 @@ def test_countdown_part_uses_the_users_date_and_todays_clock():
     assert sitebuild.countdown("Bir sayaç olsun.") == ""  # tarih yok
     part = sitebuild.countdown(DAVETIYE)
     assert "new Date(2027, 5, 14)" in part and "new Date();" in part and "14 Haziran 2027" in part
-    assert sitebuild.problems(DAVETIYE, part) == []
-    node = sitebuild.shutil.which("node")
+    assert sitescrub.problems(DAVETIYE, part) == []
+    node = sitescrub.shutil.which("node")
     if node:
-        js = sitebuild._SCRIPT.search(part).group(1)
+        js = sitescrub._SCRIPT.search(part).group(1)
         fake = (
             "const RealDate = Date; global.Date = class extends RealDate {"
             " constructor(...a) { super(...(a.length ? a : [2026, 10, 16, 15, 0])); } };"
             "const el = {}; global.document = { getElementById: () => el };"
         )
-        out = sitebuild.subprocess.run(
+        out = sitescrub.subprocess.run(
             [node, "-e", fake + js + ";console.log(el.textContent)"],
             capture_output=True,
             text=True,
@@ -178,16 +178,16 @@ def test_invented_places_are_caught_but_single_capitalized_words_are_not():
         "<section><h2>Konum, Harita ve Yollar</h2><ul><li>Konum: Bursa, Altınova Plaza Şeref Salonu</li>"
         "<li>1) İznik Havalimanı</li><li>Düğün saat:04.30 da başlar.</li></ul></section>"
     )
-    issues = sitebuild.problems(DAVETIYE, made)
+    issues = sitescrub.problems(DAVETIYE, made)
     assert any("Altınova Plaza Şeref Salonu" in p and "İznik Havalimanı" in p for p in issues)
     assert any("saat" in p and "04.30" in p for p in issues)
     ok = (
         "<section><h2>Davet</h2><p>Ali ve Zeynep 14 Haziran 2027'de Bursa'daki düğünlerine bekliyor.</p>"
         "<ul><li>Baklava: 120 TL – Klasik ve taze.</li><li>Tarih: 14.06.2027</li></ul></section>"
     )
-    assert sitebuild.problems(DAVETIYE + " baklava 120 TL", ok) == []
+    assert sitescrub.problems(DAVETIYE + " baklava 120 TL", ok) == []
     assert (
-        sitebuild.invented_names(
+        sitescrub.invented_names(
             PASTANE, "<p>Hoş geldiniz, Tatlı Köşe'ye! Biz Nilüfer Bursa'dayız.</p>"
         )
         == []
@@ -199,11 +199,11 @@ def test_persistent_inventions_are_scrubbed_line_by_line(tmp_path):
         "<section><h2>Yer</h2><p>Düğün Bursa'da olacak.</p><ul><li>Yer: Bursa, Konuklar Oteli</li>"
         "<li>Tel: +90 543 210 98 76</li><li>Tarih: 14 Haziran 2027</li></ul></section>"
     )
-    cleaned, n = sitebuild.scrub(DAVETIYE, made)
+    cleaned, n = sitescrub.scrub(DAVETIYE, made)
     assert (
         n == 2 and "Oteli" not in cleaned and "543" not in cleaned and "14 Haziran 2027" in cleaned
     )
-    assert sitebuild.problems(DAVETIYE, cleaned) == []
+    assert sitescrub.problems(DAVETIYE, cleaned) == []
     model = Scripted(
         ModelResponse("1. Yer - Bursa"),
         ModelResponse(""),  # başlık yazamadı

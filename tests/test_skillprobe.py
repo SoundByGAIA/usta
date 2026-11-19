@@ -3,7 +3,7 @@
 import re
 
 from test_api import Scripted
-from usta import sitebuild, skillprobe
+from usta import sitebuild, sitescrub, skillprobe
 from usta.models import ModelResponse
 
 SECTION = '<section id="b0"><h2>İletişim</h2><p>E-posta: ayse@ornek.com</p></section>'
@@ -130,7 +130,7 @@ def test_fact_rows_keep_the_users_words():
 
 
 def test_heading_only_section_counts_as_empty():
-    assert sitebuild.problems(PASTANE, "<section><h2>Menü</h2></section>") == [
+    assert sitescrub.problems(PASTANE, "<section><h2>Menü</h2></section>") == [
         "bölümde başlık dışında metin yok"
     ]
 
@@ -167,7 +167,7 @@ def test_prompts_name_no_forbidden_items(tmp_path):
 
 
 def test_fix_note_names_the_models_own_inventions_not_categories():
-    note = sitebuild.fix_note(
+    note = sitescrub.fix_note(
         DAVETIYE,
         "<section><h2>Yer</h2><p>Bursa, Konuklar Oteli, saat 19:00, tel 0532 123 45 67</p></section>",
     )
@@ -175,7 +175,7 @@ def test_fix_note_names_the_models_own_inventions_not_categories():
         r"telefon|phone|saat|hours", note
     )
     assert (
-        sitebuild.fix_note(
+        sitescrub.fix_note(
             DAVETIYE, "<section><h2>Davet</h2><p>Ali ve Zeynep evleniyor.</p></section>"
         )
         == ""

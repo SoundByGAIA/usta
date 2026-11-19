@@ -24,7 +24,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from usta import compat, sitebuild, sitecheck
+from usta import compat, sitebuild, sitecheck, sitescrub
 from usta.models import Message, ModelClient, ModelError
 
 SCHEMA = 1
@@ -88,7 +88,7 @@ def check_section(reply: str) -> bool:
     if not sitebuild._SECTION.search(body) or re.search(r"<html|<head|<style", body, re.IGNORECASE):
         return False
     frag = sitebuild.parse_section(reply, 0)
-    return "ayse@ornek.com" in frag and not sitebuild.problems(_SECTION_TASK, frag)
+    return "ayse@ornek.com" in frag and not sitescrub.problems(_SECTION_TASK, frag)
 
 
 _INTRO_TASK = "Pastanemin adı Tatlı Köşe, yeri Nilüfer, Bursa."
@@ -100,7 +100,7 @@ def check_noinvent(reply: str) -> bool:
         return False
     if len(_SENT.findall(text + " ")) > 3:
         return False
-    return not sitebuild.problems(_INTRO_TASK, f"<section><p>{text}</p></section>")
+    return not sitescrub.problems(_INTRO_TASK, f"<section><p>{text}</p></section>")
 
 
 def check_page(reply: str) -> bool:
@@ -112,7 +112,7 @@ def check_page(reply: str) -> bool:
     return (
         "ayse@ornek.com" in body
         and "Ayşe" in body
-        and not sitebuild.problems(_SECTION_TASK, body)
+        and not sitescrub.problems(_SECTION_TASK, body)
         and not _CJK.search(body)
     )
 

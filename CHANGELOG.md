@@ -15,6 +15,10 @@
 - Sözlük kutusu "sana en kolay yoldan açıklayayım" der.
 - Açılan bölümlerin (Sözlük, Ayarlar, Gizlilik…) başında "← Geri dön" düğmesi var; "Usta" yazısına basmak ya da Esc ana
   sayfaya döndürür. Üst çubuktaki "Sayfaya dön" kalabalıkta görülmüyordu.
+- "Sonucu aç" yalnız `index.html` için çıkıyordu; artık görevde yazılan sayfa adı ne olursa olsun çıkar ve o sayfayı
+  açar. Görev bitince asıl düğme birkaç kez parlar. Geniş ekranda sonuç kartı sağda dikey durur, sohbet ve yazma kutusu
+  görünür kalır.
+- Açılış animasyonu hareket azaltma ayarında (Windows'un "en iyi performans" ayarı bunu açar) kıpırdamadan görünür.
 - Kurulum sihirbazı: Gemini'de uzun model listesi yerine üç model, öneri `gemini-3.1-flash-lite`; ücretsiz iki servisin
   kartında bir cümlelik fark; Gemini anahtarı için adım adım anlatım; model tanıma bekleme yazısı gerçek süreyi söyler.
 

@@ -76,7 +76,7 @@ Evde birden çok bilgisayarda Usta kullanıyorsan, kendini her birinde yeniden t
 3. Bundan sonra "Seni tanıyayım" bilgilerin ve ortak notlar her bilgisayarda aynıdır. Bilgilerini yalnız ev sahibi bilgisayardan değiştirirsin.
 4. Öbür bilgisayardan eklediğin not, ev sahibi bilgisayarda **Onayla**'ya basana kadar yapay zekâya gitmez. Bunu güvenlik için yaptık.
 
-Bu bağlantı yalnız evdeki ağda çalışır, imzalıdır ama **şifrelenmez**: yalnız güvendiğin ev Wi-Fi'ında kullan. Ortak hafızaya şifre ya da anahtar yazma. Ev sahibi bilgisayar kapalıysa diğerleri son bildiği kopyayı kullanır.
+Bu bağlantı yalnız evdeki ağda çalışır ve şifrelidir. Kod ağa gönderilmez. Ortak hafızaya şifre ya da anahtar yazma. Ev sahibi bilgisayar kapalıysa diğerleri son bildiği kopyayı kullanır.
 
 ## Tabletten ya da telefondan kullanmak
 

@@ -362,13 +362,13 @@ def create_app(
         if link is not None:
             shared = (
                 f"Evdeki ortak hafıza: bu bilgisayar {link['adres']} adresindeki ev sahibi bilgisayarla konuşur. "
-                "Kişisel bilgilerin ve ortak notlar oradan alınır ve her görevde yapay zekâya gider. İstekler "
-                "imzalıdır ama şifrelenmez; yalnız güvendiğin ev ağında kullan."
+                "Kişisel bilgilerin ve ortak notlar oradan alınır ve her görevde yapay zekâya gider. Bağlantı "
+                "şifrelidir."
             )
         elif ortak.Store(home).enabled:
             shared = (
                 f"Bu bilgisayar evdeki ortak hafızayı tutuyor ({ohost.address or 'şu an kapalı'}). Eşleşmiş "
-                "bilgisayarlar profilini ve onayladığın notları alır. İstekler imzalıdır ama şifrelenmez."
+                "bilgisayarlar profilini ve onayladığın notları alır. Bağlantı şifrelidir."
             )
         return privacy.report(
             home,

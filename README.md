@@ -75,8 +75,8 @@ Ayrıntılar, bulunup kapatılan açıklar ve açık bildirme yolu: [SECURITY.md
 - **Modlar:** `manuel` (her riskli adımda sorar), `oto` (sormadan yapar, yasaklar geçerli), `plan` (önce okur ve plan
   yazar; onaylarsan aşama aşama uygular).
 - **Seni tanıyayım:** sana nasıl hitap edeceğini ve nasıl anlatacağını bir kez yazarsın.
-- **Evdeki ortak hafıza:** evdeki birkaç bilgisayar aynı notları paylaşır. Eşleşme 6 haneli kodla yapılır, istekler
-  imzalıdır, dışarıdan gelen not onaylanmadan kullanılmaz.
+- **Evdeki ortak hafıza:** evdeki birkaç bilgisayar aynı notları paylaşır. Eşleşme 6 haneli kodla yapılır, bağlantı
+  şifrelidir, dışarıdan gelen not onaylanmadan kullanılmaz.
 - **Beceriler:** sık yaptığın bir işi Usta'ya bir kez öğretirsin. Usta tarifi önerir, sen kaydedersin.
 - **Başka yapay zekâ programları:** Claude Code, Codex, OpenCode, DeepSeek Harness ya da Hermes kuruluysa Usta işi onlara
   da verebilir. Her seferinde sorar, varsayılan olarak yalnız okuma izniyle verir.

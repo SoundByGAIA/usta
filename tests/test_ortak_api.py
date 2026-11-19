@@ -145,3 +145,11 @@ def test_enabling_without_a_home_network_fails_cleanly(tmp_path, monkeypatch):
     r = c.post("/ortak/ev-sahibi", json={"acik": True}, headers=AUTH)
     assert r.status_code == 409 and "ağ adresini" in r.json()["detail"]
     assert c.get("/ortak", headers=AUTH).json()["rol"] == "yok"  # yarım kalmaz
+
+
+def test_privacy_summary_says_shared_memory_is_encrypted(duo):
+    host, peer, *_, srv = duo
+    _pair(host, peer, srv)
+    for client in (host, peer):
+        text = str(client.get("/privacy", headers=AUTH).json())
+        assert "ortak hafıza" in text and "şifreli" in text and "şifrelenmez" not in text

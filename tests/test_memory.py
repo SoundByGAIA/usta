@@ -247,3 +247,10 @@ def test_notes_steering_secrets_permissions_or_verification_are_suspicious(note)
 )
 def test_ordinary_notes_are_not_suspicious(note):
     assert memory.suspicious(note) is None
+
+
+def test_notes_are_written_with_unix_newlines(tmp_path):
+    # Windows'ta satır sonu çevrilirse dosya sınırı aşar
+    memory.add_note(tmp_path, "bir")
+    memory.add_note(tmp_path, "iki")
+    assert b"\r" not in (tmp_path / ".usta" / "memory" / "NOTES.md").read_bytes()

@@ -66,7 +66,7 @@ def _write(path: Path, text: str) -> None:
     tmp = path.with_name(path.name + ".tmp")
     tmp.unlink(missing_ok=True)  # önceden FIFO/bağ olarak bırakılmış geçici dosya açılmasın
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | compat.nofollow(), 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
+    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:  # boyut sınırı her sistemde aynı
         f.write(text)
     os.replace(tmp, path)
 

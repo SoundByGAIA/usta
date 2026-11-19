@@ -21,6 +21,10 @@
   `.css` türlerini sistemin kayıt defterinden okumaz (bazı makinelerde yanlış tür betiği engelliyordu); proje notları
   her sistemde aynı satır sonuyla yazılır.
 - CI artık Windows'ta da test koşuyor; ürün kodunda kodlamasız dosya açma testle engellenir.
+- MCP: Claude Desktop, Claude Code, Cursor, VS Code ve Windsurf'e kurulu sunucuları Usta bulur ve panelde gösterir; Ekle'ye
+  basınca npm/PyPI paketi son sürümüne sabitlenip kendi kabında çalışır (internete çıkabilir, çalışma klasörünü görmez).
+  Anahtarlar istenirse kopyalanır, değerleri arayüze hiç gelmez. Bilgisayardaki bir programı ya da betiği doğrudan
+  çalıştıranlar ve internetteki sunucular eklenmez, nedeni yazılır.
 - Masaüstü ve tarayıcı sekmesi simgesi: takım çantası ve kask. Usta açılınca çanta açılır (1,5 sn, tarayıcı oturumunda
   bir kez; hareket azaltma ayarında oynamaz).
 - `usta audit show` kayıt adı verilmezse en son değişen kaydı gösterir.

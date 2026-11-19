@@ -28,6 +28,41 @@
     const avail = data.catalog.filter((c) => !c.added);
     if (!avail.length) cat.appendChild(U.h("p", "empty", "Eklenebilecek başka araç yok."));
     for (const c of avail) cat.appendChild(catalogCard(c));
+    const found = $("tools-found");
+    found.replaceChildren();
+    const fr = await U.api("/mcp/bulunanlar");
+    const list = fr.ok ? await fr.json() : [];
+    if (!list.length) found.appendChild(U.h("p", "empty", "Başka bir uygulamada kurulu araç bulamadım."));
+    for (const f of list) found.appendChild(foundCard(f));
+  }
+  // Başka uygulamada bulunan sunucu: komutu Usta kurar (sürüm sabit, kendi kabında); anahtar değeri arayüze hiç gelmez
+  function foundCard(f) {
+    const card = U.h("div", "card");
+    card.append(U.h("strong", null, f.name), U.h("span", "chip", f.app));
+    if (f.added) { card.appendChild(U.h("span", "chip", "eklendi")); return card; }
+    if (!f.kind) { card.appendChild(U.h("p", "empty", `Eklenemez: ${f.reason}.`)); return card; }
+    card.append(U.h("p", null, `${f.package}: kendi kutusunda çalışır, internete çıkabilir, dosyalarını görmez.`), U.h("code", "cmd", f.command.join(" ")));
+    const keys = f.env.filter((e) => e.has_value).map((e) => e.name);
+    let copy = null;
+    if (keys.length) {
+      const label = U.h("label");
+      copy = U.h("input");
+      copy.type = "checkbox";
+      copy.checked = true;
+      label.append(copy, ` Anahtarı da Usta'ya kopyala (${keys.join(", ")})`);
+      card.appendChild(U.h("p")).appendChild(label);
+    }
+    const add = U.h("button", "primary", "Ekle");
+    add.type = "button";
+    add.addEventListener("click", async () => {
+      add.disabled = true;
+      toolsMsg("Ekleniyor: paketin son sürümü öğreniliyor...");
+      const r = await toolsCall("/bulunanlar", "POST", { app: f.app, name: f.name, copy_secrets: !!(copy && copy.checked) });
+      if (r) { toolsMsg(`${r.name} eklendi. Şimdi Hazırla'ya bas, sonra Test et.`, "ok"); await loadTools(); }
+      else add.disabled = false;
+    });
+    card.appendChild(add);
+    return card;
   }
   function catalogCard(c) {
     const card = U.h("div", "card");

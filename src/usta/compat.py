@@ -116,6 +116,69 @@ def kill_group(pid: int) -> None:
         pass
 
 
+def kill_on_close_job(proc: subprocess.Popen) -> object | None:
+    """Windows: süreci bir iş nesnesine koyar; sonradan açtığı süreçler de girer, `close_job` hepsini öldürür.
+
+    Süreç grubu olmayan Windows'ta ebeveyn önce çıkarsa `taskkill /T` torunları bulamaz (ör. npx → node).
+    Başka sistemlerde None döner; orada süreç grubu (`kill_group`) yeter.
+    """
+    if sys.platform != "win32":
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    class Basic(ctypes.Structure):
+        _fields_ = [
+            ("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+            ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+            ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+            ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD), ("SchedulingClass", wintypes.DWORD),
+        ]  # fmt: skip
+
+    class Extended(ctypes.Structure):
+        _fields_ = [
+            ("Basic", Basic), ("Io", ctypes.c_uint64 * 6), ("ProcessMemoryLimit", ctypes.c_size_t),
+            ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+            ("PeakJobMemoryUsed", ctypes.c_size_t),
+        ]  # fmt: skip
+
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.CreateJobObjectW.restype = wintypes.HANDLE
+    k.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+    k.SetInformationJobObject.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_int,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+    ]
+    k.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    k.CloseHandle.argtypes = [wintypes.HANDLE]
+    job = k.CreateJobObjectW(None, None)
+    if not job:
+        return None
+    info = Extended()
+    info.Basic.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    ok = k.SetInformationJobObject(
+        job, 9, ctypes.byref(info), ctypes.sizeof(info)
+    )  # 9: genişletilmiş sınırlar
+    if not ok or not k.AssignProcessToJobObject(job, int(proc._handle)):  # type: ignore[attr-defined]
+        k.CloseHandle(job)
+        return None
+    return job
+
+
+def close_job(job: object | None) -> None:
+    """`kill_on_close_job` iş nesnesini kapatır: içindeki her süreç sonlanır."""
+    if job is None:
+        return
+    import ctypes
+    from ctypes import wintypes
+
+    k = ctypes.WinDLL("kernel32")
+    k.CloseHandle.argtypes = [wintypes.HANDLE]
+    k.CloseHandle(job)
+
+
 def utf8_console() -> None:
     """Windows konsolunun varsayılan kod sayfası Türkçe karakterleri ve işaretleri basamayabilir; UTF-8'e çevirir."""
     for stream in (sys.stdout, sys.stderr):

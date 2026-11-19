@@ -78,6 +78,7 @@ class McpClient:
         self._next_id = 0
         self._dead: str | None = None
         self._stderr = b""
+        self._job: object | None = None
         self._threads: list[threading.Thread] = []
 
     # --- yaşam döngüsü ---------------------------------------------------------------------
@@ -106,6 +107,7 @@ class McpClient:
             raise McpError(
                 f"komut çalıştırılamadı: {self.command[0]} ({e.strerror or e})"
             ) from None
+        self._job = compat.kill_on_close_job(self._proc)  # Windows: torunlar da kapanışta ölsün
         self.pid = self._proc.pid
         for target in (self._read_stdout, self._read_stderr):
             t = threading.Thread(target=target, daemon=True)
@@ -143,6 +145,8 @@ class McpClient:
         except subprocess.TimeoutExpired:
             pass
         compat.kill_group(proc.pid)  # sunucu ve alt süreçleri (ör. npx → node) kendi grubundan
+        compat.close_job(self._job)
+        self._job = None
         try:
             proc.wait(timeout=2.0)
         except subprocess.TimeoutExpired:
@@ -213,6 +217,8 @@ class McpClient:
         self._run_on_close()
         if self.pid is not None:
             compat.kill_group(self.pid)
+        compat.close_job(self._job)
+        self._job = None
 
     def _dispatch(self, line: bytes) -> None:
         try:

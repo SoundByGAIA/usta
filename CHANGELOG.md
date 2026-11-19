@@ -13,6 +13,12 @@
   geliştirici modunda görünür, önizleme büyür.
 - `usta serve` da ortak hafıza ev sahibiyse dinleyiciyi açar (önce yalnız portal açıyordu).
 - MCP: Windows'ta sunucunun hata mesajı sistemin kod sayfasıyla yazılmışsa da Türkçe karakterleri doğru okunur.
+- MCP, Windows: sunucu kapanınca açtığı alt süreçler de kapanır (iş nesnesi; önce `npx → node` gibi torunlar arkada
+  kalabiliyordu). Sürücü harfli çalışma klasörü kaba bağlanabilir (önce `C:` yüzünden reddediliyordu).
+- Windows: sembol araçları yolları `/` ile verir, modelin `\` ya da `./` ile yazdığı yolu da tanır; önizleme `.js` ve
+  `.css` türlerini sistemin kayıt defterinden okumaz (bazı makinelerde yanlış tür betiği engelliyordu); proje notları
+  her sistemde aynı satır sonuyla yazılır.
+- CI artık Windows'ta da test koşuyor; ürün kodunda kodlamasız dosya açma testle engellenir.
 - `usta audit show` kayıt adı verilmezse en son değişen kaydı gösterir.
 - Denetim kaydı: portal görevinin sonunda değişen her dosya (kutudaki komutların değiştirdikleri dahil) önce/sonra
   hash'iyle `task_changes` olarak yazılır; panelden yüklenen dosyalar da `file_change` olarak girer.

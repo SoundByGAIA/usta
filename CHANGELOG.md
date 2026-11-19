@@ -7,6 +7,12 @@
   (`extra_content`) artık olduğu gibi geri gönderilir.
 - "Dosyaya yaz" hatırlatması site sözcüğü geçmeyen yapma isteklerinde de çalışır ("gözlem formu yap"): model kodu
   yanıta döküp ya da "Excel mi HTML mi?" diye seçenek sunup hiç dosya yazmadan bitirmek isterse bir kez hatırlatılır.
+- Bitirme denetimi daha çok erken bitirmeyi yakalar: tarayıcıda çalışacak kod `.md`/`.txt` dosyasına konursa
+  aynı adla `.html` yazması; dosya diskte yokken "`index.html`'i oluşturdum" ya da "çift tıklayın" denirse onu yazması
+  hatırlatılır. "Uygulama" isteği sayfa isteği sayılır; klasöre bakan komut (`ls`, `dir`) dosya yazmak sayılmaz.
+  Plan kipinde yazma aracı olmadığı için denetim çalışmaz.
+- Yoğun bulut servisi (429/503) için yeniden deneme 2, 4, 8, 16 sn aralıkla; kapalı yerel sunucu yine hemen söylenir.
+- Sözlük kutusu "sana en kolay yoldan açıklayayım" der.
 - Kurulum sihirbazı: Gemini'de uzun model listesi yerine üç model, öneri `gemini-3.1-flash-lite`; ücretsiz iki servisin
   kartında bir cümlelik fark; Gemini anahtarı için adım adım anlatım; model tanıma bekleme yazısı gerçek süreyi söyler.
 

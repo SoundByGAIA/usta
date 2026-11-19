@@ -6,6 +6,9 @@ import subprocess
 import sys
 import time
 
+# Gerçek sunucular gibi UTF-8 yazar; -I kipi PYTHONIOENCODING'i yok saydığı için burada açıkça (kod sayfası ayrı test edilir)
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 MODE = sys.argv[1] if len(sys.argv) > 1 else "normal"
 saw_reply = []
 

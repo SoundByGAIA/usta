@@ -7,7 +7,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const WEB = path.resolve(__dirname, "../../src/usta/web");
-const SRC = ["office-logic.js", "office-scene.js", "office-actors.js", "office.js"].map((f) => fs.readFileSync(path.join(WEB, f), "utf8"));
+const SRC = ["office-logic.js", "office-scene.js", "office-actors.js", "office-panels.js", "office.js"].map((f) => fs.readFileSync(path.join(WEB, f), "utf8"));
 
 // Sahte ortam: pencere/bağlam yalnız kayıt tutar (fillRect + drawImage)
 function load(opts) {

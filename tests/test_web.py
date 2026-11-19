@@ -28,6 +28,7 @@ def client(tmp_path):
         ("/office-logic.js", "text/javascript"),
         ("/office-scene.js", "text/javascript"),
         ("/office-actors.js", "text/javascript"),
+        ("/office-panels.js", "text/javascript"),
         ("/office.js", "text/javascript"),
         ("/glossary.js", "text/javascript"),
     ],
@@ -82,7 +83,7 @@ def test_js_never_uses_html_injection_sinks(banned):
     assert banned not in "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
 
 
-OFFICE_JS = ("office-logic.js", "office-scene.js", "office-actors.js", "office.js")
+OFFICE_JS = ("office-logic.js", "office-scene.js", "office-actors.js", "office-panels.js", "office.js")
 
 
 @pytest.mark.parametrize("name", OFFICE_JS)
@@ -109,7 +110,7 @@ def test_office_logic_exports_for_browser_and_node():
 
 
 def test_office_js_draws_pixels_and_respects_motion_and_visibility():
-    js = "\n".join((WEB / f).read_text() for f in ("office-scene.js", "office-actors.js", "office.js"))
+    js = "\n".join((WEB / f).read_text() for f in ("office-scene.js", "office-actors.js", "office-panels.js", "office.js"))
     assert "image-rendering" in (WEB / "app.css").read_text()
     assert "prefers-reduced-motion" in js and "visibilitychange" in js
     assert "matchMedia" in js and "requestAnimationFrame" in js
@@ -148,7 +149,7 @@ def test_office_approval_strip_and_replay_bar_are_wired():
     assert "/approvals/" in js and js.count("/approvals/") == 1
     # geçmiş oturum: olaylar Ofis'e toplu verilir
     assert "O.loadReplay(events)" in js and "officeReplay(s.events.map" in js
-    office = "\n".join((WEB / f).read_text() for f in ("office-scene.js", "office-actors.js", "office.js"))
+    office = "\n".join((WEB / f).read_text() for f in ("office-scene.js", "office-actors.js", "office-panels.js", "office.js"))
     assert "Logic.replayState(" in office and "prefers-reduced-motion" in office
 
 

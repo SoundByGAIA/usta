@@ -59,9 +59,10 @@
     approvalDoneTick: 0, // karar sonrası şeridin görünme sayacı
     // --- geçmiş oturum zaman çubuğu ---
     // { events, i, playing, speed, box, play, range, text, rate, tick } DURUMU
-    // (ad `replay`; loadReplay/leaveReplay işlevleriyle çakışma yok — ikisi de farklı ad alanında)
+    // (ad `replay`; U.loadReplay/U.leaveReplay işlevleriyle çakışma yok — ikisi de farklı ad alanında)
     replay: null,
   };
+  Object.assign(U, { Logic, S, applyState, init });
 
   // Çizici saati parametre olarak alır: yerel saat yalnız burada okunur, mantık saf kalır.
   function localHour(d) {
@@ -195,340 +196,6 @@
     return `Görev: ${STATUS[state.status] || state.status} · ${Logic.countersText(state)}`;
   }
 
-  // --- göstergeler şeridi + eylem paneli (canvas DIŞI, saf DOM: textContent/createElement) ---
-  const $id = (id) => (root.document && root.document.getElementById ? root.document.getElementById(id) : null);
-  const el = (tag, cls) => {
-    const n = root.document.createElement(tag);
-    if (cls) n.className = cls;
-    return n;
-  };
-  const nowMs = () => (root.performance && root.performance.now ? root.performance.now() : Date.now());
-  const clearIntervalFn = (h) => {
-    if (root.clearInterval) root.clearInterval(h);
-    else clearTimeout(h);
-  };
-  const setIntervalFn = (fn, ms) => (root.setInterval ? root.setInterval(fn, ms) : setTimeout(fn, ms));
-
-  function initMetrics() {
-    const token = $id("office-metric-token");
-    const context = $id("office-metric-context");
-    const duration = $id("office-metric-duration");
-    const requests = $id("office-metric-requests");
-    if (!token || !context || !duration || !requests) return;
-    S.metrics = {
-      token,
-      context,
-      duration,
-      requests,
-      bar: $id("office-bar-context"),
-      barFill: $id("office-bar-context-fill"),
-    };
-  }
-
-  // Süre: görev başından beri geçen saniye; istemci saati burada okunur (mantık saf kalır).
-  // Başlangıç/bitiş işaretleri reduce'un runSeq/endSeq alanlarından gelir.
-  function durationText(state) {
-    const run = state.runSeq || 0;
-    if (!run) return Logic.formatDuration(0); // bu görevde `started` görülmedi
-    if (S.durSeq !== run) {
-      // yeni görev (veya ilk `started`): süre burada başlar
-      S.durSeq = run;
-      S.durStart = nowMs();
-      S.durEnd = 0;
-    }
-    const stopped = !!state.endSeq; // görev bitti → süre durur (sayaç ilerlemez)
-    if (stopped && !S.durEnd) S.durEnd = nowMs();
-    const end = S.durEnd || nowMs();
-    return Logic.formatDuration((end - S.durStart) / 1000);
-  }
-
-  function paintMetrics(state) {
-    const m = S.metrics;
-    if (!m) return;
-    const lines = Logic.metricLines(state.usage, S.contextWindow);
-    for (const line of lines) {
-      const node = m[line.key];
-      if (node && node.textContent !== line.value) node.textContent = line.value;
-    }
-    const pct = Logic.contextPercent(state.usage && state.usage.context, S.contextWindow);
-    if (m.bar && m.barFill) {
-      const show = pct != null;
-      if (m.bar.hidden === show) m.bar.hidden = !show; // pencere yoksa çubuk gizli, yalnız sayı kalır
-      const w = show ? `${pct}%` : "0%";
-      if (m.barFill.style.width !== w) m.barFill.style.width = w;
-      const level = pct == null ? "" : pct >= 90 ? "high" : pct >= 70 ? "mid" : "";
-      if (m.barFill.dataset.level !== level) m.barFill.dataset.level = level;
-    }
-    const dur = durationText(state);
-    if (m.duration.textContent !== dur) m.duration.textContent = dur;
-  }
-
-  // Görev sürerken saniyede bir süreyi tazeler (bitince durur; sekme gizliyse de durur).
-  function tickDuration() {
-    if (!S.metrics) return;
-    if (S.state.runSeq && !S.state.endSeq) {
-      paintMetrics(S.state);
-      if (!S.durTick) S.durTick = setIntervalFn(tickDuration, 1000);
-    } else if (S.durTick) {
-      clearIntervalFn(S.durTick);
-      S.durTick = 0;
-      paintMetrics(S.state);
-    }
-  }
-
-  function paintPanel() {
-    const p = S.panel;
-    if (!p) return;
-    const { lines, now } = Logic.actionLines(S.state);
-    const sig = lines.join("\n") + "\n" + now;
-    if (S.panelSig === sig) return;
-    S.panelSig = sig;
-    const items = lines.map((text) => {
-      const li = el("li");
-      li.textContent = text;
-      return li;
-    });
-    p.list.replaceChildren(...items);
-    p.now.textContent = now;
-  }
-
-  function setPanel(open) {
-    S.panelOpen = !!open;
-    const p = S.panel;
-    if (!p) return;
-    p.box.hidden = !S.panelOpen;
-    p.toggle.setAttribute("aria-expanded", S.panelOpen ? "true" : "false");
-    if (S.panelOpen) paintPanel();
-  }
-
-  function initPanel() {
-    const toggle = $id("office-actions-toggle");
-    const box = $id("office-actions-panel");
-    const list = $id("office-actions-list");
-    const now = $id("office-actions-now");
-    if (!toggle || !box || !list || !now) return;
-    S.panel = { toggle, box, list, now };
-    setPanel(false);
-    toggle.addEventListener("click", () => setPanel(!S.panelOpen));
-    // ek kolaylık: canvas'a tıklamak da paneli açar (asıl yol düğme)
-    if (S.canvas) S.canvas.addEventListener("click", () => setPanel(true)); // açıkken yalnız tazelenir, kapanmaz
-  }
-
-  function setContextWindow(n) {
-    const v = Number(n);
-    S.contextWindow = Number.isFinite(v) && v > 0 ? Math.round(v) : 0; // 0 = pencere bilinmiyor
-    if (S.metrics) paintMetrics(S.state);
-  }
-
-  // --- onay şeridi: app.js'teki MEVCUT karar akışı Office.onDecide ile çağrılır (kopya kod yok) ---
-  function initApproval() {
-    if (S.approval) return; // ikinci init'te düğüm dinleyicileri yeniden bağlanmaz
-    const box = $id("office-approval");
-    const text = $id("office-approval-text");
-    const allow = $id("office-approval-allow");
-    const deny = $id("office-approval-deny");
-    if (!box || !text || !allow || !deny) return;
-    S.approval = { box, text, allow, deny };
-    allow.type = deny.type = "button";
-    box.hidden = true;
-    allow.addEventListener("click", () => sendDecision("allow"));
-    deny.addEventListener("click", () => sendDecision("deny"));
-  }
-
-  // Karar: köprü işlevi (app.js `Office.onDecide = (id, decision) => decideApproval(...)`).
-  // Dönen metin şeritte gösterilir, sonra şerit kapanır; Akış'taki onay düğmeleri aynı akıştan güncellenir.
-  function sendDecision(decision) {
-    const id = S.approvalId;
-    if (!id || S.approvalBusy) return;
-    const fn = root.Office && root.Office.onDecide;
-    if (typeof fn !== "function") return; // köprü bağlı değilse istek gönderilmez (uydurma yok)
-    S.approvalBusy = true;
-    if (S.approval) {
-      S.approval.allow.disabled = true;
-      S.approval.deny.disabled = true;
-    }
-    const settle = (msg) => {
-      S.approvalBusy = false;
-      S.approvalId = "";
-      S.approvalDone = msg || "";
-      paintApproval();
-      if (!S.approvalDone) return;
-      if (S.approvalDoneTick) clearTimeout(S.approvalDoneTick);
-      // şerit kısa süre sonucu yazar, sonra gizlenir (yeni onay gelirse yeniden açılır)
-      S.approvalDoneTick = setTimeout(() => {
-        S.approvalDoneTick = 0;
-        S.approvalDone = "";
-        paintApproval();
-      }, 2500);
-    };
-    let out;
-    try {
-      out = fn(id, decision);
-    } catch (_) {
-      settle("Gönderilemedi");
-      return;
-    }
-    if (out && typeof out.then === "function") out.then(settle, () => settle("Gönderilemedi"));
-    else settle(decision === "allow" ? "İzin verildi" : "Reddedildi");
-  }
-
-  // Şerit yalnız CANLI modda, onay bekleyen kimlik varken (veya karar sonucu kısa süre) görünür.
-  function paintApproval() {
-    const a = S.approval;
-    if (!a) return;
-    if (!S.approvalDone && !S.approvalBusy) {
-      a.allow.disabled = false;
-      a.deny.disabled = false;
-    }
-    const id = S.approvalId;
-    const replaying = !!(S.replay && S.replay.events);
-    const show = replaying ? false : !!(S.approvalDone || id); // replay'de onay şeridi ÇIKMAZ
-    a.box.hidden = !show;
-    const text = S.approvalDone || Logic.approvalLine(S.state); // başlık gerçek onay olayından
-    if (a.text.textContent !== text) a.text.textContent = text;
-    a.allow.hidden = !!S.approvalDone;
-    a.deny.hidden = !!S.approvalDone;
-  }
-
-  // Canlı akışta bekleyen onay kimliği değişince şerit bağlanır (replay kendi durumunu gösterir)
-  function trackApproval(state) {
-    if (S.replay && S.replay.events) return;
-    if (state.pendingApprovalId) {
-      if (state.pendingApprovalId !== S.approvalId) {
-        S.approvalId = state.pendingApprovalId;
-        S.approvalDone = "";
-      }
-    } else if (!S.approvalDone) {
-      S.approvalId = ""; // akışta onay çözüldü (auto_approved/denied/done) → şerit kapanır
-    }
-    paintApproval();
-  }
-
-  // --- geçmiş oturum zaman çubuğu: durum saf Logic.replayState ile BAŞTAN hesaplanır ---
-  const REPLAY_MS = 700; // olay başına oynatma süresi (hıza bölünür)
-
-  function initReplay() {
-    if (S.replay) return; // ikinci init'te düğüm dinleyicileri yeniden bağlanmaz
-    const box = $id("office-replay");
-    const play = $id("office-replay-play");
-    const range = $id("office-replay-range");
-    const text = $id("office-replay-text");
-    const rate = $id("office-replay-speed");
-    if (!box || !play || !range || !text || !rate) return;
-    S.replay = { events: null, i: 0, playing: false, speed: 1, box, play, range, text, rate, tick: 0 };
-    play.type = rate.type = "button";
-    box.hidden = true;
-    play.addEventListener("click", () => {
-      const r = S.replay;
-      if (!r || !r.events) return;
-      // sonda oynat → baştan başlar (deterministik: aynı dizi, aynı durumlar)
-      if (!r.playing && r.i >= r.events.length) seekReplay(0);
-      startPlayback(!r.playing);
-    });
-    range.addEventListener("input", () => {
-      if (!S.replay || !S.replay.events) return;
-      const want = Math.round(Number(range.value) || 0); // önce oku: stopPlayback çubuğu r.i'ye geri boyar
-      stopPlayback();
-      seekReplay(want);
-    });
-    rate.addEventListener("click", () => {
-      const r = S.replay;
-      if (!r) return;
-      r.speed = r.speed === 1 ? 2 : r.speed === 2 ? 4 : 1;
-      rate.textContent = `${r.speed}x`;
-      rate.setAttribute("aria-label", `Oynatma hızı: ${r.speed}x (değiştir)`);
-      if (r.playing) startPlayback(true); // yeni hızla yeniden zamanlanır
-    });
-    rate.textContent = "1x";
-    rate.setAttribute("aria-label", "Oynatma hızı: 1x (değiştir)");
-  }
-
-  function replayPaint() {
-    const r = S.replay;
-    if (!r || !r.events) return;
-    const n = r.events.length;
-    if (r.range.max !== String(n)) r.range.max = String(n);
-    if (r.range.value !== String(r.i)) r.range.value = String(r.i);
-    const label = `Olay ${r.i} / ${n}`;
-    if (r.text.textContent !== label) r.text.textContent = label;
-    const playText = r.playing ? "⏸ Duraklat" : "▶ Oynat";
-    if (r.play.textContent !== playText) r.play.textContent = playText;
-    r.play.setAttribute("aria-pressed", r.playing ? "true" : "false");
-    r.play.setAttribute("aria-label", r.playing ? "Oynatmayı duraklat" : "Oynatmayı başlat");
-  }
-
-  // Çubuğu i. olaya sar: durum olay dizisine BAŞTAN uygulanarak hesaplanır (saf, tekrarlanabilir)
-  function seekReplay(i) {
-    const r = S.replay;
-    if (!r || !r.events) return;
-    const n = r.events.length;
-    const raw = Math.floor(Number(i));
-    r.i = !Number.isFinite(raw) ? 0 : Math.min(n, Math.max(0, raw));
-    applyState(Logic.replayState(r.events, r.i));
-    replayPaint();
-  }
-
-  function startPlayback(on) {
-    const r = S.replay;
-    if (!r) return;
-    if (!on) return stopPlayback();
-    if (S.reduced) {
-      // prefers-reduced-motion: otomatik oynatma YOK (yalnız çubukla gezinme)
-      r.playing = false;
-      replayPaint();
-      return;
-    }
-    r.playing = true;
-    if (r.tick) clearIntervalFn(r.tick);
-    r.tick = setIntervalFn(replayStep, Math.max(50, Math.round(REPLAY_MS / r.speed)));
-    replayPaint();
-  }
-
-  function replayStep() {
-    const r = S.replay;
-    if (!r || !r.playing) return;
-    if (r.i >= r.events.length) return stopPlayback(); // sonda durur
-    seekReplay(r.i + 1);
-    if (r.i >= r.events.length) stopPlayback();
-  }
-
-  function stopPlayback() {
-    const r = S.replay;
-    if (!r) return;
-    r.playing = false;
-    if (r.tick) clearIntervalFn(r.tick);
-    r.tick = 0;
-    replayPaint();
-  }
-
-  function loadReplay(events) {
-    const r = S.replay;
-    if (!r) return;
-    const list = Array.isArray(events) ? events.slice() : []; // app.js'in dizisi paylaşılmaz
-    r.events = list;
-    r.i = 0;
-    stopPlayback();
-    r.box.hidden = false; // yalnız replay modunda görünür
-    S.approvalId = ""; // geçmiş kararı değiştirilemez → onay şeridi ÇIKMAZ
-    S.approvalDone = "";
-    paintApproval();
-    applyState(Logic.replayState(list, 0));
-    replayPaint();
-    startPlayback(true); // otomatik oynatma; reduced-motion'da başlamaz
-  }
-
-  function leaveReplay() {
-    const r = S.replay;
-    if (!r) return;
-    stopPlayback();
-    r.events = null;
-    r.i = 0;
-    r.box.hidden = true; // canlı mod aynen döner
-    S.approvalId = "";
-    S.approvalDone = "";
-    paintApproval();
-  }
-
   function updateText() {
     const line = describe(S.state);
     if (S.live && S.live.textContent !== line) S.live.textContent = line;
@@ -538,10 +205,10 @@
       const label = `Usta ofis animasyonu. ${line}. ${board}`;
       if (S.canvas.getAttribute("aria-label") !== label) S.canvas.setAttribute("aria-label", label);
     }
-    paintMetrics(S.state); // göstergeler yalnız olayla değişir (token/bağlam/istek)
-    tickDuration(); // süre çizicisi yalnız görev sürerken ayakta kalır
-    if (S.panelOpen) paintPanel(); // panel kapalıyken DOM'a yazılmaz (gürültü yok)
-    paintApproval(); // onay şeridi başlığı güncel durumdan gelir
+    U.paintMetrics(S.state); // göstergeler yalnız olayla değişir (token/bağlam/istek)
+    U.tickDuration(); // süre çizicisi yalnız görev sürerken ayakta kalır
+    if (S.panelOpen) U.paintPanel(); // panel kapalıyken DOM'a yazılmaz (gürültü yok)
+    U.paintApproval(); // onay şeridi başlığı güncel durumdan gelir
   }
 
   function fit() {
@@ -589,15 +256,15 @@
   function onEvent(type, data) {
     const prev = S.state;
     applyState(Logic.reduce(prev, type, data || {}));
-    trackApproval(S.state); // onay şeridi yalnız bekleyen gerçek kimlikle açılır
+    U.trackApproval(S.state); // onay şeridi yalnız bekleyen gerçek kimlikle açılır
   }
 
   function reset() {
-    leaveReplay(); // yeni görev: replay modu ve zaman çubuğu kapanır, canlı mod döner
+    U.leaveReplay(); // yeni görev: replay modu ve zaman çubuğu kapanır, canlı mod döner
     S.approvalId = "";
     S.approvalDone = "";
     S.approvalBusy = false;
-    paintApproval();
+    U.paintApproval();
     const prev = S.state;
     S.state = Logic.initial();
     S.fx = U.createFx(); // efektler ve boş zaman davranışı da sıfırlanır
@@ -623,8 +290,8 @@
     if (on) {
       S.dirty = true;
       fit();
-      paintMetrics(S.state); // sekme açılınca göstergeler güncel duruma tazelenir
-      tickDuration();
+      U.paintMetrics(S.state); // sekme açılınca göstergeler güncel duruma tazelenir
+      U.tickDuration();
     }
     sync();
   }
@@ -635,10 +302,10 @@
     S.hooks = root.OfficeTestHooks || null; // test: saat/tohum enjeksiyonu (tarayıcıda yok)
     S.live = root.document.getElementById("office-live");
     S.word = root.document.getElementById("office-status");
-    initMetrics();
-    initPanel();
-    initApproval();
-    initReplay();
+    U.initMetrics();
+    U.initPanel();
+    U.initApproval();
+    U.initReplay();
     S.reduced = reduceMotion();
     S.scene = U.makeCanvas(W, H, U.drawScene);
     S.buf = U.makeCanvas(W, H, () => {});
@@ -712,7 +379,7 @@
     confettiBits: U.confettiBits,
     confettiParts: U.confettiParts,
     replay: () => S.replay, // testte zaman çubuğu durumu (DOM düğümleri yoksa null)
-    sendDecision, // testte onay şeridi kararı (köprü Office.onDecide çağrılır)
+    sendDecision: U.sendDecision, // testte onay şeridi kararı (köprü Office.onDecide çağrılır)
     mix32: U.mix32,
     createFx: U.createFx,
     fxEvent: U.fxEvent,
@@ -728,9 +395,9 @@
     onEvent,
     reset,
     setVisible,
-    setContextWindow, // app.js köprüsü: modelin bağlam penceresi (state.contextWindow)
-    loadReplay, // app.js köprüsü: geçmiş oturum olayları [{type,data}] → zaman çubuğu
-    leaveReplay, // replay modundan çık (yeni görev / reset ile de kapanır)
+    setContextWindow: U.setContextWindow, // app.js köprüsü: modelin bağlam penceresi (state.contextWindow)
+    loadReplay: U.loadReplay, // app.js köprüsü: geçmiş oturum olayları [{type,data}] → zaman çubuğu
+    leaveReplay: U.leaveReplay, // replay modundan çık (yeni görev / reset ile de kapanır)
     onDecide: null, // app.js köprüsü: onay kararı akışı (decideApproval)
     getState: () => S.state,
     describe,

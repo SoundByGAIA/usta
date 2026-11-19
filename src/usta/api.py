@@ -69,6 +69,7 @@ UI_FILES = {
     "/glossary.js": ("glossary.js", "text/javascript; charset=utf-8"),
     "/office-scene.js": ("office-scene.js", "text/javascript; charset=utf-8"),
     "/office-actors.js": ("office-actors.js", "text/javascript; charset=utf-8"),
+    "/office-panels.js": ("office-panels.js", "text/javascript; charset=utf-8"),
     "/office.js": ("office.js", "text/javascript; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
 }

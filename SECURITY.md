@@ -37,8 +37,9 @@ En değerli hedefler (önem sırasıyla):
    0.5.0'dan beri: `POST /local/probe-host` ve `/local/scan-lan` ile internete ya da özel ağ dışına istek attırmak (adres, ad çözümü,
    IPv6/DNS hileleri, yönlendirme), `POST /system/install` ile listedeki programdan başkasını kurdurmak ya da komuta metin sokmak
    (`src/usta/localmodels.py`, `tests/test_localmodels.py`).
-   0.6.0'dan beri, evdeki ortak hafıza (`src/usta/ortak.py`, `tests/test_ortak.py`): imzayı atlatmak ya da tekrar oynatmak, eşleşme kodunu
-   tahmin etmek, çalınmış anahtarla modele giren bir not eklemek (onay kapısını aşmak), ev sahibi dinleyicisinden portal uçlarına
+   0.6.0'dan beri, evdeki ortak hafıza (`src/usta/ortak.py`, `src/usta/ortak_dinleyici.py`, `tests/test_ortak.py`): şifreli isteği
+   çözmek, değiştirmek ya da tekrar oynatmak, ağı dinleyerek ya da araya girerek eşleşme kodunu bulmak (SPAKE2: denemede tek tahmin),
+   eşleşme kilidini aşmak, çalınmış anahtarla modele giren bir not eklemek (onay kapısını aşmak), ev sahibi dinleyicisinden portal uçlarına
    ulaşmak, özel ağ dışından ya da tarayıcıdan (`Origin`) erişmek, bağlı bilgisayarda sahte cevapla enjeksiyon.
    0.7.0'dan beri, beceri tasarımcısı (`src/usta/skills.py`, `propose_skill` aracı, `tests/test_skill_design.py`): modelin kullanıcı onayı olmadan
    beceri kaydetmesi/silmesi, öneri kartında riskli metni gizlemek (uyarıları atlatmak), kayıtlı becerinin kendiliğinden devreye girmesi.

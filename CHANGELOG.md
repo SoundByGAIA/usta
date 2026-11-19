@@ -2,6 +2,10 @@
 
 ## Yayınlanmadı
 
+- Ortak hafıza şifreli: eşleşme SPAKE2 ile yapılır, kod ve anahtar ağda gitmez; ağı dinleyen biri kodu deneyemez. Her
+  başlatma bir deneme sayılır, adres başına 3 denemede 15 dakika kilit. Eşleşmeden sonra istek ve cevaplar
+  ChaCha20-Poly1305 ile şifrelenir. Eski eşleşmeler çalışmaz; bağlı bilgisayarlar ev sahibinden yeni kodla yeniden
+  bağlanmalı. Yeni bağımlılıklar: `cryptography`, `spake2`.
 - Denetim kaydı hash zinciriyle bağlı: her satır önceki satırın sha256'sını taşır. `usta audit verify` aradan silinen ya da
   değiştirilen satırı bulur; dışarıda saklanan son hash `--anchor` ile verilirse sondan silmeyi de görür. `usta audit show`
   son kayıtları gösterir. Eski kayıtlar bozulmaz, zincirsiz satırlar ayrıca sayılır.

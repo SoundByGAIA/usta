@@ -25,13 +25,12 @@ enjeksiyon ortak hafızayı zehirleyemez.
 1. Ev sahibi bilgisayar: Ayarlar'da "Bu bilgisayar evdeki ortak hafızayı tutsun" açılır (varsayılan KAPALI).
    Usta, portaldan ayrı, çok küçük ikinci bir dinleyici başlatır. Bu dinleyicide yalnız `/ortak/*` uçları vardır;
    portalın hiçbir ucu (görev, dosya, ayar, `/quit`) bu kapıdan erişilemez.
-2. Eşleştirme: Ev sahibi 6 haneli bir kod gösterir (5 dakika geçerli, tek kullanım, 5 yanlış denemede kilit;
-   tablet eşleştirmesindeki `LoginCodes` sınıfı yeniden kullanılır). Öbür bilgisayarda kullanıcı ev sahibinin adresini
+2. Eşleştirme: Ev sahibi 6 haneli bir kod gösterir (5 dakika geçerli, tek kullanım, 5 yanlış denemede kilit, adres
+   başına 3 denemede 15 dakika kilit; tablet eşleştirmesindeki `LoginCodes` sınıfı yeniden kullanılır). Öbür bilgisayarda kullanıcı ev sahibinin adresini
    (sihirbazdaki "evdeki bilgisayar" taramasıyla bulunur) ve kodu girer.
-3. Bağlantı anahtarı: Kod doğruysa ev sahibi bu bilgisayara özel rastgele bir anahtar (32 bayt) üretir. İki
-   taraf da anahtarı saklar (0600; ev sahibinde `ortak/eslesmeler.json`, bağlanan bilgisayarda `ortak-baglanti.json`). Düzeltme:
-   ilk taslakta ev sahibinin yalnız özet saklayacağı yazıyordu; imza (HMAC) doğrulaması için ev sahibinin anahtarın kendisini
-   bilmesi gerekir. Eşleşmeyi ev sahibi tek tıkla siler: anahtar o an geçersiz olur.
+3. Bağlantı anahtarı: İki taraf kodu kullanarak SPAKE2 ile ortak bir anahtar türetir; kod da anahtar da ağda gitmez.
+   İki taraf da anahtarı saklar (0600; ev sahibinde `ortak/eslesmeler.json`, bağlanan bilgisayarda `ortak-baglanti.json`).
+   Eşleşmeyi ev sahibi tek tıkla siler: anahtar o an geçersiz olur.
 4. Okuma/yazma: Bağlanan bilgisayar profil ve notları ev sahibinden alır; her görevin başında güncel kopya
    okunur. Ev sahibi kapalıysa son bilinen kopya (önbellek) salt okunur kullanılır ve arayüz "Ortak hafıza şu an
    görünmüyor" der; görev düşmez.
@@ -49,9 +48,9 @@ enjeksiyon ortak hafızayı zehirleyemez.
 
 | Tehdit | Karşılık |
 |---|---|
-| Ağdaki biri ortak hafızayı okur/yazar | Anahtarsız her istek 401; eşleştirme kodu 5 dk, tek kullanım, 5 deneme kilidi; yalnız özel ağ kaynak adresi kabul |
-| Eşleştirme kodunu kaba kuvvetle bulmak | 6 hane × 5 deneme × 5 dk ≈ 1/200 000 şans; kilitlenince yeni kod gerekir; kod yalnız ev sahibinin ekranında |
-| Bağlantı anahtarı çalınır (düz HTTP dinleme) | Açık soru 1. Ev ağında şifresiz HTTP, tablet bağlantısıyla aynı sınır; arayüz bunu söyler |
+| Ağdaki biri ortak hafızayı okur/yazar | Anahtarsız her istek 401; yalnız özel ağ kaynak adresi kabul |
+| Eşleştirme kodunu bulmak | Dinleyen biri kodu çevrimdışı deneyemez (SPAKE2); araya giren biri her denemede tek kod tahmin eder; her başlatma bir deneme sayılır, adres başına 3 denemede 15 dk kilit, kod başına 5 yanlış onayda yeni kod gerekir |
+| Trafiği dinlemek ya da değiştirmek | İstek ve cevaplar ChaCha20-Poly1305 ile şifreli ve doğrulanmış; istek yöntem, yol, zaman ve anahtar kimliğine bağlı, cevap isteğe bağlı |
 | Çalınan anahtarla enjeksiyon | Onay kapısı (üstte); notlar sınırlı boyutta ve temizlenmiş karakterlerle |
 | Web enjeksiyonuyla ortak hafızaya yazma | Model ortak hafızaya yazamaz; yalnız arayüzdeki kullanıcı eylemi yazar |
 | DNS rebinding / başka sitenin istek attırması | Host başlığı denetimi (portaldaki gibi), `Origin` olan istekler reddedilir, CORS kapalı |
@@ -67,7 +66,8 @@ enjeksiyon ortak hafızayı zehirleyemez.
 
 ## Test ve ölçüm
 
-- Birim: eşleştirme (süre, tek kullanım, kilit), anahtarsız/yanlış anahtarlı 401, boyut sınırları, Host/Origin,
+- Birim: eşleştirme (süre, tek kullanım, adres ve kod kilidi, yanlış kodla anahtar uyuşmazlığı), dinleyenin düz metin
+  görmemesi, anahtarsız/yanlış anahtarlı 401, boyut sınırları, Host/Origin,
   özel ağ dışı kaynak reddi, onay kapısı (bekleyen not modele girmez), model yazma yolu yok.
 - Reliability Lab'a yeni senaryolar: ortak nottaki gizli talimat, bekleyen notun sızması, çalınmış anahtarla not ekleme.
 - Gerçek ağ: iki bilgisayarla uçtan uca (Windows + Linux).
@@ -110,13 +110,17 @@ tarif ettiğimiz parçaların çoğu onda var:
 Sonraki adım (onay bekliyor): ai-memory'nin HTTP/MCP uçlarını salt okunur olarak yoklayıp küçük bir bağlayıcı prototipi
 (`src/usta/ortakhafiza.py`): bağlan, ara, listele, onay kapısı.
 
-## Uygulanan (0.6.0) ve tasarımdan farklar
+## Uygulanan ve tasarımdan farklar
 
-- İmza: her istek `HMAC-SHA256(anahtar, "istek" ‖ yöntem ‖ yol ‖ zaman ‖ sayaç ‖ SHA256(gövde))`; her cevap da
-  `HMAC(anahtar, "cevap" ‖ sayaç ‖ SHA256(gövde))` ile imzalanır, bağlanan bilgisayar sahte cevabı kullanmaz. Zaman
-  sapması ±60 sn, sayaç 180 sn içinde ikinci kez kabul edilmez. Hata cevabı her durumda aynıdır (ayrıntı sızdırmaz).
-- Eşleşme isteği imzasızdır (anahtar henüz yok): 6 haneli kod, 5 dakika, tek kullanım, 5 yanlış denemede kilit.
-  Kodu dinleyen biri aynı 5 dakikada kodu kullanarak araya girebilir; bu, düz HTTP üzerindeki bilinen sınırdır.
+- Taşıma 0.6.0–0.8.x'te HMAC imzalı ve şifresizdi; şimdi şifreli (aşağıda). Eski eşleşmeler tanınmaz: bağlı bilgisayar
+  "yeniden bağlan" der, ev sahibi listesinde "eski bağlantı" görünür.
+- Eşleşme (SPAKE2, `ortak_dinleyici.py`): bağlanan bilgisayar `POST /ortak/eslesme/baslat` ile kendi mesajını yollar, ev
+  sahibi kendi mesajıyla cevap verir. Bağlanan bilgisayar `POST /ortak/eslesme/onay` ile anahtarı bildiğini önce kanıtlar;
+  ev sahibi yalnız bu doğruysa kodu tüketir, bilgisayarı kaydeder ve kendi onayını verir. Bağlanan bilgisayar ev sahibinin
+  onayını doğrulamadan anahtarı kaydetmez. Yarım eşleşme 60 sn bekler.
+- İstek: gövde ChaCha20-Poly1305 ile şifrelenir; ek veri `istek ‖ yöntem ‖ yol ‖ zaman ‖ anahtar kimliği`. Cevap aynı
+  anahtarla, isteğin kimliğine bağlı olarak şifrelenir; bağlanan bilgisayar değiştirilmiş cevabı kullanmaz. Zaman sapması
+  ±30 sn, istek kimliği 90 sn içinde ikinci kez kabul edilmez. Hata cevabı her durumda aynıdır (ayrıntı sızdırmaz).
 - Profil yalnız ev sahibinde değişir. Bağlı bilgisayarda profil salt okunurdur (aksi halde çalınmış anahtarla
   profil üzerinden enjeksiyon yapılabilirdi). Bağlı bilgisayarlardan eklenen NOTLAR ev sahibinde onay bekler.
 - Ev sahibi kapalıysa bağlı bilgisayar son bilinen kopyayı (önbellek) kullanır; görev düşmez.

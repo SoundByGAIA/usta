@@ -73,7 +73,9 @@ class Probe:
         monkeypatch.setattr(cli_chat, "Repl", FakeRepl)
         monkeypatch.setattr(cli_chat, "Portal", FakePortal)
         monkeypatch.setattr(cli_chat, "cleanup_orphans", lambda: 0)
-        monkeypatch.setattr(cli_chat.webbrowser, "open", lambda url: probe.opened.append(url) or True)
+        monkeypatch.setattr(
+            cli_chat.webbrowser, "open", lambda url: probe.opened.append(url) or True
+        )
         monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
 
 

@@ -86,7 +86,9 @@ def test_reuse_running_returns_false_when_nothing_is_running_or_it_does_not_answ
         raise httpx.ConnectError("kapalı", request=httpx.Request("POST", url))
 
     monkeypatch.setattr(httpx, "post", boom)
-    assert cli_chat._reuse_running(home, no_browser=True) is False  # eski kayıt: yeni örnek başlatılır
+    assert (
+        cli_chat._reuse_running(home, no_browser=True) is False
+    )  # eski kayıt: yeni örnek başlatılır
 
 
 def test_background_loop_runs_until_quit_and_cleans_up(tmp_path):

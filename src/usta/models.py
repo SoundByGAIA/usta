@@ -42,6 +42,8 @@ class ToolCall:
     id: str
     name: str
     arguments: dict
+    # sağlayıcının çağrıya eklediği alan (Gemini 3'ün düşünce imzası); geri gönderilmezse sonraki istek 400 alır
+    extra: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,7 @@ def _wire(m: Message) -> dict:
                 "id": c.id,
                 "type": "function",
                 "function": {"name": c.name, "arguments": json.dumps(c.arguments)},
+                **({"extra_content": c.extra} if c.extra else {}),
             }
             for c in m.tool_calls
         ]
@@ -176,7 +179,8 @@ class OpenAICompatClient:
             if not isinstance(args, dict):
                 # Çıktı sınırında kesilen/bozuk argüman görevi öldürmez: model durumu araç hatası olarak görür
                 args = {BAD_ARGS_KEY: len(raw) if isinstance(raw, str) else 0}
-            calls.append(ToolCall(cid, name, args))
+            extra = c.get("extra_content")
+            calls.append(ToolCall(cid, name, args, extra if isinstance(extra, dict) else None))
         if not calls and tools and self.rescue:
             from usta.rescue import extract_calls  # döngüsel içe aktarmayı önler
 

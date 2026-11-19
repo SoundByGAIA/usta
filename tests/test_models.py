@@ -44,6 +44,27 @@ def test_tool_result_and_assistant_call_roundtrip(endpoint):
     assert wire[1] == {"role": "tool", "content": "içerik", "tool_call_id": "k9"}
 
 
+def test_provider_extra_on_tool_call_is_sent_back_unchanged(endpoint):
+    extra = {"google": {"thought_signature": "imza=="}}
+    reply = tool_reply("read_file", {"path": "a"}, "k9")
+    reply["choices"][0]["message"]["tool_calls"][0]["extra_content"] = extra
+    endpoint.responses = [reply, text_reply("tamam")]
+    c = client(endpoint)
+    first = c.chat([Message("user", "x")], tools=TOOLS)
+    c.chat(
+        [Message("assistant", None, first.tool_calls), Message("tool", "içerik", tool_call_id="k9")]
+    )
+    sent = endpoint.requests[1]["body"]["messages"][0]["tool_calls"][0]
+    assert sent["extra_content"] == extra
+    assert "extra_content" not in _wire_call(ToolCall("k1", "read_file", {}))
+
+
+def _wire_call(call):
+    from usta.models import _wire
+
+    return _wire(Message("assistant", None, [call]))["tool_calls"][0]
+
+
 def test_api_key_header(endpoint):
     endpoint.responses = [text_reply("a")]
     client(endpoint, api_key="gizli-test").chat([Message("user", "x")])

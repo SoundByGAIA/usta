@@ -1,6 +1,7 @@
 import pytest
 
 from fake_endpoint import text_reply, tool_reply
+from perms import private
 from usta.cli import main
 
 
@@ -98,7 +99,7 @@ def test_serve_defaults_to_loopback_and_creates_token(served, home, capsys):
     out = capsys.readouterr().out
     token = (home / "token").read_text().strip()
     assert token not in out and str(home / "token") in out  # jeton yazdırılmaz, yolu söylenir
-    assert ((home / "token").stat().st_mode & 0o077) == 0
+    assert private(home / "token")
 
 
 def test_serve_opens_the_shared_memory_listener_when_this_pc_hosts_it(served, home, monkeypatch):

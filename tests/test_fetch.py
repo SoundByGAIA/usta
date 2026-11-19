@@ -217,6 +217,8 @@ class Handler(BaseHTTPRequestHandler):
 
 @pytest.fixture(scope="module")
 def server():
+    if sys.platform == "win32":  # iç betik yalnız Linux kabında çalışır (ortamı ona göre kurulu)
+        pytest.skip("fetch_inner Linux kabında çalışır")
     srv = HTTPServer(("127.0.0.1", 0), Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{srv.server_port}"

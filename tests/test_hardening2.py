@@ -5,6 +5,7 @@ import signal
 
 import pytest
 
+from perms import mode_is
 from test_api import AUTH, make_client
 from test_tasks import Scripted, manager
 from usta.audit import mask
@@ -66,6 +67,7 @@ def test_policy_blocks_dotgit_case_variants_and_raw_path(tmp_path):
 
 
 # --- ORTA-2: yaprak FIFO ve sabit bağ
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO yalnız POSIX'te var")
 def test_revert_over_a_fifo_leaf_does_not_block(tmp_path):
     root = tmp_path / "ws"
     root.mkdir()
@@ -120,6 +122,7 @@ def test_api_cannot_start_task_in_legacy_workspace_symlinked_to_home(tmp_path, m
 
 
 # --- DÜŞÜK-5: FIFO diğer yollarda
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO yalnız POSIX'te var")
 def test_outline_and_write_file_refuse_fifo(tmp_path):
     from usta.tools import ToolContext, ToolError, build_registry
 
@@ -137,6 +140,7 @@ def test_outline_and_write_file_refuse_fifo(tmp_path):
         signal.alarm(0)
 
 
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO yalnız POSIX'te var")
 def test_memory_read_and_write_do_not_block_on_fifo(tmp_path):
     from usta import memory
 
@@ -311,8 +315,8 @@ def test_revert_preserves_file_modes_and_survives_very_long_names(tmp_path):
         p.unlink()
         p.write_text("bozuk")
     revert(snap, root)
-    assert oct(secret.stat().st_mode & 0o777) == "0o600" and secret.read_text() == "S=1"
-    assert oct(script.stat().st_mode & 0o777) == "0o755"
+    assert mode_is(secret, 0o600) and secret.read_text() == "S=1"
+    assert mode_is(script, 0o755)
     assert long.read_text() == "uzun"
 
 

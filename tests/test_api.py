@@ -4,6 +4,7 @@ import threading
 import pytest
 from fastapi.testclient import TestClient
 
+from perms import private
 from usta.api import create_app, load_or_create_token
 from usta.models import ModelResponse, ToolCall
 from usta.tasks import TaskManager
@@ -73,7 +74,7 @@ def test_auth_required_everywhere(tmp_path):
 
 def test_token_file_is_private_and_stable(tmp_path):
     t1 = load_or_create_token(tmp_path / "h")
-    assert len(t1) >= 32 and ((tmp_path / "h" / "token").stat().st_mode & 0o077) == 0
+    assert len(t1) >= 32 and private(tmp_path / "h" / "token")
     assert load_or_create_token(tmp_path / "h") == t1
 
 

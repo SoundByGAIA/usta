@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from perms import mode_is
 from test_api import AUTH, make_client, new_ws
 from usta import attachments
 from usta.models import ModelResponse
@@ -59,7 +60,7 @@ def test_interrupted_session_and_file_mode(tmp_path):
     store.append("w", "a" * 12, {"i": 0, "ts": 1.0, "type": "started", "data": {}})
     assert store.list("w")[0]["status"] == "interrupted"
     f = next((tmp_path / "sessions" / "w").iterdir())
-    assert oct(f.stat().st_mode & 0o777) == "0o600"
+    assert mode_is(f, 0o600)
     assert store.load("../x", "a" * 12) is None
 
 

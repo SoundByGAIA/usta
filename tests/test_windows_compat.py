@@ -45,12 +45,13 @@ def test_kill_group_uses_taskkill_without_killpg(windows, monkeypatch):
     calls = []
     monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: calls.append(cmd))
     compat.kill_group(4242)
-    assert calls == [["taskkill", "/PID", "4242", "/T", "/F"]]
+    assert calls == [[compat.taskkill(), "/PID", "4242", "/T", "/F"]]
 
 
 def test_kill_group_uses_killpg_when_available(monkeypatch):
     seen = []
     monkeypatch.setattr(os, "killpg", lambda pid, sig: seen.append((pid, sig)), raising=False)
+    monkeypatch.setattr(signal, "SIGKILL", 9, raising=False)  # Windows'ta yok
     compat.kill_group(7)
     assert seen and seen[0][0] == 7
 
@@ -292,7 +293,7 @@ def test_docker_and_taskkill_never_resolve_from_the_current_folder(tmp_path, mon
     from usta import compat
     from usta.sandbox import SandboxError, run_command
 
-    fake = tmp_path / "docker"
+    fake = tmp_path / ("docker.exe" if os.name == "nt" else "docker")
     fake.write_text("#!/bin/sh\necho SAHTE\n")
     fake.chmod(0o755)
     monkeypatch.chdir(tmp_path)

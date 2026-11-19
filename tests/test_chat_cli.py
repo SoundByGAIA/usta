@@ -295,6 +295,7 @@ def test_start_from_home_folder_creates_usta_folder_instead_of_failing(
     userhome = tmp_path / "kullanici"
     userhome.mkdir()
     monkeypatch.setenv("HOME", str(userhome))
+    monkeypatch.setenv("USERPROFILE", str(userhome))  # Windows'ta Path.home() bunu okur
     monkeypatch.setenv("USTA_HOME", str(userhome / ".usta"))  # varsayılan: ev klasörünün içinde
     st.save(userhome / ".usta", st.Settings(model="m", endpoint="http://e/v1"))
     monkeypatch.chdir(userhome)

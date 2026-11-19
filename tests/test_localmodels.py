@@ -501,7 +501,7 @@ def test_installer_programs_are_found_only_on_absolute_path_entries(tmp_path, mo
     # 0.8.3 kutu kaçışının ikinci katmanı: bulunulan klasördeki ya da göreli PATH girişindeki sahte winget/ollama
     # seçilmez; winget tam yoluyla çalıştırılır.
     for name in ("winget", "ollama"):
-        fake = tmp_path / name
+        fake = tmp_path / (name + (".exe" if os.name == "nt" else ""))
         fake.write_text("#!/bin/sh\nexit 0\n")
         fake.chmod(0o755)
     monkeypatch.chdir(tmp_path)
@@ -512,4 +512,6 @@ def test_installer_programs_are_found_only_on_absolute_path_entries(tmp_path, mo
     monkeypatch.setenv("LOCALAPPDATA", "rel")  # göreli kurulum yeri de kabul edilmez
     assert localmodels._ollama_exe() is None
     monkeypatch.setenv("PATH", str(tmp_path))
-    assert localmodels._ollama_exe() == str(tmp_path / "ollama")
+    assert localmodels._ollama_exe() == str(
+        tmp_path / ("ollama.exe" if os.name == "nt" else "ollama")
+    )

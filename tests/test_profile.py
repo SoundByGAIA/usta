@@ -1,7 +1,6 @@
-import stat
-
 import pytest
 
+from perms import mode_is
 from usta import profile
 from usta.models import ModelError, ModelResponse, ToolCall, Usage
 
@@ -103,7 +102,7 @@ def test_cache_roundtrip_private_and_keyed_by_endpoint_and_model(tmp_path):
     assert got is not None and got.protocol == "text"
     assert profile.load(tmp_path, "http://e/v1", "baska") is None
     assert profile.load(tmp_path, "http://baska/v1", "m") is None
-    assert stat.S_IMODE((tmp_path / "profiles.json").stat().st_mode) == 0o600
+    assert mode_is(tmp_path / "profiles.json", 0o600)
 
 
 def test_corrupt_cache_is_ignored(tmp_path):

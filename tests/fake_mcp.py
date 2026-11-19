@@ -34,6 +34,9 @@ TOOLS = [
 if MODE == "hang":
     time.sleep(600)
 if MODE == "exit":
+    sys.stderr.reconfigure(
+        encoding="utf-8"
+    )  # Node sunucuları gibi; kod sayfası durumu ayrı test edilir
     sys.stderr.write("sır-olmayan hata: eksik bağımlılık\n")
     sys.exit(3)
 

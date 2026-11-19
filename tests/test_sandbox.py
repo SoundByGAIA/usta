@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 
@@ -16,7 +17,8 @@ def test_args_are_locked_down_by_default(tmp_path):
     assert args[args.index("--cap-drop") + 1] == "ALL"
     assert "no-new-privileges" in args
     assert "--pids-limit" in args and "--memory" in args and "--cpus" in args
-    assert args[args.index("--user") + 1] != "0:0"
+    if os.name != "nt":  # Windows'ta Docker Desktop kullanıcı eşlemesini kendisi yapar
+        assert args[args.index("--user") + 1] != "0:0"
     assert args[-2:] == ["echo", "hi"]
 
 
@@ -181,7 +183,18 @@ def test_git_dir_cannot_be_modified_from_inside_a_real_sandbox(tmp_path):
     assert not (tmp_path / ".git" / "evil").exists() and (tmp_path / "normal").exists()
 
 
-@pytest.mark.parametrize("name", ["a:b", "x,y", "p:rw,z"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param(
+            n,
+            marks=pytest.mark.skipif(
+                os.name == "nt" and ":" in n, reason="Windows'ta adda ':' olamaz"
+            ),
+        )
+        for n in ["a:b", "x,y", "p:rw,z"]
+    ],
+)
 def test_workdir_with_mount_syntax_chars_is_refused(tmp_path, name):
     d = tmp_path / name
     d.mkdir()

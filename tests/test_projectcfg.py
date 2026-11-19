@@ -1,7 +1,6 @@
-import stat
-
 import pytest
 
+from perms import mode_is
 from usta import projectcfg as pc
 from usta.models import ModelResponse, ToolCall
 from usta.sandbox import RunResult
@@ -20,7 +19,7 @@ def test_set_show_clear_roundtrip_with_private_file(tmp_path):
     pc.set_verify(home, proj, ["sh", "-c", "make test"], image="python:3.12-slim")
     cfg = pc.load(home, proj)
     assert cfg.verify == ("sh", "-c", "make test") and cfg.image == "python:3.12-slim"
-    assert stat.S_IMODE((home / "projects.json").stat().st_mode) == 0o600
+    assert mode_is(home / "projects.json", 0o600)
     pc.clear(home, proj)
     assert pc.load(home, proj).verify is None
 

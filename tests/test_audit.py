@@ -1,5 +1,6 @@
 import json
 
+from perms import private
 from usta.audit import AuditLog, mask
 
 FAKE_SK = "sk-" + "abcdefghijklmnopqrstuvwxyz1234"
@@ -26,7 +27,7 @@ def test_records_are_jsonl_append_only_and_masked(tmp_path):
 def test_creates_parent_dirs_with_private_mode(tmp_path):
     p = tmp_path / "x" / "audit.jsonl"
     AuditLog(p).record("e")
-    assert p.exists() and (p.stat().st_mode & 0o077) == 0
+    assert p.exists() and private(p)
 
 
 def test_mask_covers_modern_key_shapes_and_whole_pem_blocks():

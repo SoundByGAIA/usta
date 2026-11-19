@@ -9,13 +9,13 @@ def test_no_changes_empty_diff(tmp_path):
 
 
 def test_modified_added_deleted(tmp_path):
-    (tmp_path / "a.txt").write_text("bir\niki\n")
-    (tmp_path / "sil.txt").write_text("gidecek\n")
+    (tmp_path / "a.txt").write_bytes(b"bir\niki\n")  # write_text Windows'ta CRLF yazar
+    (tmp_path / "sil.txt").write_bytes(b"gidecek\n")
     snap = snapshot(tmp_path)
-    (tmp_path / "a.txt").write_text("bir\n2\n")
+    (tmp_path / "a.txt").write_bytes(b"bir\n2\n")
     (tmp_path / "sil.txt").unlink()
     (tmp_path / "d").mkdir()
-    (tmp_path / "d" / "yeni.py").write_text("print(1)\n")
+    (tmp_path / "d" / "yeni.py").write_bytes(b"print(1)\n")
     out = diff(snap, tmp_path)
     assert "--- a/a.txt\n+++ b/a.txt" in out and "-iki\n+2" in out
     assert "--- a/sil.txt\n+++ /dev/null" in out and "-gidecek" in out

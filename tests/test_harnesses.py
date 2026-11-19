@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from test_api import AUTH, Scripted, call, make_client
-from usta import harnesses, taint
+from usta import compat, harnesses, taint
 from usta import settings as usta_settings
 from usta.models import ModelResponse
 from usta.policy import Decision, Policy
@@ -545,7 +545,7 @@ def test_windows_kills_the_whole_process_tree_with_taskkill(monkeypatch):
     monkeypatch.setattr(harnesses.subprocess, "run", lambda argv, **kw: calls.append(argv))
     harnesses._kill_tree(FakeProc())
     assert calls == [
-        ["taskkill", "/PID", "4242", "/T", "/F"]
+        [compat.taskkill(), "/PID", "4242", "/T", "/F"]
     ]  # /T: çocuklar da, /F: zorla; yalnız sayısal pid
 
 

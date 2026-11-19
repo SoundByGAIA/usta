@@ -1,8 +1,8 @@
 import json
-import os
 
 import pytest
 
+from perms import mode_is
 from test_api import AUTH, make_client
 from usta import apis
 from usta.modelctl import ModelControl
@@ -13,7 +13,7 @@ def test_add_list_remove_and_key_mode(tmp_path):
     apis.add(tmp_path, "deepseek", "https://api.deepseek.com/v1/", "sk-gizli")
     a = apis.load(tmp_path)["deepseek"]
     assert a.endpoint == "https://api.deepseek.com/v1" and a.key == "sk-gizli"
-    assert oct(os.stat(tmp_path / "apis.json").st_mode & 0o777) == "0o600"
+    assert mode_is(tmp_path / "apis.json", 0o600)
     with pytest.raises(apis.ApiError):
         apis.add(tmp_path, "deepseek", "https://x.example/v1")
     apis.set_key(tmp_path, "deepseek", None)

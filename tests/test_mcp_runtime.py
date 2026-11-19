@@ -1,3 +1,5 @@
+import os
+
 """MCP Runtime: konteyner izolasyonu, kapalı başarısızlık, sabitleme, denetim kaydı.
 
 Docker gerektirenler `needs_docker` ile işaretlidir (python:3.12-slim yerelde olmalı). Gerçek hassas dosya yerine
@@ -94,7 +96,7 @@ def test_run_args_workspace_modes_and_protected_paths(tmp_path):
 
 
 def test_run_args_reject_mount_syntax_injection(tmp_path):
-    bad = tmp_path / "a:b"
+    bad = tmp_path / ("a,b" if os.name == "nt" else "a:b")  # Windows'ta adda ':' olamaz
     bad.mkdir()
     with pytest.raises(McpIsolationError):
         mcp_runtime.build_run_args(probe(workspace="ro"), name="n", workspace=bad)

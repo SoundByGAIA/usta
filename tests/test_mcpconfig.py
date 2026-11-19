@@ -3,6 +3,7 @@ import stat
 
 import pytest
 
+from perms import mode_is
 from usta import mcpconfig as cfg
 
 
@@ -27,7 +28,7 @@ def test_add_list_remove_roundtrip_with_private_perms(tmp_path):
     assert s == cfg.Server(
         "brave", ("npx", "-y", "paket"), ("BRAVE_API_KEY",), "ask", True, image="node:22-slim"
     )
-    assert mode(tmp_path / "mcp.json") == 0o600
+    assert mode_is(tmp_path / "mcp.json", 0o600)
     cfg.remove_server(tmp_path, "brave")
     assert cfg.load(tmp_path) == {}
     with pytest.raises(cfg.McpConfigError, match="yok"):
@@ -38,7 +39,7 @@ def test_secret_values_never_in_config_file(tmp_path):
     cfg.add_server(tmp_path, "x", ["cmd"], env=["API_KEY"], image="py:1")
     cfg.set_secret(tmp_path, "x", "API_KEY", "çok-gizli-değer-123")
     assert "çok-gizli-değer-123" not in (tmp_path / "mcp.json").read_text()
-    assert mode(tmp_path / "mcp-secrets.json") == 0o600
+    assert mode_is(tmp_path / "mcp-secrets.json", 0o600)
     assert cfg.resolve_env(tmp_path, cfg.load(tmp_path)["x"], {}) == {
         "API_KEY": "çok-gizli-değer-123"
     }

@@ -2,6 +2,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from perms import mode_is
 from usta.api import create_app
 from usta.auth import LoginCodes
 from usta.models import ModelResponse
@@ -132,11 +133,10 @@ def test_portal_binds_loopback_only_and_falls_back_when_port_busy(tmp_path):
 
 
 def test_login_page_hides_code_from_argv_and_is_private_and_expires(tmp_path):
-    import os
-    import stat
     import time
     from pathlib import Path
     from urllib.parse import urlparse
+    from urllib.request import url2pathname
 
     from test_api import Scripted
     from usta.portal import Portal
@@ -150,8 +150,8 @@ def test_login_page_hides_code_from_argv_and_is_private_and_expires(tmp_path):
         assert (
             uri.startswith("file://") and "code=" not in uri
         )  # komut satırına giren adreste kod yok
-        path = Path(urlparse(uri).path)
-        assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+        path = Path(url2pathname(urlparse(uri).path))  # Windows: /C:/... → C:\...
+        assert mode_is(path, 0o600)
         assert "code=" in path.read_text() and 'http-equiv="refresh"' in path.read_text()
         time.sleep(0.8)
         assert not path.exists()  # kısa sürede silinir

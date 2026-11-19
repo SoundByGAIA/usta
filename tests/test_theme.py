@@ -1,8 +1,8 @@
 import re
-import stat
 
 import pytest
 
+from perms import mode_is
 from usta import settings, theme
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
@@ -94,7 +94,7 @@ def test_settings_defaults_and_roundtrip(tmp_path):
     )
     got = settings.load(tmp_path)
     assert (got.theme, got.mode, got.model, got.portal) == ("gri", "plan", "m", False)
-    assert stat.S_IMODE((tmp_path / "config.json").stat().st_mode) == 0o600
+    assert mode_is(tmp_path / "config.json", 0o600)
 
 
 def test_settings_validation_rejects_bad_values():

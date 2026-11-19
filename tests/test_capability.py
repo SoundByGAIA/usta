@@ -2,10 +2,10 @@
 
 import argparse
 import json
-import stat
 
 import pytest
 
+from perms import mode_is
 from usta import capability, capability_probes, cli, profile
 from usta.cli import main
 from usta.jsonproto import JsonProtocolClient
@@ -190,8 +190,7 @@ def test_profile_is_keyed_by_revision_and_config(per_protocol, tmp_path):
         lambda: object(), "m", endpoint="http://x", revision="r1", config=cfg, e2e=()
     )
     capability.save(tmp_path, p)
-    mode = stat.S_IMODE((tmp_path / "capabilities.json").stat().st_mode)
-    assert mode == 0o600
+    assert mode_is(tmp_path / "capabilities.json", 0o600)
     assert capability.load(tmp_path, "http://x", "m", "r1", cfg).recommended == "json"
     assert capability.load(tmp_path, "http://x", "m", "r2", cfg) is None  # model revizyonu değişti
     assert (

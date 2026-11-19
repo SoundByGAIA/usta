@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from spake2 import SPAKE2_A
 
+from perms import mode_is
 from usta import kisi, ortak
 from usta import ortak_dinleyici as dinleyici
 from usta.auth import LoginCodes
@@ -90,7 +91,7 @@ def test_pair_then_fetch_profile_and_approved_notes(env):
     assert ortak.cached(env.b)["profil"]["ad"] == "Ayşe"
     ctx = ortak.context(env.b, env.http)
     assert "Ayşe" in ctx and "Sayfalarda büyük yazı" in ctx and "ORTAK-HAFIZA id=" in ctx
-    assert (env.b / "ortak-baglanti.json").stat().st_mode & 0o777 == 0o600
+    assert mode_is(env.b / "ortak-baglanti.json", 0o600)
 
 
 def test_both_sides_derive_the_same_key_and_the_code_is_not_stored(env):

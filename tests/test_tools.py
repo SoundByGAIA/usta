@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 
@@ -163,6 +164,7 @@ def test_fetch_url_tool_turns_errors_into_toolerror(tmp_path):
         reg.call("fetch_url", {"url": 5})
 
 
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO yalnız POSIX'te var")
 def test_fifo_is_refused_instead_of_hanging(tmp_path):
     import os
 
@@ -180,6 +182,7 @@ def test_fifo_is_refused_instead_of_hanging(tmp_path):
             reg.call(tool, args)
 
 
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO yalnız POSIX'te var")
 def test_snapshot_and_diff_skip_fifo(tmp_path):
     import os
 

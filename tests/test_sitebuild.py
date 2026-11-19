@@ -216,3 +216,31 @@ def test_persistent_inventions_are_scrubbed_line_by_line(tmp_path):
     page = (ws / "index.html").read_text()
     assert "Oteli" not in page and "543" not in page and "Usta sildi" in result.answer
     assert "<h1>Ali ve Zeynep</h1>" in page and sitebuild.DEFAULT_CSS in page
+
+
+def _pastane_with_css(tmp_path, css):
+    menu = (
+        "<section><h2>Menü</h2><ul><li>Baklava 120 TL</li><li>Sütlaç 80 TL</li><li>Kazandibi 90 TL</li></ul>"
+        "<p>Adresimiz Nilüfer, Bursa.</p></section>"
+    )
+    model = Scripted(
+        ModelResponse("1. Menü - ürünler ve adres"),
+        ModelResponse("Tatlı Köşe"),
+        ModelResponse(css),
+        ModelResponse(menu),
+    )
+    agent, ws = _agent(tmp_path, model, site_steps=True)
+    result = agent.run(PASTANE)
+    return (ws / "index.html").read_text(), result.answer
+
+
+def test_model_colours_that_hide_text_fall_back_to_usta_colours(tmp_path):
+    page, answer = _pastane_with_css(tmp_path, "header{background:#ff6b6b} h1{color:#ff6b6b}")
+    assert sitebuild.DEFAULT_CSS in page and "#ff6b6b" not in page
+    assert "zeminle aynı renkteydi" in answer
+
+
+def test_readable_model_colours_are_kept(tmp_path):
+    page, answer = _pastane_with_css(tmp_path, "header{background:#ff6b6b} h1{color:#ffffff}")
+    assert "#ff6b6b" in page and sitebuild.DEFAULT_CSS not in page
+    assert "zeminle aynı renkteydi" not in answer

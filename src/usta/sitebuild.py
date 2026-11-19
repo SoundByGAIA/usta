@@ -22,7 +22,7 @@ from collections.abc import Callable
 from itertools import pairwise
 from pathlib import Path
 
-from usta import sitecheck
+from usta import sitecheck, sitecontrast
 from usta.finishcheck import _ARTIFACT, write_targets
 from usta.models import Message, ModelClient
 from usta.sitescrub import body_text, fix_note, problems, scrub, visible_text
@@ -506,6 +506,10 @@ class SiteBuilder:
             self._step("✓ Gün sayacı (Usta'nın hazır parçası)")
         sections = self._repair(plan, sections, kept, lambda secs: assemble(title, css, secs, tail))
         page = assemble(title, css, sections, tail)
+        if css != DEFAULT_CSS and sitecontrast.hidden_texts(page):
+            # Usta'nın renkleri okunur olduğu bilinen tek seçenek; modele yeniden sormak yeni hata getirebilir
+            page = assemble(title, DEFAULT_CSS, sections, tail)
+            self._step("• Bazı yazılar zeminle aynı renkteydi; Usta'nın renkleri kullanıldı")
         result = self.write("index.html", page)
         ok = not result.startswith(("reddedildi", "hata"))
         self._step("✓ index.html yazıldı" if ok else f"• index.html yazılamadı: {result[:120]}")

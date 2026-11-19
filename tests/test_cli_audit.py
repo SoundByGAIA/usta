@@ -34,6 +34,24 @@ def test_show_prints_recent_records(tmp_path, monkeypatch, capsys):
     assert "file_change" in out and "a.txt" in out and "task" not in out
 
 
+def test_show_without_name_uses_the_latest_log(tmp_path, monkeypatch, capsys):
+    import os
+
+    log = setup(tmp_path, monkeypatch)
+    newer = AuditLog(log.path.parent / "ws2.jsonl")
+    newer.record("task", prompt="yeni")
+    os.utime(log.path, (1, 1))
+    assert main(["audit", "show"]) == 0
+    out = capsys.readouterr().out
+    assert "yeni" in out and "a.txt" not in out
+
+
+def test_show_without_any_log_is_an_error(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("USTA_HOME", str(tmp_path / "bos"))
+    assert main(["audit", "show"]) == 2
+    assert "hata" in capsys.readouterr().err
+
+
 def test_unknown_log_is_an_error(tmp_path, monkeypatch, capsys):
     setup(tmp_path, monkeypatch)
     assert main(["audit", "show", "yok"]) == 2

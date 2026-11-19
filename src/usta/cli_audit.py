@@ -21,7 +21,7 @@ def add_parser(sub) -> None:
     v.add_argument("logs", nargs="*", help="kayıt adı ya da dosya yolu (verilmezse hepsi)")
     v.add_argument("--anchor", help="daha önce saklanan son hash: zincirde hâlâ geçmeli")
     s = aus.add_parser("show", help="son kayıtları göster")
-    s.add_argument("log", help="kayıt adı ya da dosya yolu")
+    s.add_argument("log", nargs="?", help="kayıt adı ya da dosya yolu (verilmezse en son değişen)")
     s.add_argument("-n", type=int, default=20, help="kaç satır")
 
 
@@ -35,7 +35,11 @@ def _resolve(home: Path, name: str) -> Path | None:
 
 def audit_cmd(args: argparse.Namespace, home: Path) -> int:
     if args.audit_cmd == "show":
-        path = _resolve(home, args.log)
+        logs = sorted((home / "audit").glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
+        if args.log is None and not logs:
+            print("hata: henüz denetim kaydı yok", file=sys.stderr)
+            return 2
+        path = _resolve(home, args.log) if args.log else logs[-1]
         if path is None:
             return 2
         with path.open(encoding="utf-8") as f:

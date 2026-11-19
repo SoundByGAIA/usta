@@ -21,6 +21,8 @@
   `.css` türlerini sistemin kayıt defterinden okumaz (bazı makinelerde yanlış tür betiği engelliyordu); proje notları
   her sistemde aynı satır sonuyla yazılır.
 - CI artık Windows'ta da test koşuyor; ürün kodunda kodlamasız dosya açma testle engellenir.
+- Masaüstü ve tarayıcı sekmesi simgesi: takım çantası ve kask. Usta açılınca çanta açılır (1,5 sn, tarayıcı oturumunda
+  bir kez; hareket azaltma ayarında oynamaz).
 - `usta audit show` kayıt adı verilmezse en son değişen kaydı gösterir.
 - Denetim kaydı: portal görevinin sonunda değişen her dosya (kutudaki komutların değiştirdikleri dahil) önce/sonra
   hash'iyle `task_changes` olarak yazılır; panelden yüklenen dosyalar da `file_change` olarak girer.

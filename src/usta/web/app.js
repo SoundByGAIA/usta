@@ -19,6 +19,12 @@
   function get(k) {
     try { return sessionStorage.getItem(k) || ""; } catch (_) { return ""; }
   }
+  // Açılış animasyonu tarayıcı oturumu başına bir kez; sonra öğe kaldırılır (tıklamaları hiç engellemez)
+  const acilis = $("acilis");
+  if (acilis) {
+    if (get("usta_acilis")) acilis.remove();
+    else { put("usta_acilis", "1"); setTimeout(() => acilis.remove(), 1600); }
+  }
   function h(tag, cls, text) {
     const e = document.createElement(tag);
     if (cls) e.className = cls;

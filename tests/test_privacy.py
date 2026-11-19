@@ -13,7 +13,7 @@ NET_IMPORT = re.compile(
 # Ağa çıkabilen modüllerin tamamı ve nedenleri. Yeni bir modül eklenirse burada gerekçelendirilmeli
 # (ve arayüzdeki gizlilik özeti güncel kalmalı); aksi halde test kırılır.
 KNOWN_NETWORK_MODULES = {
-    "cli.py": "model uç noktasından model listesi",
+    "cli_chat.py": "model uç noktasından model listesi; arka planda çalışan Usta'ya yerel istek",
     "models.py": "seçilen model API'sine istek",
     "modelinfo.py": "model uç noktasından özet (Ollama)",
     "localmodels.py": "127.0.0.1 ve evdeki (özel ağ) adresler: yalnız model listesi sorgusu",

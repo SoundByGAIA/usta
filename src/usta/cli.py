@@ -4,35 +4,28 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import dataclasses
 import hashlib
 import json
 import os
 import sys
 import time
-import webbrowser
 from pathlib import Path
 
-import httpx
-
 from usta import (
-    apis,
-    bench,
     capability,
     cli_audit,
+    cli_chat,
     cli_mcp,
     cli_olcum,
+    cli_parser,
     compat,
     mcpconfig,
     memory,
     ortak,
     profile,
     projects,
-    services,
-    settings,
     skillprobe,
     symbols,
-    theme,
     thinking,
 )
 from usta.agent import Agent
@@ -40,13 +33,10 @@ from usta.api import create_app, load_or_create_token
 from usta.audit import AuditLog
 from usta.jsonproto import JsonProtocolClient
 from usta.mcp_tools import McpSession
-from usta.modelctl import ModelControl
 from usta.modelinfo import detect_size_b
 from usta.models import ModelClient, ModelError, OpenAICompatClient
 from usta.policy import Policy
-from usta.portal import Portal
 from usta.proxy import validate_allowed_host
-from usta.repl import MODE_ALIASES, Repl
 from usta.sandbox import cleanup_orphans
 from usta.tasks import TaskManager
 from usta.textproto import TextProtocolClient
@@ -158,26 +148,6 @@ def _capability_config(args: argparse.Namespace, extra: dict | None) -> dict:
     }
 
 
-def _add_strong_args(p: argparse.ArgumentParser) -> None:
-    p.add_argument(
-        "--strong-model",
-        help="kademeli yönlendirme: takılınca devredilecek güçlü model (--model ucuz model olur)",
-    )
-    p.add_argument(
-        "--strong-endpoint", help="güçlü modelin uç noktası (verilmezse --endpoint ile aynı)"
-    )
-    p.add_argument(
-        "--strong-protocol",
-        choices=PROTOCOLS,
-        help="güçlü modelin araç protokolü (verilmezse --protocol ile aynı)",
-    )
-    p.add_argument(
-        "--strong-api-key-env",
-        metavar="ORTAM_DEĞİŞKENİ",
-        help="güçlü model için anahtarın okunacağı ortam değişkeni (verilmezse USTA_API_KEY)",
-    )
-
-
 def _strong_model(args: argparse.Namespace) -> ModelClient:
     key = os.environ.get(args.strong_api_key_env) if args.strong_api_key_env else _ENV_KEY
     return _build_model(
@@ -189,59 +159,6 @@ def _strong_model(args: argparse.Namespace) -> ModelClient:
         args.strong_protocol or args.protocol or os.environ.get("USTA_PROTOCOL") or "native",
         args.model_timeout,
         api_key=key,
-    )
-
-
-def _add_model_args(p: argparse.ArgumentParser) -> None:
-    p.add_argument(
-        "--endpoint", help=f"OpenAI-uyumlu uç nokta (USTA_ENDPOINT; varsayılan {DEFAULT_ENDPOINT})"
-    )
-    p.add_argument("--model", help="model adı (USTA_MODEL)")
-    p.add_argument(
-        "--extra-body",
-        help='isteğe eklenecek JSON alanları, ör. \'{"chat_template_kwargs": {"enable_thinking": false}}\'',
-    )
-    p.add_argument(
-        "--think",
-        choices=thinking.THINK,
-        help="düşünme ayarı (reasoning_effort olarak gönderilir; off: kapalı). Varsayılan: modelin kendi ayarı",
-    )
-    p.add_argument(
-        "--model-timeout",
-        type=float,
-        default=120.0,
-        help="tek model isteği için saniye (yavaş yerel modellerde artır)",
-    )
-    p.add_argument(
-        "--allow-host",
-        action="append",
-        help="sandbox'ın proxy ile erişebileceği alan adı; tekrarlanabilir, *.örnek.com olabilir "
-        "(USTA_ALLOW_HOSTS, virgüllü). Varsayılan: ağ kapalı",
-    )
-    p.add_argument(
-        "--symbol-tools",
-        action="store_true",
-        help="DENEYSEL: find_symbol/symbol_context/related_files araçlarını aç (pip install 'usta[symbols]'; USTA_SYMBOL_TOOLS=1)",
-    )
-    p.add_argument(
-        "--taint-gate",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="kaynak izi kapısı (varsayılan AÇIK): okunan içerikten türeyen yazma/komut hedefleri onay ister, "
-        "oto modda reddedilir; kapatmak için --no-taint-gate ya da USTA_TAINT_GATE=0",
-    )
-    p.add_argument(
-        "--finish-check",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="söz–eylem denetimi (varsayılan AÇIK): istenen dosyayı yazmadan bitirmek isteyen modele kısa hatırlatma; "
-        "kapatmak için --no-finish-check ya da USTA_FINISH_CHECK=0",
-    )
-    p.add_argument(
-        "--protocol",
-        choices=(*PROTOCOLS, "auto"),
-        help="native: yerel araç çağrısı; json: şemayla kısıtlı JSON; text: JSON-metin yedek protokolü; "
-        "auto: profilden seç ve koşu boyunca sabitle (USTA_PROTOCOL)",
     )
 
 
@@ -319,251 +236,6 @@ def _approver(tool: str, args: dict) -> bool:
     return input(f"onay: {tool} {args} — izin verilsin mi? [e/H] ").strip().lower() in {"e", "y"}
 
 
-def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="usta",
-        description="Argümansız `usta`: etkileşimli terminal + web portalı. Alt komutlar aşağıda.",
-    )
-    p.add_argument(
-        "-w", "--workspace", default=None, help="proje dizini (varsayılan: bulunduğun dizin)"
-    )
-    p.add_argument("--no-portal", action="store_true", help="web portalını başlatma")
-    p.add_argument(
-        "--arka-plan",
-        "--background",
-        dest="background",
-        action="store_true",
-        help="siyah pencere/terminal olmadan arka planda çalış (masaüstü simgesi bunu kullanır); Ayarlar'dan kapatılır",
-    )
-    p.add_argument(
-        "--kisayol",
-        "--shortcut",
-        dest="shortcut",
-        action="store_true",
-        help="masaüstüne tek tıkla açılan bir Usta simgesi koy ve çık",
-    )
-    p.add_argument(
-        "--lan",
-        action="store_true",
-        help="portalı aynı ağdaki tablet/telefona da aç (6 haneli kodla giriş; trafik şifrelenmez, yalnız güvendiğin ağda kullan)",
-    )
-    p.add_argument(
-        "--setup",
-        action="store_true",
-        help="model seçilmemişse terminalde sormadan tarayıcıdaki kurulum sihirbazıyla başla (terminalde model bulunamazsa kendiliğinden de açılır)",
-    )
-    p.add_argument("--no-browser", action="store_true", help="portalı başlat ama tarayıcıyı açma")
-    p.add_argument("--port", type=int, help="portal portu (varsayılan 8765, doluysa boş bir port)")
-    p.add_argument("--mode", help="başlangıç modu: manuel | oto | plan")
-    p.add_argument("--theme", help="renk teması: beyaz | gri | siyah")
-    p.add_argument("--context-window", type=int, help="modelin bağlam penceresi (token)")
-    p.add_argument("--guard", action="store_true", help="koruma: doğrulama kapısı + devre kesici")
-    _add_model_args(p)
-    sub = p.add_subparsers(dest="cmd")
-    r = sub.add_parser("run", help="bir görevi çalıştır")
-    r.add_argument("prompt")
-    r.add_argument("-w", "--workspace", default=".", help="çalışma alanı dizini")
-    _add_model_args(r)
-    r.add_argument("--max-steps", type=int, default=20)
-    sv = sub.add_parser("serve", help="HTTP API sunucusunu başlat")
-    sv.add_argument("--host", default="127.0.0.1")
-    sv.add_argument("--port", type=int, default=8765)
-    sv.add_argument(
-        "--allow-remote", action="store_true", help="loopback dışında dinlemeye izin ver"
-    )
-    sv.add_argument("--max-steps", type=int, default=20)
-    sv.add_argument("--guard", action="store_true", help="görevlerde varsayılan olarak koruma aç")
-    sv.add_argument(
-        "--context-window",
-        type=int,
-        help="modelin bağlam penceresi (token); arayüzde doluluk göstergesi için (ör. 8192)",
-    )
-    _add_model_args(sv)
-    lab = sub.add_parser(
-        "lab", help="Reliability Lab: saldırı/hata senaryolarıyla ajan güvenilirliğini ölç"
-    )
-    ls = lab.add_subparsers(dest="lab_cmd", required=True)
-    ls.add_parser("list", help="senaryoları listele")
-    lv = ls.add_parser("validate", help="senaryo dosyasını doğrula")
-    lv.add_argument("file", nargs="?", help="JSONL (varsayılan: yerleşik küme)")
-    lsm = ls.add_parser("smoke", help="betikli modellerle (harici model yok) değerlendiriciyi sına")
-    lsm.add_argument("--out", help="rapor klasörü (davranış başına bir alt klasör)")
-    lr = ls.add_parser("run", help="senaryoları modelle çalıştır (temiz + saldırılı eşleştirilmiş)")
-    lr.add_argument("--out", required=True, help="deney klasörü (runs.jsonl, traces/, report.md)")
-    lr.add_argument("--file", help="senaryo JSONL (varsayılan: yerleşik küme)")
-    lr.add_argument("--scenario", action="append", help="yalnız bu senaryo(lar)")
-    lr.add_argument("--category", action="append", help="yalnız bu kategori(ler)")
-    lr.add_argument("--repeat", type=int, default=1, help="her koşulu kaç kez tekrarla")
-    lr.add_argument("--time-limit", type=float, default=300.0, help="koşu başına saniye")
-    lr.add_argument(
-        "--breaker", action="store_true", help="devre kesici açık (harness yapılandırması)"
-    )
-    lr.add_argument("--harness-id", default="base", help="deney kaydına yazılan yapılandırma adı")
-    _add_strong_args(lr)
-    lr.add_argument(
-        "--model-revision", help="model revizyonu/özeti (verilmezse Ollama'dan okunmaya çalışılır)"
-    )
-    lr.add_argument("--note", default="", help="deney kaydına serbest not")
-    _add_model_args(lr)
-    lrp = ls.add_parser("report", help="deney klasöründen results.json + report.md üret")
-    lrp.add_argument("dir")
-    lcp = ls.add_parser("compare", help="iki deneyi karşılaştır (A: önceki, B: yeni)")
-    lcp.add_argument("a")
-    lcp.add_argument("b")
-    bn = sub.add_parser(
-        "bench", help="modeli küçük yazılım görevlerinde ölç (harness değerlendirmesi)"
-    )
-    bs = bn.add_subparsers(dest="bench_cmd", required=True)
-    bs.add_parser("list", help="ölçüm görevlerini listele")
-    bc = bs.add_parser(
-        "compare", help="rapor dosyalarını katman (zayıf/orta/büyük) başına karşılaştır"
-    )
-    bc.add_argument("pairs", nargs="+", metavar="KATMAN=RAPOR.json")
-    bc.add_argument("--out", help="Markdown çıktı dosyası")
-    bs.add_parser("splits", help="görev bölümlerini (train/dev/final) göster")
-    brp = bs.add_parser(
-        "replay", help="kaydedilmiş bir izi modelsiz yeniden oynat ve gizli testle doğrula"
-    )
-    brp.add_argument("trace", help="--trace-dir ile kaydedilen iz dosyası (JSON)")
-    brg = bs.add_parser(
-        "regress", help="önceki sürüm raporuna göre regresyon/iyileşme (görev bazında)"
-    )
-    brg.add_argument("old", metavar="ONCEKI.json")
-    brg.add_argument("new", metavar="YENI.json")
-    bdg = bs.add_parser("diagnose", help="rapor(lar)dan başarısızlık nedenleri ve maliyet dökümü")
-    bdg.add_argument("reports", nargs="+", metavar="RAPOR.json")
-    br = bs.add_parser("run", help="görevleri modelle çalıştır, gizli testle doğrula")
-    br.add_argument(
-        "--split",
-        choices=["dev-all", "train", "dev", "final", "all"],
-        default="dev-all",
-        help="görev bölümü: dev-all (eğitim+geliştirme, varsayılan), final yalnız sürüm ölçümünde kullanılmalı",
-    )
-    br.add_argument(
-        "--trace-dir",
-        help="her koşu için adım izi ve model yanıtlarını bu klasöre yaz (tekrar oynatma)",
-    )
-    br.add_argument("--task", action="append", help="yalnız bu görev(ler); tekrarlanabilir")
-    br.add_argument("--repeat", type=int, default=1, help="her görevi kaç kez dene")
-    br.add_argument("--max-steps", type=int, default=30)
-    br.add_argument("--time-limit", type=float, default=600.0, help="görev başına saniye")
-    br.add_argument("--out", help="JSON rapor dosyası")
-    br.add_argument(
-        "--arm", choices=sorted(bench.ARMS), default="B", help="deney kolu (A: minimal, B: Usta)"
-    )
-    br.add_argument(
-        "--stop-file",
-        help="bu dosya var olursa ölçüm geçerli koşudan sonra durur (paylaşılan sunucuyu korumak için)",
-    )
-    br.add_argument("--infra-retries", type=int, default=2, help="altyapı hatasında yeniden deneme")
-    br.add_argument(
-        "--shrink-writes",
-        type=int,
-        metavar="N",
-        help="deney: son N dosya yazması tam kalır, eskilerin içeriği bağlamdan atılır",
-    )
-    _add_strong_args(br)
-    _add_model_args(br)
-    mcp = sub.add_parser("mcp", help="MCP sunucularını yönet (arama, takvim vb. ek araçlar)")
-    vf = sub.add_parser(
-        "verify", help="projeye özel doğrulama komutu (çalışma alanı dışında saklanır)"
-    )
-    vs = vf.add_subparsers(dest="verify_cmd", required=True)
-    vset = vs.add_parser("set", help="usta verify set [--image İMAJ] -- KOMUT [ARG...]")
-    vset.add_argument("--image", help="sandbox imajı (yerelde çekilmiş olmalı)")
-    vs.add_parser("show", help="geçerli ayarı göster")
-    vs.add_parser("clear", help="ayarı sil (otomatik keşif)")
-    for v in vs.choices.values():
-        v.add_argument("-w", "--workspace", default=".", help="proje dizini")
-    sbx = sub.add_parser(
-        "sandbox", help="sandbox imajı: kimliğini sabitle ve doğrula (tedarik zinciri)"
-    )
-    sbs = sbx.add_subparsers(dest="sandbox_cmd", required=True)
-    sbp = sbs.add_parser(
-        "pin", help="yerel imajın kimliğini kaydet; değişirse çalıştırma reddedilir"
-    )
-    sbp.add_argument("--image", default="python:3.12-slim")
-    sbs.add_parser("status", help="sabitlemeleri ve yerel imaj kimliklerini göster")
-    pr = sub.add_parser("probe", help="modelin araç çağrısı yeteneğini ölç ve önbelleğe al")
-    pr.add_argument("--refresh", action="store_true", help="önbelleği yok say, yeniden ölç")
-    pr.add_argument(
-        "--deep",
-        action="store_true",
-        help="derin yetenek profili: çoklu çağrı, argüman doğruluğu, toparlanma, uzun bağlam (protokol başına)",
-    )
-    pr.add_argument(
-        "--long-chars",
-        type=int,
-        default=6000,
-        help="--deep uzun bağlam sondasının uzunluğu (karakter)",
-    )
-    pr.add_argument(
-        "--probe-repeats",
-        type=int,
-        default=3,
-        help="--deep: her sondayı kaç kez dene (gürültüyü azaltır)",
-    )
-    pr.add_argument(
-        "--context-window",
-        type=int,
-        help="modelin bağlam penceresi (token); derin profil bu yapılandırmaya bağlanır",
-    )
-    _add_model_args(pr)
-    ms = mcp.add_subparsers(dest="mcp_cmd", required=True)
-    add = ms.add_parser("add", help="sunucu ekle: usta mcp add AD [seçenekler] -- KOMUT [ARG...]")
-    add.add_argument("name")
-    add.add_argument("--env", action="append", default=[], help="sunucunun istediği anahtar adı")
-    add.add_argument(
-        "--approve", choices=mcpconfig.APPROVE_MODES, default="ask", help="ask: her çağrıda sor"
-    )
-    add.add_argument("--yes", action="store_true", help="onay sormadan ekle")
-    add.add_argument("--replace", action="store_true", help="aynı adlıyı değiştir")
-    add.add_argument(
-        "--image",
-        help="konteyner imajı (yerelde çekilmiş olmalı; ör. node:22-slim, mümkünse @sha256)",
-    )
-    add.add_argument(
-        "--allow-host",
-        action="append",
-        default=[],
-        dest="allow_hosts",
-        help="sunucunun erişebileceği alan adı (allowlist proxy); verilmezse ağ kapalı",
-    )
-    add.add_argument(
-        "--workspace-access",
-        choices=mcpconfig.WORKSPACE_MODES,
-        default="none",
-        dest="workspace_access",
-        help="çalışma alanı sunucuya bağlansın mı (varsayılan: none)",
-    )
-    add.add_argument("--memory", default="256m", help="bellek sınırı (256m, 1g)")
-    add.add_argument("--cpus", default="0.5", help="CPU sınırı")
-    add.add_argument("--pids", type=int, default=64, help="süreç sayısı sınırı")
-    add.add_argument(
-        "--isolation",
-        choices=mcpconfig.ISOLATIONS,
-        default="container",
-        help="container (varsayılan, yalıtılmış) ya da host (ana makinede; riskli uyumluluk modu)",
-    )
-    add.add_argument(
-        "--i-understand-host-risk",
-        action="store_true",
-        dest="host_risk",
-        help="--isolation host için zorunlu: sunucu tüm yetkilerinle çalışır",
-    )
-    ms.add_parser("list", help="ekli sunucuları göster")
-    for name, text in (
-        ("test", "sunucuyu başlat ve araçlarını listele"),
-        ("prepare", "paketleri allowlist ağıyla önbelleğe indir ve imaj/önbelleği sabitle"),
-        ("remove", "sunucuyu ve anahtarlarını sil"),
-        ("enable", "sunucuyu aç"),
-        ("disable", "sunucuyu kapat (silmeden)"),
-    ):
-        ms.add_parser(name, help=text).add_argument("name")
-    cli_audit.add_parser(sub)
-    return p
-
-
 def _mcp_servers(home: Path) -> list[mcpconfig.Server] | None:
     try:
         return list(mcpconfig.load(home).values())
@@ -606,115 +278,6 @@ def _serve_cmd(args: argparse.Namespace) -> int:
     return 0
 
 
-def _open_browser(url: str) -> None:
-    """Tarayıcıyı terminalden bağımsız açar: çıktısı/girdisi terminale karışmaz (istem donmaz)."""
-    saved = []
-    try:
-        null = os.open(os.devnull, os.O_RDWR)
-        for fd in (0, 1, 2):
-            saved.append((fd, os.dup(fd)))
-            os.dup2(null, fd)
-        os.close(null)
-    except OSError:
-        pass
-    try:
-        webbrowser.open(url)
-    finally:
-        for fd, copy in saved:
-            os.dup2(copy, fd)
-            os.close(copy)
-
-
-def _discover_models(endpoint: str, key: str | None = None) -> list[str]:
-    try:
-        headers = {"Authorization": f"Bearer {key}"} if key else {}
-        r = httpx.get(endpoint.rstrip("/") + "/models", headers=headers, timeout=4)
-        r.raise_for_status()
-        found = services.usable_ids(r.json().get("data", []))
-    except (httpx.HTTPError, ValueError, AttributeError, TypeError):
-        found = []
-    return found or services.fallback_models(
-        endpoint
-    )  # bilinen servis: /models çalışmıyorsa sabit liste
-
-
-def _pick_model(endpoint: str, home: Path, cur: settings.Settings) -> str | None:
-    """İlk çalıştırma: uç noktadaki modelleri listeler, seçileni ayarlara kaydeder."""
-    if not compat.is_tty():
-        print(
-            "hata: model belirtilmedi (--model, USTA_MODEL ya da ~/.usta/config.json)",
-            file=sys.stderr,
-        )
-        return None
-    models = _discover_models(endpoint)
-    if not models:
-        print(
-            f"hata: model uç noktasına ulaşılamadı: {endpoint}\n"
-            "Ollama çalışıyor mu? (ollama serve). Ya da elle ver: usta --endpoint URL --model AD",
-            file=sys.stderr,
-        )
-        return None
-    print("Kullanılabilir modeller:")
-    for i, m in enumerate(models, 1):
-        print(f"  {i}) {m}")
-    choice = input("Hangisini kullanayım? [numara] ").strip()
-    if not choice.isdigit() or not 1 <= int(choice) <= len(models):
-        print("hata: geçersiz seçim", file=sys.stderr)
-        return None
-    name = models[int(choice) - 1]
-    try:
-        settings.save(home, dataclasses.replace(cur, endpoint=endpoint, model=name))
-    except OSError:
-        pass  # kaydedilemese de bu oturumda kullanılır
-    print(f"Seçildi: {name} (bir daha sorulmaz; değiştirmek için ~/.usta/config.json)")
-    return name
-
-
-def _setup_readline(home: Path):
-    try:
-        import readline
-    except ImportError:  # Windows
-        return None
-    path = home / "repl_history"
-    try:
-        readline.read_history_file(path)
-    except OSError:
-        pass
-    readline.set_history_length(500)
-    return lambda: _save_history(readline, path)
-
-
-def _save_history(readline, path: Path) -> None:
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        readline.write_history_file(path)
-        path.chmod(0o600)
-    except OSError:
-        pass
-
-
-def _running_file(home: Path) -> Path:
-    return home / "running.json"
-
-
-def _reuse_running(home: Path, no_browser: bool) -> bool:
-    """Arka planda zaten çalışan bir Usta varsa yeni oturum kodu alıp tarayıcıyı açar; True döner."""
-    try:
-        info = json.loads(_running_file(home).read_text(encoding="utf-8"))
-        port = int(info["port"])
-        token = (home / "token").read_text(encoding="utf-8").strip()
-        base = f"http://127.0.0.1:{port}"
-        r = httpx.post(f"{base}/auth/code", headers={"Authorization": f"Bearer {token}"}, timeout=3)
-        r.raise_for_status()
-        code = r.json()["code"]
-    except (OSError, ValueError, KeyError, TypeError, httpx.HTTPError):
-        return False  # çalışan örnek yok ya da yanıt vermiyor: yenisini başlat
-    if not no_browser:
-        with contextlib.suppress(Exception):
-            _open_browser(f"{base}/?code={code}")
-    return True
-
-
 def _shortcut_cmd() -> int:
     try:
         path = compat.create_desktop_shortcut()
@@ -722,219 +285,6 @@ def _shortcut_cmd() -> int:
         print(f"hata: {e}", file=sys.stderr)
         return 2
     print(f'Masaüstüne "Usta" simgesi koydum: {path}\nBundan sonra o simgeye çift tıklaman yeter.')
-    return 0
-
-
-def _chat_cmd(args: argparse.Namespace) -> int:
-    home = _home()
-    if args.background:
-        if _reuse_running(home, args.no_browser):
-            return 0  # zaten açıktı; tarayıcı yeniden açıldı
-        # pencere yok: çıktıyı dosyaya yaz ki bir sorun olursa bakılabilsin
-        with contextlib.suppress(OSError):
-            log = open(home / "usta.log", "a", encoding="utf-8", buffering=1)  # noqa: SIM115
-            sys.stdout = sys.stderr = log
-    cur = settings.load(home)
-    try:
-        if args.theme:
-            cur = dataclasses.replace(cur, theme=theme.resolve(args.theme))
-    except ValueError as e:
-        print(f"hata: {e}", file=sys.stderr)
-        return 2
-    if args.guard:
-        cur = dataclasses.replace(cur, guard=True)
-    if args.mode:
-        mode = MODE_ALIASES.get(args.mode.casefold())
-        if mode is None:
-            print(f"hata: geçersiz mod: {args.mode!r} (manuel, oto, plan)", file=sys.stderr)
-            return 2
-        cur = dataclasses.replace(cur, mode=mode)
-    endpoint = args.endpoint or os.environ.get("USTA_ENDPOINT") or cur.endpoint or DEFAULT_ENDPOINT
-    name = args.model or os.environ.get("USTA_MODEL") or cur.model
-    api_name, api_key = "varsayılan", os.environ.get("USTA_API_KEY")
-    if cur.api and not (args.endpoint or os.environ.get("USTA_ENDPOINT")):
-        try:
-            saved = apis.load(home).get(cur.api)
-        except apis.ApiError:
-            saved = None
-        if saved is not None:  # son oturumda seçilen kayıtlı API
-            endpoint, api_key, api_name = saved.endpoint, saved.key, saved.name
-    explicit = args.protocol or os.environ.get("USTA_PROTOCOL") or cur.protocol
-    if explicit == "auto":
-        explicit = None
-    if explicit and explicit not in PROTOCOLS:
-        print(f"hata: protokol native|json|text olmalı: {explicit}", file=sys.stderr)
-        return 2
-    setup = False
-    if not name:
-        # Terminalde seçilebilecek model varsa eski seçici; yoksa ve portal açıksa kurulum modu (sihirbaz).
-        can_pick = compat.is_tty() and bool(_discover_models(endpoint))
-        in_terminal = compat.is_tty() and not can_pick
-        if cur.portal and not args.no_portal and (args.setup or args.background or in_terminal):
-            setup = True
-            name = ""
-            print("Model seçilmedi: tarayıcıdaki kurulum sihirbazını tamamla.", flush=True)
-        else:
-            name = _pick_model(endpoint, home, cur)
-            if name is None:
-                return 2
-    protocol = explicit or "native"
-    if not explicit and not setup:  # yetenek sondası: önbellekte yoksa birkaç küçük istekle ölç
-        print(f"{name} tanınıyor (ilk seferde birkaç küçük istek)…", flush=True)
-        try:
-            prof = profile.resolve_protocol(
-                home,
-                endpoint,
-                name,
-                lambda: _build_model(endpoint, name, "native", args.model_timeout, api_key=api_key),
-            )
-        except profile.ProfileError as e:
-            print(f"hata: {e}", file=sys.stderr)
-            return 2
-        protocol = prof.protocol
-        print(f"Protokol: {protocol} — {prof.note}")
-    hosts = _allowed_hosts(args)
-    servers = _mcp_servers(home)
-    root = Path(args.workspace or ".").resolve()
-    if hosts is None or servers is None or not root.is_dir():
-        if not root.is_dir():
-            print(f"hata: çalışma alanı yok: {root}", file=sys.stderr)
-        return 2
-    try:
-        projects.check_root(home, root)
-    except ValueError as e:
-        if args.workspace is not None:  # klasörü kullanıcı açıkça verdi: sessizce değiştirme
-            print(f"hata: {e}", file=sys.stderr)
-            return 2
-        # Klasör verilmedi ve bulunduğun yer uygun değil (ör. Windows'ta cmd'nin açıldığı ev klasörü):
-        # hata vermek yerine kendi klasörünü kur. Kodsuz kullanıcı "proje klasörü"nü bilmez.
-        fallback = Path.home() / "Usta"
-        try:
-            fallback.mkdir(exist_ok=True)
-            projects.check_root(home, fallback)
-        except (OSError, ValueError) as e2:
-            print(f"hata: {e}\n(otomatik klasör de kurulamadı: {e2})", file=sys.stderr)
-            return 2
-        print(
-            f"Bulunduğun yer ({root}) çalışma klasörü olamaz. Senin için bir klasör kurdum:\n"
-            f"  {fallback.resolve()}\nUsta'ya yaptırdığın dosyalar buraya yazılacak.",
-            flush=True,
-        )
-        root = fallback.resolve()
-    extra = _extra_body(args)
-    if extra is None:
-        return 2
-    default_ep = (
-        args.endpoint or os.environ.get("USTA_ENDPOINT") or cur.endpoint or DEFAULT_ENDPOINT
-    )
-    control = ModelControl(
-        home,
-        default_ep,
-        name,
-        protocol,
-        lambda ep, nm, pr, key: _build_model(
-            ep,
-            nm,
-            pr,
-            args.model_timeout,
-            {**thinking.extra_for(settings.load(home).think), **(extra or {})},
-            api_key=key,
-        ),
-        _discover_models,
-        explicit_protocol=explicit,
-        default_key=os.environ.get("USTA_API_KEY"),
-        api=api_name,
-    )
-    try:
-        cleanup_orphans()
-    except OSError:  # docker yok
-        pass
-    wid = projects.register(home, root)
-    window = args.context_window or cur.context_window
-    manager = TaskManager(
-        control.current,
-        home=home,
-        allowed_hosts=hosts,
-        context_window=window,
-        model_control=control,
-        symbol_tools=_symbol_tools(args),
-        taint_gate=_taint_gate(args),
-        finish_check=_finish_check(args),
-        mcp_servers=lambda: _mcp_servers(home) or [],
-    )
-    interactive = compat.is_tty()
-    portal, url = None, None
-    if cur.portal and not args.no_portal:
-        try:
-            portal = Portal(
-                manager,
-                home,
-                load_or_create_token(home),
-                preferred_port=args.port or 8765,
-                workspace=wid,
-                lan=args.lan,
-                background=args.background,
-            )
-            url = portal.start()
-            pairing = portal.pairing()
-            if pairing is not None:
-                urls, pin = pairing
-                print("Tablet/telefon için (aynı Wi-Fi'da):")
-                print(f"  adres: {urls[0] if urls else 'yerel ağ adresi bulunamadı'}")
-                print(
-                    f'  giriş kodu: {pin}  (5 dakika geçerli; yeni kod için portalda "Tablet" düğmesi)'
-                )
-        except RuntimeError as e:
-            print(f"uyarı: portal başlatılamadı: {e}", file=sys.stderr)
-            portal = None
-    if portal is not None and (interactive or args.background) and not args.no_browser:
-        with contextlib.suppress(Exception):  # tarayıcı açılamazsa terminal yine çalışır
-            _open_browser(portal.login_page())
-    if args.background:
-        return _background_loop(home, portal, url)
-    save_history = _setup_readline(home) if interactive else None
-    repl = Repl(
-        manager,
-        root,
-        wid,
-        home,
-        cur,
-        model_name=name,
-        protocol=protocol,
-        portal_url=url,
-        open_portal=(lambda: _open_browser(portal.login_page())) if portal else None,
-        login_link=portal.login_url if portal else None,
-        context_window=window,
-    )
-    try:
-        return repl.run()
-    finally:
-        if save_history:
-            save_history()
-        if portal is not None:
-            portal.stop()
-
-
-def _background_loop(home: Path, portal, url: str | None) -> int:
-    """Arka plan kipi: REPL yok; portal `/quit` ile kapatılana kadar çalışır."""
-    if portal is None:
-        print("hata: portal başlatılamadı; arka planda çalışılamaz", file=sys.stderr)
-        return 2
-    port = int(url.rstrip("/").rsplit(":", 1)[1]) if url else 0
-    with contextlib.suppress(OSError):
-        _running_file(home).write_text(
-            json.dumps({"pid": os.getpid(), "port": port}), encoding="utf-8"
-        )
-    print(f"Usta arka planda çalışıyor: {url}", flush=True)
-    try:
-        while not portal.quit.wait(timeout=1.0):
-            pass
-    except KeyboardInterrupt:
-        pass
-    finally:
-        with contextlib.suppress(OSError):
-            _running_file(home).unlink()
-        portal.stop()
     return 0
 
 
@@ -1007,11 +357,11 @@ def _main(argv: list[str] | None = None) -> int:
     ):  # `--` sonrası sunucu komutudur
         i = argv.index("--")
         argv, command = argv[:i], argv[i + 1 :]
-    args = _parser().parse_args(argv)
+    args = cli_parser.build().parse_args(argv)
     if args.cmd is None and getattr(args, "shortcut", False):
         return _shortcut_cmd()
     if args.cmd is None:
-        return _chat_cmd(args)
+        return cli_chat.chat_cmd(args)
     if args.cmd == "mcp":
         return cli_mcp.mcp_cmd(args, command)
     if args.cmd == "audit":

@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from usta import cli
+from usta import cli, cli_chat
 from usta import settings as st
 
 
@@ -70,10 +70,10 @@ class Probe:
             "resolve_protocol",
             lambda *a, **k: Profile("m", "native", 3, 3, 0, 3, "test", 1.0),
         )
-        monkeypatch.setattr(cli, "Repl", FakeRepl)
-        monkeypatch.setattr(cli, "Portal", FakePortal)
-        monkeypatch.setattr(cli, "cleanup_orphans", lambda: 0)
-        monkeypatch.setattr(cli.webbrowser, "open", lambda url: probe.opened.append(url) or True)
+        monkeypatch.setattr(cli_chat, "Repl", FakeRepl)
+        monkeypatch.setattr(cli_chat, "Portal", FakePortal)
+        monkeypatch.setattr(cli_chat, "cleanup_orphans", lambda: 0)
+        monkeypatch.setattr(cli_chat.webbrowser, "open", lambda url: probe.opened.append(url) or True)
         monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
 
 
@@ -138,7 +138,7 @@ def test_settings_theme_mode_and_flag_overrides(tmp_path, monkeypatch, env):
 
 def test_first_run_wizard_lists_models_and_saves_choice(tmp_path, monkeypatch, env, capsys):
     p = Probe(monkeypatch)
-    monkeypatch.setattr(cli, "_discover_models", lambda endpoint: ["a-model", "b-model"])
+    monkeypatch.setattr(cli_chat, "_discover_models", lambda endpoint: ["a-model", "b-model"])
     monkeypatch.setattr("builtins.input", lambda prompt="": "2")
     monkeypatch.chdir(tmp_path)
     assert cli.main([]) == 0
@@ -149,7 +149,7 @@ def test_first_run_wizard_lists_models_and_saves_choice(tmp_path, monkeypatch, e
 
 def test_wizard_unreachable_endpoint_explains(tmp_path, monkeypatch, capsys):
     Probe(monkeypatch)
-    monkeypatch.setattr(cli, "_discover_models", lambda endpoint: [])
+    monkeypatch.setattr(cli_chat, "_discover_models", lambda endpoint: [])
     monkeypatch.chdir(tmp_path)
     assert cli.main(["--no-portal"]) == 2  # portal kapalıyken sihirbaz yok: terminalde açıklama
     err = capsys.readouterr().err
@@ -158,7 +158,7 @@ def test_wizard_unreachable_endpoint_explains(tmp_path, monkeypatch, capsys):
 
 def test_no_model_found_in_terminal_starts_setup_mode(tmp_path, monkeypatch, capsys):
     p = Probe(monkeypatch)
-    monkeypatch.setattr(cli, "_discover_models", lambda endpoint: [])
+    monkeypatch.setattr(cli_chat, "_discover_models", lambda endpoint: [])
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     monkeypatch.chdir(tmp_path)
     assert cli.main([]) == 0
@@ -177,7 +177,7 @@ def test_setup_flag_forces_setup_mode_even_without_terminal(tmp_path, monkeypatc
 
 def test_wizard_bad_choice_is_rejected(tmp_path, monkeypatch, env):
     Probe(monkeypatch)
-    monkeypatch.setattr(cli, "_discover_models", lambda endpoint: ["a"])
+    monkeypatch.setattr(cli_chat, "_discover_models", lambda endpoint: ["a"])
     monkeypatch.setattr("builtins.input", lambda prompt="": "7")
     monkeypatch.chdir(tmp_path)
     assert cli.main([]) == 2

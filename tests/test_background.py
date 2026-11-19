@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from test_api import AUTH, TOKEN, Scripted, make_client
-from usta import cli, compat
+from usta import cli, cli_chat, compat
 from usta.api import create_app
 from usta.auth import LoginCodes
 from usta.tasks import TaskManager
@@ -60,7 +60,7 @@ def test_reuse_running_opens_browser_with_a_fresh_code(tmp_path, monkeypatch):
     (home / "token").write_text("tok\n")
     (home / "running.json").write_text(json.dumps({"pid": 1, "port": 8765}))
     opened = []
-    monkeypatch.setattr(cli, "_open_browser", lambda u: opened.append(u))
+    monkeypatch.setattr(cli_chat, "_open_browser", lambda u: opened.append(u))
 
     def post(url, headers=None, timeout=None):
         assert url == "http://127.0.0.1:8765/auth/code" and headers == {
@@ -69,7 +69,7 @@ def test_reuse_running_opens_browser_with_a_fresh_code(tmp_path, monkeypatch):
         return httpx.Response(200, json={"code": "KOD123"}, request=httpx.Request("POST", url))
 
     monkeypatch.setattr(httpx, "post", post)
-    assert cli._reuse_running(home, no_browser=False) is True
+    assert cli_chat._reuse_running(home, no_browser=False) is True
     assert opened == ["http://127.0.0.1:8765/?code=KOD123"]
 
 
@@ -78,7 +78,7 @@ def test_reuse_running_returns_false_when_nothing_is_running_or_it_does_not_answ
 ):
     home = tmp_path / "home"
     home.mkdir()
-    assert cli._reuse_running(home, no_browser=True) is False  # running.json yok
+    assert cli_chat._reuse_running(home, no_browser=True) is False  # running.json yok
     (home / "token").write_text("tok")
     (home / "running.json").write_text(json.dumps({"pid": 1, "port": 8765}))
 
@@ -86,7 +86,7 @@ def test_reuse_running_returns_false_when_nothing_is_running_or_it_does_not_answ
         raise httpx.ConnectError("kapalı", request=httpx.Request("POST", url))
 
     monkeypatch.setattr(httpx, "post", boom)
-    assert cli._reuse_running(home, no_browser=True) is False  # eski kayıt: yeni örnek başlatılır
+    assert cli_chat._reuse_running(home, no_browser=True) is False  # eski kayıt: yeni örnek başlatılır
 
 
 def test_background_loop_runs_until_quit_and_cleans_up(tmp_path):
@@ -101,9 +101,9 @@ def test_background_loop_runs_until_quit_and_cleans_up(tmp_path):
     home.mkdir()
     p = FakePortal()
     p.quit.set()
-    assert cli._background_loop(home, p, "http://127.0.0.1:8765/") == 0
+    assert cli_chat._background_loop(home, p, "http://127.0.0.1:8765/") == 0
     assert p.stopped and not (home / "running.json").exists()
-    assert cli._background_loop(home, None, None) == 2  # portal yoksa arka planda çalışılamaz
+    assert cli_chat._background_loop(home, None, None) == 2  # portal yoksa arka planda çalışılamaz
 
 
 def test_shortcut_creates_a_desktop_file_on_linux(tmp_path, monkeypatch):

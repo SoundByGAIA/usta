@@ -2,7 +2,7 @@
 
 import httpx
 
-from usta import cli, services
+from usta import cli_chat, services
 
 OPENCODE = [
     {
@@ -46,7 +46,7 @@ def _get(payload=None, fail=False):
 
 def test_discover_filters_opencode_through_cli(monkeypatch):
     monkeypatch.setattr(httpx, "get", _get({"data": OPENCODE}))
-    assert cli._discover_models("https://opencode.ai/inference/openai/v1") == [
+    assert cli_chat._discover_models("https://opencode.ai/inference/openai/v1") == [
         "deepseek-v4-pro",
         "glm-5.3",
     ]
@@ -54,7 +54,7 @@ def test_discover_filters_opencode_through_cli(monkeypatch):
 
 def test_discover_falls_back_to_preset_for_anthropic_when_models_endpoint_fails(monkeypatch):
     monkeypatch.setattr(httpx, "get", _get(fail=True))
-    got = cli._discover_models("https://api.anthropic.com/v1/", key="k")
+    got = cli_chat._discover_models("https://api.anthropic.com/v1/", key="k")
     assert (
         "claude-sonnet-5-5" in got and got == services.PRESET_MODELS["https://api.anthropic.com/v1"]
     )
@@ -62,4 +62,4 @@ def test_discover_falls_back_to_preset_for_anthropic_when_models_endpoint_fails(
 
 def test_discover_has_no_preset_for_unknown_services(monkeypatch):
     monkeypatch.setattr(httpx, "get", _get(fail=True))
-    assert cli._discover_models("https://bilinmeyen.example/v1") == []
+    assert cli_chat._discover_models("https://bilinmeyen.example/v1") == []

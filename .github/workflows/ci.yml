@@ -48,6 +48,26 @@ jobs:
           usta lab validate
           usta lab smoke
 
+  windows:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"  # testlerin kendi dosya okumaları için; ürün kodunu tests/test_encoding.py korur
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Kurulum
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --require-hashes -r requirements-dev.lock
+          python -m pip install --no-deps -e .
+      - name: Test
+        run: pytest -q
+
   audit:
     runs-on: ubuntu-latest
     steps:

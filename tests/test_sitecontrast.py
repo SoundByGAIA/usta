@@ -64,7 +64,7 @@ def test_finish_check_reminds_once_about_invisible_text(tmp_path):
     fc = FinishCheck("Kuaför dükkanım için bir site yap. Adı Ayşe Kuaför.", root=tmp_path)
     fc.observe("write_file", {"path": "index.html", "content": PINK}, True)
     note = fc.on_finish("Siteyi yaptım.")
-    assert note and "Ayşe Kuaför" in note and "görünmüyor" in note
+    assert note and "Ayşe Kuaför" in note and "göremiyor" in note
     assert fc.on_finish("Siteyi yaptım.") is None
 
 

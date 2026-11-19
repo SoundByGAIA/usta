@@ -185,7 +185,7 @@ class FinishCheck:
             quoted = ", ".join(f'"{t}"' for t in hidden[:3])
             return self._nudge(
                 "contrast",
-                f"Sayfada şu yazılar zeminle aynı renkte, kullanıcı onları görünmüyor: {quoted}. "
+                f"Sayfada şu yazılar zeminle aynı renkte, kullanıcı onları göremiyor: {quoted}. "
                 "Yazı rengini ya da zemin rengini değiştir ki okunsun.",
             )
         intent_only = len(text) <= MAX_INTENT_CHARS and "?" not in text and not _CLAIM.search(text)

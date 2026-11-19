@@ -394,3 +394,5 @@ button.q:hover, button.q:focus-visible { background: var(--accent-soft); }
 @keyframes alet-cik { to { transform: translateY(0); } }
 @keyframes acilis-git { to { opacity: 0; visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { #acilis { display: none; } }
+
+#tools-reg-form input { flex: 1; min-width: 0; }

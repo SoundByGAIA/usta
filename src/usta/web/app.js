@@ -359,6 +359,7 @@
   $("apis-btn").addEventListener("click", () => U.togglePanel("apis"));
   $("privacy-btn").addEventListener("click", () => U.togglePanel("privacy"));
   $("api-form").addEventListener("submit", U.addApi);
+  $("tools-reg-form").addEventListener("submit", (ev) => U.searchRegistry(ev));
   $("local-scan").addEventListener("click", U.scanLocal);
   $("wizard-btn").addEventListener("click", () => U.togglePanel("wizard"));
   $("tablet-btn").addEventListener("click", () => U.togglePanel("tablet"));

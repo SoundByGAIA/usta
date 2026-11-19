@@ -415,6 +415,13 @@
     <h2>MCP araçları</h2>
     <p class="note">Ek araçlar (MCP sunucuları) <strong>yalıtılmış bir Docker konteynerinde</strong> <button type="button" class="q" data-gloss="Docker" aria-label="Bu ne demek? Docker" title="Bu ne demek?">?</button> çalışır (ev dizinin ve Docker soketi yok; çalışma klasörünü yalnız izin verirsen görür); Docker ve imaj gerekir. Yine de yalnız güvendiklerini ekle. Her çağrıları varsayılan olarak onayına sunulur.</p>
     <div id="tools-installed"></div>
+    <h2>Bağlantıyla ekle</h2>
+    <form id="tools-reg-form" class="row">
+      <label for="tools-reg-q" class="sr">GitHub bağlantısı ya da paket adı</label>
+      <input id="tools-reg-q" placeholder="GitHub bağlantısı ya da paket adı (ör. github.com/brave/brave-search-mcp-server)" spellcheck="false" required minlength="2">
+      <button type="submit">Bul</button>
+    </form>
+    <div id="tools-reg"></div>
     <h2>Bilgisayarında bulduklarım</h2>
     <p class="note">Claude Desktop, Cursor ya da VS Code'a kurduğun araçlar. Usta da kullansın istersen Ekle'ye bas.</p>
     <div id="tools-found"></div>

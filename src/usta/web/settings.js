@@ -35,6 +35,39 @@
     if (!list.length) found.appendChild(U.h("p", "empty", "Başka bir uygulamada kurulu araç bulamadım."));
     for (const f of list) found.appendChild(foundCard(f));
   }
+  // Resmî kayıt defterinde bulunan sunucu: eklerken sunucu kaydı yeniden okur (buradaki komuta güvenmez)
+  async function searchRegistry(ev) {
+    ev.preventDefault();
+    const box = $("tools-reg");
+    box.replaceChildren();
+    toolsMsg("Kayıt defterinde arıyorum...");
+    const list = await toolsCall("/kayit/ara", "POST", { sorgu: $("tools-reg-q").value.trim() });
+    if (!list) return;
+    toolsMsg("");
+    if (!list.length) box.appendChild(U.h("p", "empty", "Resmî MCP kayıt defterinde bulamadım. Bu araç otomatik kurulamıyor."));
+    for (const e of list) box.appendChild(registryCard(e));
+  }
+  function registryCard(e) {
+    const card = U.h("div", "card");
+    const owner = (e.repository.match(/github\.com\/([\w.-]+)/i) || [])[1];
+    card.append(U.h("strong", null, e.name), U.h("span", "chip", e.verified ? `doğrulanmış yayıncı: ${owner}` : "yayıncı doğrulanmamış"));
+    if (e.description) card.appendChild(U.h("p", null, e.description));
+    if (!e.command.length) { card.appendChild(U.h("p", "empty", `Eklenemez: ${e.reason}.`)); return card; }
+    card.append(U.h("p", "empty", `Sürüm ${e.version}: kendi kutusunda çalışır, internete çıkabilir, dosyalarını görmez.`), U.h("code", "cmd", e.command.join(" ")));
+    const need = e.env.filter((v) => v.required).map((v) => v.name);
+    if (need.length) card.appendChild(U.h("p", "empty", `Ekledikten sonra şu anahtarı girmen gerekecek: ${need.join(", ")}`));
+    const add = U.h("button", "primary", "Ekle");
+    add.type = "button";
+    add.addEventListener("click", async () => {
+      add.disabled = true;
+      const r = await toolsCall("/kayit", "POST", { name: e.name, version: e.version });
+      if (r) { toolsMsg(`${r.name} eklendi. ${need.length ? "Anahtarını gir, " : ""}Hazırla'ya bas, sonra Test et.`, "ok"); $("tools-reg").replaceChildren(); await loadTools(); }
+      else add.disabled = false;
+    });
+    card.appendChild(add);
+    return card;
+  }
+  U.searchRegistry = searchRegistry;
   // Başka uygulamada bulunan sunucu: komutu Usta kurar (sürüm sabit, kendi kabında); anahtar değeri arayüze hiç gelmez
   function foundCard(f) {
     const card = U.h("div", "card");

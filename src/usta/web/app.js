@@ -406,6 +406,7 @@
 
   // --- ekler (metin / Markdown) ---
   const MAX_ATT = 5, MAX_ATT_BYTES = 100000;
+  Object.assign(U, { MAX_ATT, MAX_ATT_BYTES, renderAttached });
   function renderAttached() {
     const box = $("attached");
     box.replaceChildren();
@@ -539,7 +540,7 @@
         const res = await api(`/tasks/${encodeURIComponent(taskId)}/diff`);
         if (res.ok) renderDiff(await res.text());
         setActive(false);
-        refreshTree();
+        U.refreshTree();
         if (!$("preview").hidden) loadPreview();
         if (info.mode === "plan" && info.status === "done" && info.answer) offerPlan(info);
         return;
@@ -742,163 +743,6 @@
     loadApis(); loadModels();
   }
 
-  // --- dosya gezgini ---
-  const filesMsg = (t) => { $("files-msg").textContent = t || ""; };
-  const joinPath = (dir, name) => (dir ? `${dir}/${name}` : name);
-  async function fillDir(dir, ul) {
-    const res = await api(`/workspaces/${encodeURIComponent(state.ws)}/tree?path=${encodeURIComponent(dir)}`);
-    if (!res.ok) { filesMsg(await errorText(res)); return; }
-    ul.replaceChildren();
-    const { entries } = await res.json();
-    if (!entries.length && !dir) ul.appendChild(h("li", "empty", "Boş. Dosya ya da klasör yükleyebilirsin."));
-    for (const e of entries) {
-      const path = joinPath(dir, e.name);
-      const li = h("li", (e.dir ? "dir" : "file") + (e.link ? " link" : "") + (e.dir && state.selDir === path ? " sel" : ""));
-      const b = h("button", null, (e.dir ? (state.openDirs.has(path) ? "▾ " : "▸ ") : "  ") + e.name);
-      b.type = "button";
-      b.title = path;
-      const line = h("div", "line");
-      line.appendChild(b);
-      line.appendChild(rowActions(path, e));
-      li.appendChild(line);
-      if (e.dir && !e.link) {
-        const sub = h("ul");
-        sub.hidden = !state.openDirs.has(path);
-        li.appendChild(sub);
-        if (state.openDirs.has(path)) fillDir(path, sub);
-        b.addEventListener("click", () => {
-          document.querySelectorAll("#file-tree li.sel").forEach((x) => x.classList.remove("sel"));
-          li.classList.add("sel");
-          state.selDir = path;
-          const open = !state.openDirs.has(path);
-          if (open) state.openDirs.add(path); else state.openDirs.delete(path);
-          b.textContent = (open ? "▾ " : "▸ ") + e.name;
-          sub.hidden = !open;
-          if (open) fillDir(path, sub);
-        });
-      } else if (!e.dir) {
-        b.addEventListener("click", () => openFile(path));
-      }
-      ul.appendChild(li);
-    }
-  }
-  // --- dosya işlemleri: yeni dosya/klasör, yeniden adlandır, sil ---
-  async function fsCall(body) {
-    const res = await api(`/workspaces/${encodeURIComponent(state.ws)}/fs`, { method: "POST", body: JSON.stringify(body) });
-    if (!res.ok) { filesMsg(await errorText(res)); return false; }
-    return true;
-  }
-  function rowActions(path, e) {
-    const acts = h("span", "acts");
-    const ren = h("button", null, "✎");
-    ren.type = "button"; ren.title = "Yeniden adlandır"; ren.setAttribute("aria-label", `${path} yeniden adlandır`);
-    ren.addEventListener("click", () => startFs("rename", path));
-    const del = h("button", null, "🗑");
-    del.type = "button"; del.title = "Sil"; del.setAttribute("aria-label", `${path} sil`);
-    let armed = null;
-    del.addEventListener("click", async () => {
-      if (!armed) {
-        del.textContent = e.dir ? "Klasörü sil?" : "Sil?";
-        del.classList.add("armed");
-        armed = setTimeout(() => { armed = null; del.textContent = "🗑"; del.classList.remove("armed"); }, 4000);
-        return;
-      }
-      clearTimeout(armed);
-      if (await fsCall({ op: "delete", path })) {
-        if (state.openFile && (state.openFile.path === path || state.openFile.path.startsWith(`${path}/`))) { state.openFile = null; showTab("stream"); }
-        state.openDirs.delete(path);
-        if (state.selDir === path) state.selDir = "";
-        refreshTree();
-        filesMsg(`${path} silindi.`);
-      }
-    });
-    acts.append(ren, del);
-    return acts;
-  }
-  function startFs(mode, path) {
-    state.fsMode = { mode, path };
-    const label = { create_file: "Yeni dosya adı", create_dir: "Yeni klasör adı", rename: `Yeni ad: ${path}` }[mode];
-    $("fs-label").textContent = mode === "rename" ? label : `${label}${state.selDir ? ` (${state.selDir}/ içine)` : ""}`;
-    $("fs-input").value = mode === "rename" ? path.split("/").pop() : "";
-    $("fs-form").hidden = false;
-    $("fs-input").focus();
-  }
-  async function submitFs(ev) {
-    ev.preventDefault();
-    const f = state.fsMode;
-    const name = $("fs-input").value.trim();
-    if (!f || !name || name.includes("\\")) return;
-    const base = f.mode === "rename" ? f.path.split("/").slice(0, -1).join("/") : state.selDir;
-    const target = joinPath(base, name);
-    const ok = await fsCall(f.mode === "rename" ? { op: "rename", path: f.path, to: target } : { op: f.mode, path: target });
-    if (!ok) return;
-    $("fs-form").hidden = true;
-    state.fsMode = null;
-    if (f.mode === "rename" && state.openFile && state.openFile.path === f.path) { state.openFile = null; showTab("stream"); }
-    refreshTree(true);
-    filesMsg(f.mode === "rename" ? `${f.path} → ${target}` : `${target} oluşturuldu.`);
-  }
-  async function refreshTree(keepMsg) {
-    if (keepMsg !== true) filesMsg("");
-    const ul = $("file-tree");
-    ul.replaceChildren();
-    const up = !state.ws || state.active;
-    $("f-up-files").disabled = $("f-up-dir").disabled = $("f-new-file").disabled = $("f-new-dir").disabled = up;
-    if (state.ws) await fillDir("", ul);
-  }
-  async function openFile(path) {
-    const res = await api(`/workspaces/${encodeURIComponent(state.ws)}/files?path=${encodeURIComponent(path)}`);
-    if (!res.ok) { filesMsg(`${path}: ${await errorText(res)}`); return; }
-    const f = await res.json();
-    state.openFile = { path, content: f.content };
-    $("fileview-path").textContent = path;
-    $("fileview-body").textContent = f.content.length > 200000 ? `${f.content.slice(0, 200000)}\n… [kırpıldı]` : f.content;
-    showTab("file");
-  }
-  function attachOpenFile() {
-    const f = state.openFile;
-    if (!f) return;
-    if (state.files.some((x) => x.name === f.path)) { filesMsg("Zaten ekli."); return; }
-    if (f.content.length > MAX_ATT_BYTES) { filesMsg("Dosya 100 KB'tan büyük, göreve eklenemez; ajan zaten read_file ile okuyabilir."); return; }
-    if (state.files.length >= MAX_ATT) { filesMsg(`En çok ${MAX_ATT} dosya eklenebilir.`); return; }
-    state.files.push({ name: f.path, content: f.content, size: f.content.length });
-    renderAttached();
-    filesMsg(`${f.path} göreve eklendi.`);
-    showTab("stream");
-  }
-  const SKIP_UPLOAD = new Set([".git", "node_modules", ".venv", "__pycache__", ".usta"]);
-  async function toB64(file) {
-    const buf = new Uint8Array(await file.arrayBuffer());
-    let s = "";
-    for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-    return btoa(s);
-  }
-  async function uploadFiles(list) {
-    if (!state.ws || state.active) return;
-    const files = Array.from(list).filter((f) => !(f.webkitRelativePath || f.name).split("/").some((p) => SKIP_UPLOAD.has(p)));
-    if (!files.length) { filesMsg("Yüklenecek dosya yok."); return; }
-    let written = 0, skipped = 0, batch = [], size = 0;
-    const flush = async () => {
-      if (!batch.length) return true;
-      const res = await api(`/workspaces/${encodeURIComponent(state.ws)}/import`, { method: "POST", body: JSON.stringify({ files: batch }) });
-      batch = []; size = 0;
-      if (!res.ok) { filesMsg(await errorText(res)); return false; }
-      const r = await res.json();
-      written += r.written.length; skipped += r.skipped.length;
-      return true;
-    };
-    filesMsg(`Yükleniyor (${files.length} dosya)…`);
-    for (const f of files) {
-      if (f.size > 5000000) { filesMsg(`${f.name}: 5 MB'tan büyük, atlandı.`); continue; }
-      batch.push({ path: f.webkitRelativePath || f.name, b64: await toB64(f) });
-      size += f.size;
-      if (batch.length >= 100 || size > 6000000) { if (!(await flush())) return; }
-    }
-    if (!(await flush())) return;
-    filesMsg(`${written} dosya yüklendi${skipped ? `, ${skipped} dosya zaten vardı (atlandı)` : ""}.`);
-    refreshTree(true);
-  }
-
   // --- çalışma alanları ---
   async function loadWorkspaces() {
     const res = await api("/workspaces");
@@ -940,7 +784,7 @@
     state.openDirs = new Set();
     state.selDir = "";
     $("fs-form").hidden = true;
-    refreshTree();
+    U.refreshTree();
     if (!$("memory").hidden || !$("history").hidden || !$("fileview").hidden || !$("preview").hidden) showTab("stream");
     await loadWorkspaces();
     const saved = get("usta_task");
@@ -1095,16 +939,6 @@
   $("wiz-cloud-form").addEventListener("submit", U.wizTryKey);
   $("skill-upload").addEventListener("click", () => $("skill-input").click());
   $("skill-input").addEventListener("change", async () => { await U.uploadSkills($("skill-input").files); $("skill-input").value = ""; });
-  $("f-refresh").addEventListener("click", () => refreshTree());
-  $("f-new-file").addEventListener("click", () => startFs("create_file"));
-  $("f-new-dir").addEventListener("click", () => startFs("create_dir"));
-  $("fs-form").addEventListener("submit", submitFs);
-  $("fs-cancel").addEventListener("click", () => { $("fs-form").hidden = true; state.fsMode = null; });
-  $("f-up-files").addEventListener("click", () => $("f-input").click());
-  $("f-up-dir").addEventListener("click", () => $("f-dir-input").click());
-  $("f-input").addEventListener("change", async () => { await uploadFiles($("f-input").files); $("f-input").value = ""; });
-  $("f-dir-input").addEventListener("change", async () => { await uploadFiles($("f-dir-input").files); $("f-dir-input").value = ""; });
-  $("fileview-attach").addEventListener("click", attachOpenFile);
   $("tab-file").addEventListener("click", () => showTab("file"));
   $("tab-preview").addEventListener("click", () => showTab("preview"));
   $("tab-office").addEventListener("click", () => showTab("office"));

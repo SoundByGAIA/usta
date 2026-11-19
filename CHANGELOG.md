@@ -1,26 +1,25 @@
 # Değişiklik günlüğü
 
-## Yayınlanmadı
+## 0.9.1: bağlantıdan beceri ve MCP, Windows sağlamlaştırma
 
-- Görünmeyen yazı denetimi: site isteğinde model bir yazıyı zeminiyle aynı renge boyarsa (pembe şerit üstüne pembe
-  dükkân adı) bir kez hatırlatılır (`sitecontrast.py`). Önceki site ölçümünde küçük modellerin yazdığı 95 sayfanın
-  12'sinde başlık bu yüzden görünmüyordu. Görsel ya da gradyan zemin, `@media` ve `:hover` için karar verilmez.
-  Deneysel bölüm bölüm kurmada (`USTA_SITE_STEPS=1`) modele sorulmaz: modelin renkleri bir yazıyı gizliyorsa Usta'nın
-  renkleri kullanılır; o 12 sayfanın hepsi böyle okunur hale geliyor (12'si de bu yoldan çıkmıştı).
+Varsayılan model davranışında tek değişiklik: site isteğinde görünmeyen yazı hatırlatması. Bu sürümdeki Windows
+düzeltmelerinin çoğu, testlerin gerçek bir Windows bilgisayarda ve CI'da koşturulmasıyla bulundu.
+
+- Bağlantıdan beceri: sohbete "şu skill iyiymiş: github.com/…" yazınca (ya da Ayarlar → Becerilerim'e bağlantıyı
+  yapıştırınca) Usta `SKILL.md`'yi indirip beceri öneri kartını açar; modele gitmez. Depo bağlantısında içindeki
+  beceriler listelenir. Yalnız GitHub, yalnız yönerge metni; uyarılar ve onay her zamanki gibi.
+- Masaüstü ve tarayıcı sekmesi simgesi: takım çantası ve kask. Usta açılınca çanta açılır (1,5 sn, tarayıcı oturumunda
+  bir kez; hareket azaltma ayarında oynamaz).
 - Kodsuz kullanıcı denemesinden: kurulumda seçilen servis kartı işaretli görünür; servis listesindeki müzik, görsel,
   araştırma ve ajan modelleri (Gemini'de `lyria`, `nano-banana`, `deep-research`…) model seçiminde çıkmaz; model
   seçilmeden üst çubukta "Bu bilgisayarda" yazmaz. Sonuç sekmesinde teknik açıklama ve dosya yolu kutusu yalnız
   geliştirici modunda görünür, önizleme büyür.
-- `usta serve` da ortak hafıza ev sahibiyse dinleyiciyi açar (önce yalnız portal açıyordu).
-- MCP: Windows'ta sunucunun hata mesajı sistemin kod sayfasıyla yazılmışsa da Türkçe karakterleri doğru okunur.
-- MCP, Windows: sunucu kapanınca açtığı alt süreçler de kapanır (iş nesnesi; önce `npx → node` gibi torunlar arkada
-  kalabiliyordu). Sürücü harfli çalışma klasörü kaba bağlanabilir (önce `C:` yüzünden reddediliyordu).
-  Python ile yazılmış sunuculara `PYTHONIOENCODING=utf-8` verilir; MCP stdio'da UTF-8 ister, İngilizce Windows'ta
-  Python sunucusu Türkçe yazınca çöküyordu.
-- Windows: sembol araçları yolları `/` ile verir, modelin `\` ya da `./` ile yazdığı yolu da tanır; önizleme `.js` ve
-  `.css` türlerini sistemin kayıt defterinden okumaz (bazı makinelerde yanlış tür betiği engelliyordu); proje notları
-  her sistemde aynı satır sonuyla yazılır.
-- CI artık Windows'ta da test koşuyor; ürün kodunda kodlamasız dosya açma testle engellenir.
+- Görünmeyen yazı denetimi: site isteğinde model bir yazıyı zeminiyle aynı renge boyarsa (pembe şerit üstüne pembe
+  dükkân adı) bir kez hatırlatılır (`sitecontrast.py`). Önceki site ölçümünde küçük modellerin yazdığı 95 sayfanın
+  12'sinde başlık bu yüzden görünmüyordu. Görsel ya da gradyan zemin, `@media` ve `:hover` için karar verilmez.
+  Deneysel bölüm bölüm kurmada (`USTA_SITE_STEPS=1`) modele sorulmaz: modelin renkleri bir yazıyı gizliyorsa Usta'nın
+  renkleri kullanılır; o 12 sayfanın hepsi böyle okunur hale geliyor (12'si de bu yoldan çıkmıştı). Ölçüm: hatırlatma
+  Qwen3 4B'de görünmeyen başlığı 0/8'den 3/8'e çıkarıyor ([docs/olcumler/gorunmez-yazi.md](docs/olcumler/gorunmez-yazi.md)).
 - MCP: Claude Desktop, Claude Code, Cursor, VS Code ve Windsurf'e kurulu sunucuları Usta bulur ve panelde gösterir; Ekle'ye
   basınca npm/PyPI paketi son sürümüne sabitlenip kendi kabında çalışır (internete çıkabilir, çalışma klasörünü görmez).
   Anahtarlar istenirse kopyalanır, değerleri arayüze hiç gelmez. Bilgisayardaki bir programı ya da betiği doğrudan
@@ -28,14 +27,19 @@
 - MCP, bağlantıyla ekleme: GitHub bağlantısı ya da paket adı yazılınca Usta resmî MCP kayıt defterinde arar; bağlantıda
   yalnız deposu birebir eşleşen kayıt gösterilir, GitHub hesabıyla doğrulanmış yayıncı işaretlenir. Ekle'ye basınca
   kayıt sunucuda yeniden okunur, sürüm sabit kurulur. Geliştirici modunda, Araçlar panelinde.
-- Bağlantıdan beceri: sohbete "şu skill iyiymiş: github.com/…" yazınca (ya da Ayarlar → Becerilerim'e bağlantıyı
-  yapıştırınca) Usta `SKILL.md`'yi indirip beceri öneri kartını açar; modele gitmez. Depo bağlantısında içindeki
-  beceriler listelenir. Yalnız GitHub, yalnız yönerge metni; uyarılar ve onay her zamanki gibi.
-- Masaüstü ve tarayıcı sekmesi simgesi: takım çantası ve kask. Usta açılınca çanta açılır (1,5 sn, tarayıcı oturumunda
-  bir kez; hareket azaltma ayarında oynamaz).
-- `usta audit show` kayıt adı verilmezse en son değişen kaydı gösterir.
+- `usta serve` da ortak hafıza ev sahibiyse dinleyiciyi açar (önce yalnız portal açıyordu).
+- MCP, Windows: sunucu kapanınca açtığı alt süreçler de kapanır (iş nesnesi; önce `npx → node` gibi torunlar arkada
+  kalabiliyordu). Sürücü harfli çalışma klasörü kaba bağlanabilir (önce `C:` yüzünden reddediliyordu).
+  Python ile yazılmış sunuculara `PYTHONIOENCODING=utf-8` verilir; MCP stdio'da UTF-8 ister, İngilizce Windows'ta
+  Python sunucusu Türkçe yazınca çöküyordu.
+- MCP: Windows'ta sunucunun hata mesajı sistemin kod sayfasıyla yazılmışsa da Türkçe karakterleri doğru okunur.
+- Windows: sembol araçları yolları `/` ile verir, modelin `\` ya da `./` ile yazdığı yolu da tanır; önizleme `.js` ve
+  `.css` türlerini sistemin kayıt defterinden okumaz (bazı makinelerde yanlış tür betiği engelliyordu); proje notları
+  her sistemde aynı satır sonuyla yazılır.
+- CI artık Windows'ta da test koşuyor; ürün kodunda kodlamasız dosya açma testle engellenir.
 - Denetim kaydı: portal görevinin sonunda değişen her dosya (kutudaki komutların değiştirdikleri dahil) önce/sonra
   hash'iyle `task_changes` olarak yazılır; panelden yüklenen dosyalar da `file_change` olarak girer.
+- `usta audit show` kayıt adı verilmezse en son değişen kaydı gösterir.
 
 ## 0.9.0: şifreli ortak hafıza, zincirli denetim kaydı
 

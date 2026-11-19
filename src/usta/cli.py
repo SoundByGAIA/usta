@@ -274,7 +274,9 @@ def _serve_cmd(args: argparse.Namespace) -> int:
         ),  # panelden eklenenler yeniden başlatmadan gelir
     )
     print(f"Usta API: http://{args.host}:{args.port}  jeton dosyası: {home / 'token'}", flush=True)
-    _serve(create_app(manager, home, token), args.host, args.port)
+    app = create_app(manager, home, token)
+    app.state.ortak_host.start_if_enabled()  # portaldaki gibi: ev sahibiyse bağlı bilgisayarlar ulaşabilsin
+    _serve(app, args.host, args.port)
     return 0
 
 

@@ -101,6 +101,18 @@ def test_serve_defaults_to_loopback_and_creates_token(served, home, capsys):
     assert ((home / "token").stat().st_mode & 0o077) == 0
 
 
+def test_serve_opens_the_shared_memory_listener_when_this_pc_hosts_it(served, home, monkeypatch):
+    from usta import ortak, ortak_dinleyici
+
+    ortak.Store(home).configure(True, "Ana-PC")
+    started = []
+    monkeypatch.setattr(
+        ortak_dinleyici.HostServer, "start", lambda self, *a, **k: started.append(1)
+    )
+    assert main(["serve", "--model", "m"]) == 0
+    assert started == [1]
+
+
 def test_serve_refuses_non_loopback_without_flag(served, capsys):
     assert main(["serve", "--model", "m", "--host", "0.0.0.0"]) == 2
     assert served == [] and "allow-remote" in capsys.readouterr().err

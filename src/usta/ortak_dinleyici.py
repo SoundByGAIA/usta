@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import secrets
 import socket
 import threading
@@ -271,6 +272,10 @@ class HostServer:
             )
         for p in range(port, port + 10):  # meşgulse sıradaki port
             with socket.socket() as s, contextlib.suppress(OSError):
+                # uvicorn da böyle bağlanır; yoksa kapanan bağlantıların bekleme süresi kapıyı dolu gösterir.
+                # Windows'ta bu seçenek başka programın kapısını ele geçirmeye izin verir, orada açılmaz.
+                if os.name != "nt":
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind((ip, p))
                 break
         else:

@@ -436,3 +436,19 @@ def test_real_listener_end_to_end_over_loopback(tmp_path):
     finally:
         host.stop()
     assert not host.running
+
+
+def test_host_keeps_its_port_after_reopening(tmp_path):
+    # Bağlı bilgisayarlar adresi saklar; kapı değişirse hepsinin bağlantısı kopar.
+    host = dinleyici.HostServer(tmp_path / "ev")
+    host.store.configure(True, "Ana-PC")
+    addr = host.start(bind="127.0.0.1", port=18768)
+    try:
+        ortak.connect(tmp_path / "salon", addr, host.codes.issue(), "Salon-PC")
+        ortak.fetch(tmp_path / "salon")
+    finally:
+        host.stop()
+    try:
+        assert host.start(bind="127.0.0.1", port=18768) == addr
+    finally:
+        host.stop()

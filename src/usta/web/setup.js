@@ -65,12 +65,18 @@
   // --- kurulum sihirbazı (kodsuz kullanıcı için: "API/endpoint/token" yok) ---
   // Servis bilgileri resmî sayfalardan doğrulandı (2026-11-09). Ücretsiz katman iddiası yalnız doğrulananlar için.
   const WIZ_SERVICES = [
-    { id: "gemini", label: "Google Gemini", free: true, endpoint: "https://generativelanguage.googleapis.com/v1beta/openai",
+    { id: "gemini", label: "Google Gemini", free: true,
+      pitch: "Önerilen. Google'ın modeli: Google hesabınla birkaç dakikada başlarsın, hızlı yanıt verir.", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai",
       url: "https://aistudio.google.com/apikey", linkText: "Google AI Studio anahtar sayfasını aç",
-      steps: ["Sayfa açılınca Google hesabınla giriş yap.", "\"Create API key\" (anahtar oluştur) düğmesine bas.", "Çıkan uzun yazıyı kopyala ve aşağıdaki kutuya yapıştır."],
+      steps: ["Aşağıdaki bağlantıya bas; yeni bir sekmede Google'ın sayfası açılır. Gmail hesabınla giriş yap.",
+        "İlk kez giriyorsan bir hoş geldin penceresi çıkar: kutuları işaretleyip devam et (İngilizce olabilir, \"Continue\" ya da \"I agree\").",
+        "\"Create API key\" (anahtar oluştur) düğmesine bas. Proje sorarsa önerilen projeyi seç ya da \"Create API key in new project\" de.",
+        "Ekranda \"AIza\" ile başlayan uzun bir yazı çıkar. Yanındaki kopyala simgesine bas.",
+        "Bu sekmeye dön, yazıyı aşağıdaki kutuya yapıştır (Ctrl+V) ve \"Dene\" düğmesine bas."],
       note: "Ücretsiz kotası var, ama günlük istek sınırı düşüktür ve Google bunu değiştirebilir. Ücretsiz katmanda yazdıkların Google'ın ürünlerini geliştirmek için kullanılabilir (Google'ın koşullarına bak).",
-      prefer: "gemini-2.5-flash" },
-    { id: "openrouter", label: "OpenRouter", free: true, endpoint: "https://openrouter.ai/api/v1",
+      prefer: "gemini-3.1-flash-lite", picks: ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.5-flash"] },
+    { id: "openrouter", label: "OpenRouter", free: true,
+      pitch: "Birçok şirketin modelini tek yerden sunar. Ücretsiz modelleri bazen yavaş ya da meşgul olur.", endpoint: "https://openrouter.ai/api/v1",
       url: "https://openrouter.ai/keys", linkText: "OpenRouter anahtar sayfasını aç",
       steps: ["Sayfa açılınca hesap aç (e-posta ya da Google ile) ve giriş yap.", "Anahtar oluştur düğmesine bas ve bir ad ver.", "Çıkan uzun yazıyı kopyala ve aşağıdaki kutuya yapıştır."],
       note: "Ücretsiz kalmak için \"openrouter/free\" modelini seç (sihirbaz onu önerir). \"openrouter/auto\" ücretli modellere yönlendirir. Ücretsiz modellerin günlük istek sınırı düşüktür; bazı ücretsiz modellerde sağlayıcı yazdıklarını kaydedebilir.",
@@ -135,7 +141,7 @@
   }
 
   async function wizUse(apiName, model) {
-    wizBusy(true, "Modeli tanıyorum, bu yarım dakika sürebilir. Lütfen bekle…");
+    wizBusy(true, "Modeli tanıyorum. Bu birkaç dakika sürebilir, ücretsiz servislerde daha uzun; sayfayı kapatma…");
     let r;
     try { r = await U.api("/model", { method: "PUT", body: JSON.stringify({ model, api: apiName }) }); }
     finally { wizBusy(false); }
@@ -328,6 +334,7 @@
         const name = U.h("strong", null, svc.label);
         name.appendChild(U.h("span", free ? "wiz-tag" : "wiz-tag paid", free ? "ücretsiz katmanı var" : "ücretli"));
         b.append(name);
+        if (svc.pitch) b.append(U.h("span", "wiz-note", svc.pitch));
         b.setAttribute("aria-pressed", "false");
         b.addEventListener("click", () => wizPickService(svc, b));
         row.appendChild(b);
@@ -364,7 +371,7 @@
       wizBusy(false);
       if (!g || !g.models.length) { wizMsg("Anahtar kabul edilmedi ya da servise ulaşılamadı. Doğru kopyaladığından emin ol (başında/sonunda boşluk olmasın) ve tekrar dene.", "error"); return; }
       const sel = $("wiz-model");
-      const list = L.chatModels(g.models, svc.prefer);
+      const list = L.chatModels(g.models, svc.prefer, svc.picks);
       sel.replaceChildren(...list.map((m) => { const o = U.h("option", null, m.replace(/^models\//, "")); o.value = m; return o; }));
       sel.value = list[0];
       $("wiz-models").hidden = false;

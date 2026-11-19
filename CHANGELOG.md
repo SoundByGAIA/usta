@@ -1,5 +1,15 @@
 # Değişiklik günlüğü
 
+## Yayınlanmadı
+
+- Gemini 3 modelleri araç çağrısında bir düşünce imzası gönderir ve sonraki istekte onu geri ister; Usta imzayı
+  taşımadığı için ilk dosya yazımından sonraki her istek HTTP 400 alıyordu. Sağlayıcının araç çağrısına eklediği alan
+  (`extra_content`) artık olduğu gibi geri gönderilir.
+- "Dosyaya yaz" hatırlatması site sözcüğü geçmeyen yapma isteklerinde de çalışır ("gözlem formu yap"): model kodu
+  yanıta döküp ya da "Excel mi HTML mi?" diye seçenek sunup hiç dosya yazmadan bitirmek isterse bir kez hatırlatılır.
+- Kurulum sihirbazı: Gemini'de uzun model listesi yerine üç model, öneri `gemini-3.1-flash-lite`; ücretsiz iki servisin
+  kartında bir cümlelik fark; Gemini anahtarı için adım adım anlatım; model tanıma bekleme yazısı gerçek süreyi söyler.
+
 ## 0.9.1: bağlantıdan beceri ve MCP, Windows sağlamlaştırma
 
 Varsayılan model davranışında tek değişiklik: site isteğinde görünmeyen yazı hatırlatması. Bu sürümdeki Windows

@@ -172,10 +172,12 @@
   // Servisler ses, görsel ve gömme modellerini de listeler; kodsuz biri yanlışını seçmesin.
   // Süzme tümünü eliyorsa tam liste döner. `prefer` (öneri) varsa başa alınır.
   const NOT_CHAT = /(embed|tts|image|imagen|veo|audio|whisper|dall-e|moderation|transcribe|realtime|live|aqa|robotics|nano-banana|lyria|deep-research|computer-use|antigravity|decision|customtools)/i;
-  function chatModels(models, prefer) {
+  // picks: servisin kısa listesi; uzun listede kodsuz kullanıcı seçemez, servis bunlardan birini sunuyorsa yalnız onlar
+  function chatModels(models, prefer, picks) {
     const chat = models.filter((m) => !NOT_CHAT.test(m));
-    const list = chat.length ? chat : models.slice();
     const bare = (m) => m.replace(/^models\//, "");
+    const short = picks ? chat.filter((m) => picks.includes(bare(m))) : [];
+    const list = short.length ? short : chat.length ? chat : models.slice();
     const i = prefer ? list.findIndex((m) => bare(m) === prefer) : -1;
     if (i > 0) list.unshift(list.splice(i, 1)[0]);
     return list;

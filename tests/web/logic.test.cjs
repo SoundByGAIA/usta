@@ -169,6 +169,15 @@ test("chatModels drops music, image, research and agent-only models", () => {
   assert.deepEqual(L.chatModels(all, ""), ["models/gemini-2.5-flash"]);
 });
 
+test("chatModels keeps only the service's short list when the service offers any of them", () => {
+  const all = ["models/gemini-2.5-flash", "models/gemini-3.5-flash", "models/gemini-4-argon",
+    "models/gemini-3.1-flash-lite", "models/gemini-3.8-flash"];
+  const picks = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.5-flash-lite"];
+  assert.deepEqual(L.chatModels(all, "gemini-3.1-flash-lite", picks),
+    ["models/gemini-3.1-flash-lite", "models/gemini-3.5-flash"]);
+  assert.deepEqual(L.chatModels(["models/gemini-9"], "x", picks), ["models/gemini-9"]);
+});
+
 test("chatModels falls back to the full list when filtering removes everything", () => {
   assert.deepEqual(L.chatModels(["a-embed", "b-tts"], ""), ["a-embed", "b-tts"]);
   assert.deepEqual(L.chatModels([], "x"), []);

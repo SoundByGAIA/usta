@@ -64,6 +64,7 @@ UI_FILES = {
     "/setup.js": ("setup.js", "text/javascript; charset=utf-8"),
     "/files.js": ("files.js", "text/javascript; charset=utf-8"),
     "/history.js": ("history.js", "text/javascript; charset=utf-8"),
+    "/usta.svg": ("usta.svg", "image/svg+xml"),
     "/stream.js": ("stream.js", "text/javascript; charset=utf-8"),
     "/apis.js": ("apis.js", "text/javascript; charset=utf-8"),
     "/glosstip.js": ("glosstip.js", "text/javascript; charset=utf-8"),

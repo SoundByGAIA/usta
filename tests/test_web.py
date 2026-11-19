@@ -23,6 +23,7 @@ def client(tmp_path):
         ("/setup.js", "text/javascript"),
         ("/files.js", "text/javascript"),
         ("/history.js", "text/javascript"),
+        ("/usta.svg", "image/svg+xml"),
         ("/stream.js", "text/javascript"),
         ("/apis.js", "text/javascript"),
         ("/glosstip.js", "text/javascript"),

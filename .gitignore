@@ -11,3 +11,4 @@ build/
 .usta/
 .playwright-mcp/
 *.png
+!src/usta/web/*.png

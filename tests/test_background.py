@@ -1,3 +1,6 @@
+import subprocess
+from pathlib import Path
+
 """Arka plan kipi: pencere/terminal olmadan çalışma, tek örnek, kapatma ve masaüstü simgesi."""
 
 import json
@@ -118,6 +121,22 @@ def test_shortcut_creates_a_desktop_file_on_linux(tmp_path, monkeypatch):
         path.endswith("Usta.desktop") and "-m usta --arka-plan" in text and "Terminal=false" in text
     )
     assert (tmp_path / "Usta").is_dir()  # çalışma klasörü de kurulur
+    icon = next(line[5:] for line in text.splitlines() if line.startswith("Icon="))
+    assert icon.endswith("usta.png") and Path(icon).is_file()
+
+
+def test_windows_shortcut_uses_the_toolbox_icon(tmp_path, monkeypatch):
+    scripts = []
+
+    def fake_run(argv, **kw):
+        scripts.append(argv[-1])
+        return subprocess.CompletedProcess(argv, 0, stdout="C:\\Masaustu\\Usta.lnk\n", stderr="")
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(compat.subprocess, "run", fake_run)
+    compat.create_desktop_shortcut(workdir=tmp_path / "Usta")
+    ico = Path(compat.__file__).parent / "web" / "usta.ico"
+    assert ico.is_file() and f"$s.IconLocation='{ico}'" in scripts[0]
 
 
 def test_shortcut_flag_runs_without_starting_usta(tmp_path, monkeypatch, capsys):

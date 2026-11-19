@@ -33,7 +33,7 @@ from pathlib import Path
 
 from usta import compat, mcpconfig
 from usta.mcp import McpClient, McpError
-from usta.sandbox import ProxyNetwork, SandboxConfig, SandboxError
+from usta.sandbox import ProxyNetwork, SandboxConfig, SandboxError, unsafe_mount_path
 from usta.workspace import find_protected
 
 PREPARE_HOSTS = ("registry.npmjs.org", "pypi.org", "files.pythonhosted.org")
@@ -139,7 +139,7 @@ def build_run_args(
         if workspace is None:
             raise McpIsolationError("sunucu çalışma alanı istiyor ama çalışma alanı verilmedi")
         ws = Path(workspace).resolve()
-        if ":" in str(ws) or "," in str(ws):
+        if unsafe_mount_path(str(ws)):  # Windows'ta sürücü harfinin iki noktası serbest
             raise McpIsolationError("çalışma klasörü adında ':' ya da ',' olamaz")
         args += ["-v", f"{ws}:/workspace:{srv.workspace}"]
         if srv.workspace == "rw":  # yazılabilirse de .git/.usta ajan gibi salt okunur kalır

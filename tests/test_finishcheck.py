@@ -158,6 +158,55 @@ def test_make_request_without_site_word_answered_with_code_or_offer_gets_a_remin
     assert FinishCheck("Bana bir plan yap.").on_finish("1. Sabah yürüyüş\n2. Öğlen okuma") is None
 
 
+def test_page_code_written_into_a_markdown_file_gets_a_reminder():
+    page = (
+        "# Form\n\n```html\n<!DOCTYPE html><html><script>setInterval(t, 1000)</script></html>\n```"
+    )
+    fc = FinishCheck(ABC)
+    fc.observe("write_file", {"path": "abc_gozlem_formu.md", "content": page}, executed=True)
+    msg = fc.on_finish("Form güncellendi.")
+    assert msg and "abc_gozlem_formu.html" in msg and "write_file" in msg
+    fixed = FinishCheck(ABC)
+    fixed.observe("write_file", {"path": "abc_gozlem_formu.md", "content": page}, executed=True)
+    fixed.observe(
+        "write_file", {"path": "abc_gozlem_formu.html", "content": "<html></html>"}, executed=True
+    )
+    assert fixed.on_finish("Tamam.") is None
+    plain = FinishCheck("Notlarımı notlar.md dosyasına yaz.")
+    plain.observe(
+        "write_file", {"path": "notlar.md", "content": "# Notlar\n- süt al"}, executed=True
+    )
+    assert plain.on_finish("Yazdım.") is None
+
+
+def test_claimed_file_that_does_not_exist_gets_a_reminder(tmp_path):
+    (tmp_path / "abc_gozlem_formu.md").write_text("# Form", encoding="utf-8")
+    task = "ben bunu uygulama şeklinde görmek istiyorum"
+    msg = FinishCheck(task, root=tmp_path).on_finish(
+        "Uygulama dosyasını oluşturdum: **`index.html`**. Tarayıcınızda açabilirsiniz!"
+    )
+    assert msg and "index.html" in msg and "write_file" in msg
+    assert FinishCheck(task, root=tmp_path).on_finish(
+        "Uygulamayı açmak için `index.html` dosyasını çift tıklamanız yeterlidir."
+    )
+    # dosya gerçekten varsa ya da yalnız anılıyorsa itilmez
+    (tmp_path / "index.html").write_text("<html></html>", encoding="utf-8")
+    assert FinishCheck("x", root=tmp_path).on_finish("index.html dosyasını oluşturdum.") is None
+    assert (
+        FinishCheck("x", root=tmp_path).on_finish("abc_gozlem_formu.md dosyasını okudum.") is None
+    )
+
+
+def test_read_only_command_does_not_count_as_writing():
+    for cmd in ("ls -la", "dir", "cat abc.md", "Get-ChildItem"):
+        fc = FinishCheck("ben bunu uygulama şeklinde görmek istiyorum")
+        fc.observe("run", {"command": cmd}, executed=True)
+        assert fc.on_finish("Uygulamayı hemen index.html olarak oluşturmamı ister misin?"), cmd
+    wrote = FinishCheck("ben bunu uygulama şeklinde görmek istiyorum")
+    wrote.observe("run", {"command": "cat > index.html"}, executed=True)
+    assert wrote.on_finish("Oluşturmamı ister misin?") is None
+
+
 # --- yanlış alarm vermemeli ---------------------------------------------------------------------------
 def test_normal_final_answers_pass_through():
     fc = FinishCheck(TASK_SUMMARY)

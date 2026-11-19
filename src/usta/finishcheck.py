@@ -52,13 +52,25 @@ _INTENT = re.compile(
 MAX_INTENT_CHARS = 240
 # kodsuz kullanıcı dosya adı vermez: "web sitesi yap", "menümü gösteren bir sayfa istiyorum"
 _ARTIFACT = re.compile(
-    r"\b(?:web\s*)?site\w*|\bsayfa\w*|\bweb\s*page|\bwebsite|\blanding\s*page|\bhomepage",
+    r"\b(?:web\s*)?site\w*|\bsayfa\w*|\buygulama\w*|\bweb\s*page|\bwebsite|\blanding\s*page|\bhomepage",
     re.IGNORECASE,
 )
 # site sözcüğü geçmeyen yapma istekleri ("gözlem formu yap", "bir hesap makinesi oluştur"); "yaz/göster" sohbet
 # yanıtı da isteyebildiği için sayılmaz
 _MAKE = re.compile(r"\b(?:yap|oluştur|hazırla|tasarla)\w*|\b(?:make|build|create)\b", re.IGNORECASE)
 _CODE_IN_ANSWER = re.compile(r"```|<html|<!doctype", re.IGNORECASE)
+# yanıtta "oluşturdum" denen dosya adı (yalnız sık çıktı uzantıları: sürüm numarası ya da alan adı karışmasın)
+_NAMED_FILE = re.compile(
+    r"(?<![\w/.-])([\w-]+(?:/[\w.-]+)*\.(?:html?|css|js|md|txt|csv|json|py|xlsx|docx|pdf))\b",
+    re.IGNORECASE,
+)
+# yalnız bakan komut ("ls -la" ile klasöre bakmak) dosya yazmak sayılmaz; yönlendirme varsa yazar
+_READ_ONLY = re.compile(
+    r"\s*(?:ls|dir|pwd|cat|type|head|tail|tree|wc|find|Get-ChildItem|Get-Content)\b[^>|]*$",
+    re.IGNORECASE,
+)
+# tarayıcıda çalışacak kod: .md/.txt içinde açılınca düz metin olarak görünür, düğmeler çalışmaz
+_PAGE_CODE = re.compile(r"<script|<!doctype\s+html|<html", re.IGNORECASE)
 # yapmak için izin sormak ("oluşturayım mı?", "shall I") ya da seçenek sunmak ("kodlayabilirim ... hangisi?")
 _ASK_TO_BUILD = re.compile(
     r"(?:yap|oluştur|hazırla|başla|yaz)\w*\s+m[ıiuü]\w*\s*\?|ister\s+misiniz|ister\s+misin|shall\s+i|should\s+i|want\s+me\s+to"
@@ -90,6 +102,7 @@ class FinishCheck:
         self.make = bool(_MAKE.search(self.task))
         self.pages: list[str] = []  # bu görevde yazılan .html dosyaları (özgün yazımıyla)
         self.wrote_any = False  # bu görevde herhangi bir dosya yazıldı mı (ya da komut çalıştı mı)
+        self.misplaced: list[str] = []  # sayfa kodu konmuş .html olmayan dosyalar
         self.nudges = 0
         self.fired: list[str] = []  # tetiklenen kurallar (Lab kaydı için)
 
@@ -106,8 +119,21 @@ class FinishCheck:
             self.written.add(self._norm(args["path"]))
             if args["path"].lower().endswith((".html", ".htm")) and args["path"] not in self.pages:
                 self.pages.append(args["path"])
-        if executed and tool in (*WRITE_TOOLS, "run"):
+        if executed and (
+            tool in WRITE_TOOLS
+            or (tool == "run" and not _READ_ONLY.match(str(args.get("command", ""))))
+        ):
             self.wrote_any = True
+        path, content = args.get("path"), args.get("content")
+        if (
+            executed
+            and tool == "write_file"
+            and isinstance(path, str)
+            and isinstance(content, str)
+            and not path.lower().endswith((".html", ".htm"))
+            and _PAGE_CODE.search(content)
+        ):
+            self.misplaced.append(path)
         # komutla yazma ("echo 3 > count.txt"): hedef adı geçen bir komut çalıştıysa dosya yazılmış sayılır
         if executed and tool == "run" and isinstance(args.get("command"), str):
             cmd = args["command"].replace("\\", "/").lower()
@@ -156,6 +182,17 @@ class FinishCheck:
             found += [h for h in sitecontrast.hidden(html, "\n".join(css)) if h not in found]
         return found
 
+    def _claimed_missing(self, text: str) -> str | None:
+        # sayfa isteğinde hiç dosya yazılmadıysa "index.html'i aç" demek de yazdım demektir
+        asked = (self.artifact or self.make) and not self.wrote_any
+        if self.root is None or not (asked or _CLAIM.search(text)):
+            return None
+        for m in _NAMED_FILE.finditer(text):
+            name = m.group(1)
+            if self._norm(name) not in self.written and not (Path(self.root) / name).exists():
+                return name
+        return None
+
     def on_finish(self, answer: str) -> str | None:
         """Model araç çağırmadan bitirmek istiyor: hatırlatma mesajı ya da None (bitir)."""
         text = (answer or "").strip()
@@ -166,6 +203,13 @@ class FinishCheck:
                 "target",
                 f"Görev `{missing[0]}` dosyasına yazmanı istiyor; {said}bu görevde o dosyaya henüz yazmadın. "
                 "İzin sormana gerek yok: istenen sonucu şimdi write_file ile yaz. Yazamıyorsan nedenini kısaca söyle.",
+            )
+        ghost = self._claimed_missing(text)
+        if ghost:
+            return self._nudge(
+                "claimed",
+                f"`{ghost}` dosyasını oluşturduğunu söylüyorsun ama böyle bir dosya yok; bu görevde ona yazmadın. "
+                f"Söylediğin dosyayı şimdi write_file ile yaz, sonra kısaca ne yaptığını söyle.",
             )
         if (
             (self.artifact or self.make)
@@ -178,6 +222,17 @@ class FinishCheck:
                 f"Kullanıcı {what} istedi ama bu görevde hiçbir dosya yazmadın; kodu ya da taslağı yanıta yazmak "
                 "yetmez, kullanıcı onu açamaz. Seçenek sorma: şimdi write_file ile yaz (tarayıcıda açılacaksa tek bir "
                 ".html dosyası, ör. index.html), sonra kısaca ne yaptığını söyle.",
+            )
+        if self.misplaced and not self.pages:
+            src = self.misplaced[0]
+            page = (
+                src.rsplit(".", 1)[0] + ".html" if "." in src.rsplit("/", 1)[-1] else src + ".html"
+            )
+            return self._nudge(
+                "page_type",
+                f"`{src}` dosyasına tarayıcıda çalışacak kod koydun, ama bu dosya açılınca düz metin görünür; "
+                f"düğmeler ve sayaç çalışmaz. Çalışan sayfayı tek başına `{page}` dosyasına write_file ile yaz "
+                "(yalnız HTML, Markdown ya da ``` işareti olmadan), sonra kısaca ne yaptığını söyle.",
             )
         lack = self._missing_facts() if self.artifact and self.wrote_any else []
         if lack:

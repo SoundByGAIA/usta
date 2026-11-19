@@ -11,7 +11,7 @@ from usta import context as ctx
 from usta import sitebuild
 from usta.audit import AuditLog, file_hash
 from usta.breaker import CircuitBreaker, Trip
-from usta.finishcheck import FinishCheck
+from usta.finishcheck import WRITE_TOOLS, FinishCheck
 from usta.models import Message, ModelClient, ToolCall
 from usta.phases import PhaseTracker
 from usta.policy import Decision, PathEscapeError, Policy, resolve_path
@@ -151,9 +151,11 @@ class Agent:
         messages = [Message("system", self.system_prompt), Message("user", first)]
         self.audit.record("task", prompt=prompt)
         self._taint = Taint(prompt, self.memory_context) if self.taint else None
+        # plan kipinde yazma aracı yok: "dosyaya yaz" hatırlatması yapılamayacak işi ister
+        can_write = any(s.get("name") in WRITE_TOOLS for s in self.registry.schemas())
         self._finish = (
             FinishCheck(prompt, root=getattr(self.policy, "root", None))
-            if self.finish_check
+            if self.finish_check and can_write
             else None
         )
         self._usage_base = self._usage_now()

@@ -1,6 +1,8 @@
 # Değişiklik günlüğü
 
-## Yayınlanmadı
+## 0.9.0: şifreli ortak hafıza, zincirli denetim kaydı
+
+Model davranışı değişmedi. Ortak hafıza kullanan evlerde bağlı bilgisayarlar bir kez yeniden bağlanmalı.
 
 - Ortak hafıza şifreli: eşleşme SPAKE2 ile yapılır, kod ve anahtar ağda gitmez; ağı dinleyen biri kodu deneyemez. Her
   başlatma bir deneme sayılır, adres başına 3 denemede 15 dakika kilit. Eşleşmeden sonra istek ve cevaplar
@@ -12,7 +14,13 @@
 - Dosya değişiklikleri kayda önce/sonra hash'iyle girer: ajanın `write_file`/`edit_file` çağrıları ve paneldeki dosya düzenlemeleri.
   Tetikleyici yazılır (`görev`, `okunan içerik`, `kullanıcı`); görev başında mod (manual/auto/plan) kaydedilir.
 - NVIDIA anahtarları (`nvapi-…`) denetim ve oturum kayıtlarında maskelenir.
+- Ortak hafıza Windows ve Linux bilgisayar arasında gerçek ev ağında denendi: eşleşme, onaylı not, ev sahibi
+  kapalıyken önbellek ve eşleşmenin silinmesi. Ev sahibi kapatılıp açılınca dinleyici başka kapıya geçiyor, bağlı
+  bilgisayarlar kopuyordu; artık aynı kapıyı kullanır.
+- MCP: ana makinede çalışan sunuculara (`--isolation host`) Windows'un `SYSTEMROOT`, `TEMP` gibi değişkenleri de
+  geçer; bunlar olmadan Windows'ta sunucu ağ bağlantısı açamıyordu.
 - Ölçüm: NVIDIA NIM ücretsiz modelleriyle bench ([docs/olcumler/nim-modelleri.md](docs/olcumler/nim-modelleri.md)).
+- Büyük dosyalar bölünmeye devam etti (komut satırı, HTTP API, bench, panel, Ofis ve diğerleri); davranış değişmedi.
 
 ## 0.8.7: kodsuz kullanıcının site isteği
 

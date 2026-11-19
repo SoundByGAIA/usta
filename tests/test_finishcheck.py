@@ -137,6 +137,27 @@ def test_site_word_without_code_or_claim_is_left_alone():
     )
 
 
+ABC = "bana ABC kayıt formunun şablon şeklinde olduğu ve süre sayacının da olduğu gözlem formu yap"
+
+
+def test_make_request_without_site_word_answered_with_code_or_offer_gets_a_reminder():
+    msg = FinishCheck(ABC).on_finish(
+        "Aşağıda bir taslak hazırladım.\n\n```html\n<!DOCTYPE html>\n<html>...</html>\n```\n"
+        "Bunu bir HTML dosyası olarak kaydedip tarayıcınızda açabilirsiniz."
+    )
+    assert msg and "write_file" in msg and ".html" in msg
+    assert FinishCheck(ABC).on_finish(
+        "İsterseniz bunu bir Excel dosyası haline getirebilirim veya HTML ile sayaçlı form olarak "
+        "kodlayabilirim. Hangi yöntem işinize yarar?"
+    )
+    done = FinishCheck(ABC)
+    done.observe("write_file", {"path": "form.html"}, executed=True)
+    assert done.on_finish("Form hazır: ```html <html>```") is None
+    # açıklama ya da gerçek bir soru itilmez
+    assert FinishCheck(ABC).on_finish("Formda kaç satır olsun?") is None
+    assert FinishCheck("Bana bir plan yap.").on_finish("1. Sabah yürüyüş\n2. Öğlen okuma") is None
+
+
 # --- yanlış alarm vermemeli ---------------------------------------------------------------------------
 def test_normal_final_answers_pass_through():
     fc = FinishCheck(TASK_SUMMARY)

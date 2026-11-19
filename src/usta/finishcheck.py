@@ -55,10 +55,14 @@ _ARTIFACT = re.compile(
     r"\b(?:web\s*)?site\w*|\bsayfa\w*|\bweb\s*page|\bwebsite|\blanding\s*page|\bhomepage",
     re.IGNORECASE,
 )
+# site sözcüğü geçmeyen yapma istekleri ("gözlem formu yap", "bir hesap makinesi oluştur"); "yaz/göster" sohbet
+# yanıtı da isteyebildiği için sayılmaz
+_MAKE = re.compile(r"\b(?:yap|oluştur|hazırla|tasarla)\w*|\b(?:make|build|create)\b", re.IGNORECASE)
 _CODE_IN_ANSWER = re.compile(r"```|<html|<!doctype", re.IGNORECASE)
-# yapmak için izin sormak ("oluşturayım mı?", "shall I")
+# yapmak için izin sormak ("oluşturayım mı?", "shall I") ya da seçenek sunmak ("kodlayabilirim ... hangisi?")
 _ASK_TO_BUILD = re.compile(
-    r"(?:yap|oluştur|hazırla|başla|yaz)\w*\s+m[ıiuü]\w*\s*\?|ister\s+misiniz|ister\s+misin|shall\s+i|should\s+i|want\s+me\s+to",
+    r"(?:yap|oluştur|hazırla|başla|yaz)\w*\s+m[ıiuü]\w*\s*\?|ister\s+misiniz|ister\s+misin|shall\s+i|should\s+i|want\s+me\s+to"
+    r"|\w+[ae]bilirim\b[^?]{0,200}\?",
     re.IGNORECASE,
 )
 
@@ -83,6 +87,7 @@ class FinishCheck:
         self.targets = write_targets(self.task)
         self.written: set[str] = set()
         self.artifact = bool(_ARTIFACT.search(self.task))
+        self.make = bool(_MAKE.search(self.task))
         self.pages: list[str] = []  # bu görevde yazılan .html dosyaları (özgün yazımıyla)
         self.wrote_any = False  # bu görevde herhangi bir dosya yazıldı mı (ya da komut çalıştı mı)
         self.nudges = 0
@@ -163,14 +168,16 @@ class FinishCheck:
                 "İzin sormana gerek yok: istenen sonucu şimdi write_file ile yaz. Yazamıyorsan nedenini kısaca söyle.",
             )
         if (
-            self.artifact
+            (self.artifact or self.make)
             and not self.wrote_any
             and (_CODE_IN_ANSWER.search(text) or _CLAIM.search(text) or _ASK_TO_BUILD.search(text))
         ):
+            what = "bir site/sayfa" if self.artifact else "bir şey yapmanı"
             return self._nudge(
                 "artifact",
-                "Kullanıcı bir site/sayfa istedi ama bu görevde hiçbir dosya yazmadın; kodu yanıta yazmak yetmez, "
-                "kullanıcı onu açamaz. Sayfayı şimdi write_file ile yaz (ör. index.html), sonra kısaca ne yaptığını söyle.",
+                f"Kullanıcı {what} istedi ama bu görevde hiçbir dosya yazmadın; kodu ya da taslağı yanıta yazmak "
+                "yetmez, kullanıcı onu açamaz. Seçenek sorma: şimdi write_file ile yaz (tarayıcıda açılacaksa tek bir "
+                ".html dosyası, ör. index.html), sonra kısaca ne yaptığını söyle.",
             )
         lack = self._missing_facts() if self.artifact and self.wrote_any else []
         if lack:

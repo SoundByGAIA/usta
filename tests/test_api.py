@@ -224,17 +224,33 @@ def test_audit_endpoint_is_scoped_and_limited(tmp_path):
     sse(c, f"/tasks/{tid}/events")
     rows = c.get("/audit", params={"workspace": w}, headers=AUTH).json()
     assert [r["event"] for r in rows] == [
+        "mode",
         "task",
         "answer",
         "terminal",
     ]  # v0.2.0: terminal durum kaydı
-    assert rows[-1]["state"] == "COMPLETE_NO_CHANGE"
+    assert rows[-1]["state"] == "COMPLETE_NO_CHANGE" and rows[0]["mode"] == "manual"
     assert (
         c.get("/audit", params={"workspace": w, "limit": 1}, headers=AUTH).json()[0]["event"]
         == "terminal"
     )
     assert c.get("/audit", params={"workspace": "../x"}, headers=AUTH).status_code == 422
     assert c.get("/audit", params={"workspace": "yok"}, headers=AUTH).json() == []
+
+
+def test_panel_file_write_is_audited_as_user_change(tmp_path):
+    import hashlib
+
+    c, _ = make_client(tmp_path, Scripted(ModelResponse("ok")))
+    w = new_ws(c)
+    for text in ("bir", "iki"):
+        c.put(f"/workspaces/{w}/files?path=a.txt", json={"content": text}, headers=AUTH)
+    rows = c.get("/audit", params={"workspace": w}, headers=AUTH).json()
+    h = {t: hashlib.sha256(t.encode()).hexdigest() for t in ("bir", "iki")}
+    assert [(r["event"], r["before"], r["after"], r["trigger"]) for r in rows] == [
+        ("file_change", None, h["bir"], "kullanıcı"),
+        ("file_change", h["bir"], h["iki"], "kullanıcı"),
+    ]
 
 
 def test_prompt_validation(tmp_path):

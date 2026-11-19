@@ -9,12 +9,12 @@ from pathlib import Path
 
 from usta import context as ctx
 from usta import sitebuild
-from usta.audit import AuditLog
+from usta.audit import AuditLog, file_hash
 from usta.breaker import CircuitBreaker, Trip
 from usta.finishcheck import FinishCheck
 from usta.models import Message, ModelClient, ToolCall
 from usta.phases import PhaseTracker
-from usta.policy import Decision, Policy
+from usta.policy import Decision, PathEscapeError, Policy, resolve_path
 from usta.taint import Taint
 from usta.tools import Registry, ToolError
 from usta.verify import Verifier
@@ -366,6 +366,12 @@ class Agent:
     def _root(self):
         return self.verifier.gate.root if self.verifier else None
 
+    def _file_hash(self, call: ToolCall) -> str | None:
+        try:
+            return file_hash(resolve_path(self.policy.root, call.arguments.get("path")))
+        except (TypeError, PathEscapeError):
+            return None
+
     def _cancelled(self) -> bool:
         return self.cancel is not None and self.cancel.is_set()
 
@@ -414,8 +420,16 @@ class Agent:
             self.audit.record("decision", tool=call.name, decision="deny")
             self._emit("denied", tool=call.name)
             return "reddedildi: bu eylem izin politikasına aykırı veya onaylanmadı"
+        writes = call.name in ("write_file", "edit_file")
+        before = self._file_hash(call) if writes else None
         try:
             result = self.registry.call(call.name, call.arguments)
+            if writes:
+                change = {"path": call.arguments.get("path"), "before": before}
+                change["after"] = self._file_hash(call)
+                if self._taint is not None:  # kapı kapalıyken hedefin kaynağı bilinmez
+                    change["trigger"] = "okunan içerik" if note else "görev"
+                self.audit.record("file_change", **change)
             if self._finish is not None:
                 self._finish.observe(call.name, call.arguments, executed=True)
             if self._taint is not None:

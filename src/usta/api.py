@@ -69,7 +69,7 @@ from usta.api_models import (
     WorkspaceIn,
     friendly_model_error,
 )
-from usta.audit import AuditLog
+from usta.audit import AuditLog, file_hash
 from usta.auth import LoginCodes
 from usta.modelctl import ModelSwitchError
 from usta.models import Message, ModelError
@@ -327,7 +327,7 @@ def create_app(
             raise HTTPException(e.status, str(e)) from None
         with contextlib.suppress(OSError):
             AuditLog(home / "audit" / f"{workspace}.jsonl").record(
-                "fs_op", op=body.op, path=body.path, to=body.to
+                "fs_op", op=body.op, path=body.path, to=body.to, trigger="kullanıcı"
             )
         return {"ok": True}
 
@@ -414,11 +414,16 @@ def create_app(
             raise HTTPException(400, "geçersiz yol") from None
         if manager.is_busy(workspace):
             raise HTTPException(409, "çalışma alanında görev sürüyor")
+        before = file_hash(full)
         try:
             full.parent.mkdir(parents=True, exist_ok=True)
             full.write_text(body.content, encoding="utf-8")
         except OSError:
             raise HTTPException(400, "yazılamadı") from None
+        with contextlib.suppress(OSError):
+            AuditLog(home / "audit" / f"{workspace}.jsonl").record(
+                "file_change", path=path, before=before, after=file_hash(full), trigger="kullanıcı"
+            )
         return {"path": path, "bytes": len(body.content.encode())}
 
     def idle_ws(workspace: str) -> Path:

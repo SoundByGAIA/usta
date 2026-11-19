@@ -1044,6 +1044,7 @@ def _main(argv: list[str] | None = None) -> int:
     audit = AuditLog(
         _home() / "audit" / f"{hashlib.sha256(str(root).encode()).hexdigest()[:12]}.jsonl"
     )
+    audit.record("mode", mode="manual")  # komut satırında her onay sorulur
     with McpSession(
         servers, _home(), workspace=root, on_event=lambda k, d: audit.record(k, **d)
     ) as mcp:

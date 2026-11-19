@@ -567,6 +567,8 @@ class TaskManager:
 
     def _run(self, task: Task) -> None:
         audit = AuditLog(self.home / "audit" / f"{task.workspace_id}.jsonl")
+        with contextlib.suppress(OSError):
+            audit.record("mode", mode=task.mode)
         status, error = "done", None
         mcp: McpSession | None = None
         try:

@@ -172,7 +172,7 @@ def test_fs_create_rename_delete(tmp_path):
     assert fs(c, ws, op="delete", path="yeni").status_code == 200 and not (root / "yeni").exists()
     assert fs(c, ws, op="delete", path="yeni").status_code == 404
     audit = (tmp_path / "home" / "audit" / f"{ws}.jsonl").read_text()
-    assert '"fs_op"' in audit and "create_dir" in audit
+    assert '"fs_op"' in audit and "create_dir" in audit and '"trigger": "kullanıcı"' in audit
 
 
 @pytest.mark.parametrize(

@@ -50,7 +50,13 @@ def test_tool_loop_executes_and_feeds_result_back(tmp_path):
     assert r.answer == "bitti" and r.steps == 2
     last = model.seen[1][-1]
     assert last.role == "tool" and last.tool_call_id == "c1" and "yazıldı" in last.content
-    assert [e["event"] for e in events(audit)] == ["task", "tool_call", "tool_result", "answer"]
+    assert [e["event"] for e in events(audit)] == [
+        "task",
+        "tool_call",
+        "file_change",
+        "tool_result",
+        "answer",
+    ]
 
 
 def test_denied_call_is_not_executed_and_model_is_told(tmp_path):

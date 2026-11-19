@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   const U = (window.UstaApp = window.UstaApp || {});
-  Object.assign(U, { api, apisMsg, errorText, fillPrompt, h, hideGlossTip, loadApis, loadModels, showTab });
+  Object.assign(U, { api, errorText, fillPrompt, h, loadModels, put, setActive, updateStarters });
   const L = window.UstaLogic;
   const $ = (id) => document.getElementById(id);
   const state = { token: "", ws: null, task: null, active: false, abort: null, approvals: {}, contextWindow: null, files: [], replay: false, openFile: null, openDirs: new Set(), selDir: "", defaultWs: null, zoom: "auto", fsMode: null, tab: "stream", resultOn: false, panelStack: [], designSkill: false };
@@ -11,8 +11,7 @@
     running: "çalışıyor", awaiting_approval: "onay bekliyor", cancelling: "durduruluyor",
     done: "bitti", cancelled: "durduruldu", failed: "başarısız",
   };
-  const MAX_DIFF_LINES = 2000;
-  Object.assign(U, { STATUS, addNode, officeReplay, officeReset, renderEvent, setStatus, showUsage });
+  Object.assign(U, { STATUS, setStatus });
 
   function put(k, v) {
     try { if (v == null || v === "") sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (_) { /* gizli mod */ }
@@ -97,6 +96,7 @@
     try { await api("/settings", { method: "PUT", body: JSON.stringify(change) }); } catch (_) { /* yoksay */ }
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  Object.assign(U, { sleep });
 
   async function api(path, opts) {
     opts = opts || {};
@@ -185,284 +185,6 @@
     $("f-up-files").disabled = $("f-up-dir").disabled = $("f-new-file").disabled = $("f-new-dir").disabled = active || !state.ws;
   }
 
-  // --- akış çizimi ---
-  function addNode(node) {
-    const box = $("stream");
-    const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-    box.appendChild(node);
-    if (near) box.scrollTop = box.scrollHeight;
-  }
-  function showUsage(u, windowSize) {
-    const t = $("tokens");
-    const info = L.usageText(u, windowSize);
-    t.hidden = !info;
-    if (!info) return;
-    t.textContent = info.context ? `${info.text} · ${info.context}` : info.text;
-    t.dataset.level = info.pct == null ? "" : info.pct >= 90 ? "high" : info.pct >= 70 ? "mid" : "";
-  }
-  // Ofis sekmesi: her olayı sahneye iletir; yeni görev/geçmiş oturum sıfırlar (Office.onEvent(type, data))
-  function officeEvent(type, data) {
-    const O = window.Office;
-    // Ofis.onEvent(type, data)
-    if (O && typeof O.onEvent === "function") O.onEvent(type, data);
-  }
-  function officeReset() {
-    const O = window.Office;
-    if (O && typeof O.reset === "function") O.reset();
-    officeContextWindow(); // sıfırlanan sahneye penceresi bilgisi yeniden verilir
-  }
-  // Ofis'teki onay şeridi: karar MEVCUT akışa (decideApproval) iletilir; dönen metni şerit yazar.
-  // Köprü tek satır: `Office.onDecide = (id, decision) => decideApproval(id, decision)` (init içinde).
-  // Geçmiş oturum: olaylar tek tek değil toplu verilir (replay durumu saf reduce ile hesaplanır)
-  function officeReplay(events) {
-    const O = window.Office;
-    if (O && typeof O.loadReplay === "function") O.loadReplay(events);
-  }
-  // Ofis köprüsü: modelin bağlam penceresi göstergelere aktarılır (0/null = bilinmiyor)
-  function officeContextWindow() {
-    const O = window.Office;
-    if (O && typeof O.setContextWindow === "function") O.setContextWindow(state.contextWindow || 0);
-  }
-  function renderEvent(type, data) {
-    if (type === "usage") { officeEvent(type, data); showUsage(data, state.contextWindow); officeContextWindow(); return; } // usage sayaçları değiştirmez
-    officeEvent(type, data);
-    if (type === "tool_call" && data && data.tool === "propose_skill" && !state.replay) return addNode(U.skillProposalNode(data.args || {}));
-    const s = L.summarize(type, data);
-    if (type === "message" && !s.body) return;
-    if (s.kind === "tool" || s.kind === "result") {
-      const d = h("details", "msg " + s.kind);
-      const simpleTitle = s.kind === "tool" && state.view !== "advanced" ? L.plainProgress(s.tool, s.args) : null;
-      d.appendChild(h("summary", null, simpleTitle || (s.kind === "result" ? "↳ " : "") + s.title));
-      if (s.body) d.appendChild(h("pre", null, s.body));
-      return addNode(d);
-    }
-    if (s.kind === "approval" && !state.replay) return addNode(approvalNode(s));
-    const box = h("div", "msg " + s.kind);
-    box.textContent = s.title && s.body ? `${s.title}\n${s.body}` : s.title || s.body;
-    addNode(box);
-  }
-  // Onay kararı: tek akış (onay uç noktasına POST + durum "running"). Akış'taki onay düğmeleri ve
-  // Ofis'teki onay şeridi aynı işlevi çağırır (kopya kod yok). Çözüm metni çağırana döner.
-  const approvalRows = new Map(); // onay kimliği -> Akış'taki düğme satırı (karar iki yerden de verilebilir)
-  async function decideApproval(approvalId, decision) {
-    const row = approvalRows.get(approvalId);
-    if (row) for (const b of row.querySelectorAll("button")) b.disabled = true; // çift gönderim yok
-    const msg = await decideSend(approvalId, decision);
-    let text;
-    if (msg === "ok") { setStatus("running"); text = decision === "allow" ? "İzin verildi" : "Reddedildi"; }
-    else text = msg === "stale" ? "İstek artık geçerli değil" : msg;
-    if (row) row.textContent = text; // Akış'taki onay arayüzü de karar Ofis'ten verilse bile güncellenir
-    return text;
-  }
-  // Karar isteğini gönderir; ağ/sunucu sonucunu düz metne çevirir. Akış'taki onay düğmesi de
-  // (decideApproval üzerinden) aynı yolu kullanır — kopya kod yok.
-  async function decideSend(id, decision) {
-    try {
-      const res = await api(`/approvals/${encodeURIComponent(id)}`, { method: "POST", body: JSON.stringify({ decision }) });
-      return res.ok ? "ok" : "stale";
-    } catch (_) { return "Gönderilemedi"; }
-  }
-  function approvalNode(s) {
-    const box = h("div", "msg approval");
-    const plain = L.plainApproval(s.tool, s.args, s.reason);
-    box.appendChild(h("p", "plain", plain.title));
-    if (plain.warn) box.appendChild(h("p", "plain-warn", plain.warn));
-    const det = h("details", null);
-    det.appendChild(h("summary", null, "Ayrıntılar (teknik)"));
-    det.appendChild(h("strong", null, s.title));
-    if (s.body) det.appendChild(h("pre", null, s.body));
-    box.appendChild(det);
-    const row = h("div", "row");
-    const allow = h("button", "primary", "İzin ver");
-    const deny = h("button", null, "Reddet");
-    allow.type = deny.type = "button";
-    if (s.approvalId != null) approvalRows.set(s.approvalId, row);
-    const decide = (decision) => decideApproval(s.approvalId, decision);
-    allow.addEventListener("click", () => decide("allow"));
-    deny.addEventListener("click", () => decide("deny"));
-    row.append(allow, deny);
-    box.appendChild(row);
-    return box;
-  }
-
-  // --- diff çizimi ---
-  function renderDiff(text) {
-    const files = L.parseDiff(text);
-    const root = $("diff-files");
-    root.replaceChildren();
-    $("diff-count").textContent = files.length ? `(${files.length})` : "";
-    $("revert").disabled = files.length === 0;
-    if (!files.length) { root.appendChild(h("p", "empty", "Değişiklik yok.")); return; }
-    const TAG = { added: "yeni", deleted: "silindi", modified: "değişti", binary: "ikili" };
-    for (const f of files) {
-      const d = h("details", "file");
-      d.open = true;
-      const sum = h("summary");
-      sum.append(h("span", null, f.name + " "), h("span", "tag", `[${TAG[f.status]}] `));
-      if (f.status !== "binary") sum.append(h("span", "stat-add", `+${f.stats.add} `), h("span", "stat-del", `−${f.stats.del}`));
-      d.appendChild(sum);
-      const code = h("div", "code");
-      f.lines.slice(0, MAX_DIFF_LINES).forEach((l) => {
-        const sign = { add: "+", del: "-", ctx: " ", hunk: "", meta: "" }[l.kind];
-        code.appendChild(h("div", l.kind, sign + l.text));
-      });
-      if (f.lines.length > MAX_DIFF_LINES) code.appendChild(h("div", "meta", `… ${f.lines.length - MAX_DIFF_LINES} satır daha (gösterilmiyor)`));
-      d.appendChild(code);
-      root.appendChild(d);
-    }
-  }
-  function showTab(name) {
-    state.tab = name;
-    $("stream").hidden = name !== "stream";
-    $("diff").hidden = name !== "diff";
-    $("memory").hidden = name !== "memory";
-    $("history").hidden = name !== "history";
-    $("fileview").hidden = name !== "file";
-    $("preview").hidden = name !== "preview";
-    $("office").hidden = name !== "office";
-    $("replay-bar").hidden = !(state.replay && name === "stream");
-    $("tab-file").hidden = !state.openFile && name !== "file";
-    for (const t of ["stream", "diff", "memory", "history", "file", "preview", "office"]) $(`tab-${t}`).setAttribute("aria-selected", String(t === name));
-    if (window.Office && typeof window.Office.setVisible === "function") window.Office.setVisible(name === "office");
-    $("result-card").hidden = !(state.resultOn && name === "stream");
-    updateStarters();
-    if (name === "memory") U.loadMemory();
-    if (name === "history") U.loadHistory();
-    if (name === "preview") loadPreview();
-  }
-
-  // --- önizleme: yalıtılmış (sandbox) çerçeve, statik dosyalar ---
-  async function previewBase() {
-    const res = await api(`/workspaces/${encodeURIComponent(state.ws)}/preview`);
-    return res.ok ? (await res.json()).base : null;
-  }
-  async function loadPreview() {
-    if (!state.ws) return;
-    const base = await previewBase();
-    if (!base) return;
-    const rel = $("preview-path").value.trim().replace(/^\/+/, "") || "index.html";
-    const url = `${base}${rel.split("/").map(encodeURIComponent).join("/")}`;
-    $("preview-frame").src = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
-    $("preview-open").href = url;
-  }
-  // --- görev akışı ---
-  async function follow(taskId) {
-    state.task = taskId;
-    put("usta_task", `${state.ws}:${taskId}`);
-    setActive(true);
-    const ctl = new AbortController();
-    state.abort = ctl;
-    let last = null;
-    let finished = false;
-    let nextTask = null;  // aşamalı uygulamada sunucunun başlattığı sonraki görev
-    let tries = 0;
-    while (!finished && tries < 6 && state.task === taskId) {
-      const att = new AbortController();  // bu bağlantı denemesi; takılırsa yeniden bağlanılır
-      const onAbort = () => att.abort();
-      ctl.signal.addEventListener("abort", onAbort);
-      let lastByte = Date.now();
-      const watchdog = setInterval(() => { if (Date.now() - lastByte > 40000) att.abort(); }, 5000);  // sunucu 15 sn'de bir canlılık yollar
-      try {
-        const headers = last != null ? { "Last-Event-ID": String(last) } : {};
-        const res = await api(`/tasks/${encodeURIComponent(taskId)}/events`, { headers, signal: att.signal });
-        if (res.status === 404) {
-          put("usta_task", "");
-          addNode(h("div", "msg error", "Görev bulunamadı (sunucu yeniden başlamış olabilir)."));
-          break;
-        }
-        if (!res.ok) throw new Error(String(res.status));
-        const dec = new TextDecoder();
-        const parser = L.createSSEParser((ev) => {
-          let data = {};
-          try { data = JSON.parse(ev.data); } catch (_) { return; }
-          if (ev.id != null) last = Number(ev.id);
-          if (ev.event === "started") setStatus("running");
-          if (ev.event === "approval_required") setStatus("awaiting_approval");
-          if (ev.event === "done") { finished = true; setStatus(data.status); if (data.next) nextTask = data.next; }
-          try { renderEvent(ev.event, data); } catch (_) { /* tek olay çizilemese de akış sürsün */ }
-        });
-        const reader = res.body.getReader();
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          lastByte = Date.now();
-          tries = 0;
-          parser.feed(dec.decode(value, { stream: true }));
-        }
-      } catch (e) {
-        if (ctl.signal.aborted || String(e.message) === "401") break;
-        tries++;
-      } finally {
-        clearInterval(watchdog);
-        ctl.signal.removeEventListener("abort", onAbort);
-      }
-      if (!finished) await sleep(1000);
-    }
-    if (!finished && tries >= 6) addNode(h("div", "msg error", "Bağlantı koptu."));
-    if (nextTask && state.task === taskId) {
-      try {
-        const info = await (await api(`/tasks/${encodeURIComponent(nextTask)}`)).json();
-        addNode(h("div", "msg user", info.prompt));
-      } catch (_) { /* istem gösterilemese de akış sürer */ }
-      return follow(nextTask);
-    }
-    await finish(taskId);
-  }
-  async function finish(taskId) {
-    if (state.task !== taskId) return;
-    try {
-      const info = await (await api(`/tasks/${encodeURIComponent(taskId)}`)).json();
-      setStatus(info.status);
-      if (!L.isActive(info.status)) {
-        const res = await api(`/tasks/${encodeURIComponent(taskId)}/diff`);
-        if (res.ok) renderDiff(await res.text());
-        setActive(false);
-        U.refreshTree();
-        if (!$("preview").hidden) loadPreview();
-        if (info.mode === "plan" && info.status === "done" && info.answer) offerPlan(info);
-        return;
-      }
-    } catch (_) { /* bağlantı yok */ }
-    setActive(false);
-  }
-
-  function offerPlan(info) {
-    const box = h("div", "msg approval");
-    box.appendChild(h("strong", null, "Planı uygulayayım mı?"));
-    const row = h("div", "row");
-    const mk = (label, mode, primary, phased) => {
-      const b = h("button", primary ? "primary" : null, label);
-      b.type = "button";
-      b.title = phased ? "Plan PLAN.md aşamalarına bölünür; her aşama taze bağlamla ayrı görev olarak koşar (bağlam şişmez; yerel küçük modeller için)" : "Planın tamamı tek görevde uygulanır";
-      b.addEventListener("click", () => {
-        row.textContent = phased ? "Aşamalara bölünüyor…" : "Uygulanıyor…";
-        startTask(phased ? "Planı aşama aşama uygula" : "Planı uygula", mode, [], info.id, phased);  // plan sunucuda; istem yeniden yazılmaz
-      });
-      return b;
-    };
-    const no = h("button", null, "Hayır");
-    no.type = "button";
-    no.addEventListener("click", () => { row.textContent = "Plan uygulanmadı"; });
-    row.append(
-      mk("Aşama aşama · oto onay (önerilen)", "auto", true, true), mk("Aşama aşama · manuel", "manual", false, true),
-      mk("Tek seferde · manuel", "manual", false, false), mk("Tek seferde · oto onay", "auto", false, false), no);
-    box.appendChild(row);
-    addNode(box);
-  }
-
-  async function sendPrompt() {
-    const prompt = $("prompt").value.trim();
-    if (!prompt || !state.ws) return;
-    if (state.active) return steer(prompt);
-    return startTask(prompt, $("mode").value, state.files);
-  }
-  async function steer(text) {
-    if (!state.task) return;
-    const res = await api(`/tasks/${encodeURIComponent(state.task)}/messages`, { method: "POST", body: JSON.stringify({ text }) });
-    if (res.ok) { $("prompt").value = ""; return; }  // mesaj akışa "user_message" olayıyla düşer
-    addNode(h("div", "msg error", await errorText(res)));
-  }
-
   // --- model seçimi ---
   async function loadModels() {
     const sel = $("model-select");
@@ -502,124 +224,10 @@
     } catch (_) { sel.value = sel.dataset.cur; setConn("Model değiştirilemedi", "bad"); }
     sel.disabled = state.active;
   }
-  async function startTask(prompt, mode, files = [], planId = null, phased = false) {
-    U.leaveReplay();
-    const body = { prompt, mode, guard: $("guard").checked, files: files.map((f) => ({ name: f.name, content: f.content })) };
-    if (planId) { body.apply_plan = planId; if (phased) body.phased = true; }
-    if (state.designSkill && mode !== "plan") body.design_skill = true;
-    const res = await api(`/workspaces/${encodeURIComponent(state.ws)}/tasks`, { method: "POST", body: JSON.stringify(body) });
-    if (!res.ok) { addNode(h("div", "msg error", await errorText(res))); return; }
-    const task = await res.json();
-    U.setDesignSkill(false);  // tek seferlik: bir sonraki görev yine normal
-    state.contextWindow = task.context_window || null;
-    showUsage(null);
-    officeContextWindow(); // modelin bağlam penceresi Ofis göstergelerine
-    $("prompt").value = "";
-    $("diff-files").replaceChildren();
-    $("diff-count").textContent = "";
-    $("revert").disabled = true;
-    state.files = [];
-    U.renderAttached();
-    addNode(h("div", "msg user", files.length ? `${prompt}\n📎 ${files.map((f) => f.name).join(", ")}` : prompt));
-    officeReset(); // yeni görev: ofis sahnesi sıfırdan başlar
-    showTab("stream");
-    follow(task.id);
-  }
-
-  async function stopTask() {
-    if (!state.task) return;
-    $("stop").disabled = true;
-    try { await api(`/tasks/${encodeURIComponent(state.task)}/cancel`, { method: "POST" }); setStatus("cancelling"); } catch (_) { /* yoksay */ }
-    $("stop").disabled = false;
-  }
-
-  let revertArmed = null;
-  async function revertTask() {
-    const btn = $("revert");
-    if (!state.task || state.active) return;
-    if (!revertArmed) {
-      btn.textContent = "Emin misin? Tekrar tıkla";
-      revertArmed = setTimeout(() => { revertArmed = null; btn.textContent = "Değişiklikleri geri al"; }, 4000);
-      return;
-    }
-    clearTimeout(revertArmed);
-    revertArmed = null;
-    btn.textContent = "Değişiklikleri geri al";
-    await doRevert();
-  }
-  async function doRevert() {
-    const res = await api(`/tasks/${encodeURIComponent(state.task)}/revert`, { method: "POST" });
-    if (!res.ok) { addNode(h("div", "msg error", await errorText(res))); return false; }
-    renderDiff("");
-    renderEvent("reverted", {});
-    showTab("stream");
-    return true;
-  }
-
-  let tipFor = null, tipPinned = false, tipTimer = null;  // "?" balonu durumu (aşağıda)
   const PANELS = ["tools", "apis", "privacy", "wizard", "tablet", "settings", "glossary"];
   Object.assign(U, { PANELS });
   const openPanel = () => PANELS.find((p) => !$(p).hidden) || null;
   Object.assign(U, { openPanel });
-  // --- API'ler ---
-  function apisMsg(text, cls) { const m = $("apis-msg"); m.textContent = text || ""; m.className = cls || "empty"; }
-  async function loadApis() {
-    const box = $("apis-list");
-    box.replaceChildren();
-    const [res, info] = await Promise.all([api("/apis"), api("/model").then((r) => (r.ok ? r.json() : null)).catch(() => null)]);
-    if (!res.ok) { apisMsg(await errorText(res), "error"); return; }
-    const byApi = {};
-    for (const g of (info && info.apis) || []) byApi[g.api] = g;
-    for (const a of await res.json()) {
-      const card = h("div", "card");
-      const g = byApi[a.name];
-      card.append(h("strong", null, a.name), h("span", "chip", a.has_key ? "anahtar var" : "anahtarsız"), h("code", "cmd", a.endpoint));
-      const models = h("div", "models");
-      if (g && g.models.length) for (const m of g.models) models.appendChild(h("span", info && info.api === a.name && info.model === m ? "cur" : null, m));
-      else models.appendChild(h("span", null, g && g.error ? g.error : "model yok"));
-      card.appendChild(models);
-      if (a.builtin) { card.appendChild(h("p", "empty", "Terminalden açılan varsayılan uç nokta.")); box.appendChild(card); continue; }
-      const row = h("div", "key-row");
-      const input = h("input");
-      input.type = "password"; input.autocomplete = "off"; input.spellcheck = false;
-      input.placeholder = a.has_key ? "yeni anahtar (değiştirmek için yaz)" : "anahtar gir";
-      input.setAttribute("aria-label", `${a.name} anahtarı`);
-      const save = h("button", null, "Kaydet");
-      save.type = "button";
-      save.addEventListener("click", async () => {
-        const v = input.value.trim();
-        if (!v) return;
-        const r = await api(`/apis/${encodeURIComponent(a.name)}/key`, { method: "PUT", body: JSON.stringify({ key: v }) });
-        if (r.ok) { apisMsg("Anahtar kaydedildi.", "ok"); loadApis(); loadModels(); } else apisMsg(await errorText(r), "error");
-      });
-      row.append(input, save);
-      const remove = h("button", null, "Kaldır");
-      remove.type = "button";
-      let armed = null;
-      remove.addEventListener("click", async () => {
-        if (!armed) { remove.textContent = "Emin misin? Tekrar tıkla"; armed = setTimeout(() => { armed = null; remove.textContent = "Kaldır"; }, 4000); return; }
-        clearTimeout(armed);
-        const r = await api(`/apis/${encodeURIComponent(a.name)}`, { method: "DELETE" });
-        if (r.ok) { loadApis(); loadModels(); } else apisMsg(await errorText(r), "error");
-      });
-      const actions = h("div", "row");
-      actions.appendChild(remove);
-      card.append(row, actions);
-      box.appendChild(card);
-    }
-  }
-  async function addApi(ev) {
-    ev.preventDefault();
-    const body = { name: $("api-name").value.trim(), endpoint: $("api-endpoint").value.trim() };
-    const key = $("api-key").value.trim();
-    if (key) body.key = key;
-    const res = await api("/apis", { method: "POST", body: JSON.stringify(body) });
-    if (!res.ok) { apisMsg(await errorText(res), "error"); return; }
-    $("api-form").reset();
-    apisMsg("API eklendi; modelleri model listesinde görünür.", "ok");
-    loadApis(); loadModels();
-  }
-
   // --- çalışma alanları ---
   async function loadWorkspaces() {
     const res = await api("/workspaces");
@@ -643,15 +251,15 @@
     state.ws = id;
     state.task = null;
     state.replay = false;
-    officeReset();
+    U.officeReset();
     state.files = [];
     U.renderAttached();
     $("replay-bar").hidden = true;
     put("usta_ws", id);
     $("ws-title").textContent = id;
     $("stream").replaceChildren();
-    showUsage(null);
-    renderDiff("");
+    U.showUsage(null);
+    U.renderDiff("");
     $("diff-count").textContent = "";
     $("revert").disabled = true;
     setStatus("");
@@ -662,7 +270,7 @@
     state.selDir = "";
     $("fs-form").hidden = true;
     U.refreshTree();
-    if (!$("memory").hidden || !$("history").hidden || !$("fileview").hidden || !$("preview").hidden) showTab("stream");
+    if (!$("memory").hidden || !$("history").hidden || !$("fileview").hidden || !$("preview").hidden) U.showTab("stream");
     await loadWorkspaces();
     const saved = get("usta_task");
     if (saved.startsWith(id + ":")) await resume(saved.slice(id.length + 1));
@@ -674,10 +282,10 @@
     if (!res.ok) { put("usta_task", ""); return; }
     const info = await res.json();
     state.contextWindow = info.context_window || null;
-    showUsage(info.usage, state.contextWindow);
-    officeReset();
-    addNode(h("div", "msg user", info.prompt));
-    follow(taskId);
+    U.showUsage(info.usage, state.contextWindow);
+    U.officeReset();
+    U.addNode(h("div", "msg user", info.prompt));
+    U.follow(taskId);
   }
   async function createWorkspace(ev) {
     ev.preventDefault();
@@ -718,18 +326,18 @@
 
   $("token-form").addEventListener("submit", connect);
   $("ws-form").addEventListener("submit", createWorkspace);
-  $("composer").addEventListener("submit", (ev) => { ev.preventDefault(); sendPrompt(); });
+  $("composer").addEventListener("submit", (ev) => { ev.preventDefault(); U.sendPrompt(); });
   $("prompt").addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); sendPrompt(); }
+    if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); U.sendPrompt(); }
   });
-  $("stop").addEventListener("click", stopTask);
+  $("stop").addEventListener("click", U.stopTask);
   $("model-select").addEventListener("change", switchModel);
-  $("revert").addEventListener("click", revertTask);
-  $("tab-stream").addEventListener("click", () => showTab("stream"));
-  $("tab-diff").addEventListener("click", () => showTab("diff"));
-  $("tab-memory").addEventListener("click", () => showTab("memory"));
-  $("tab-history").addEventListener("click", () => showTab("history"));
-  $("replay-close").addEventListener("click", () => { U.leaveReplay(); showTab("stream"); });
+  $("revert").addEventListener("click", U.revertTask);
+  $("tab-stream").addEventListener("click", () => U.showTab("stream"));
+  $("tab-diff").addEventListener("click", () => U.showTab("diff"));
+  $("tab-memory").addEventListener("click", () => U.showTab("memory"));
+  $("tab-history").addEventListener("click", () => U.showTab("history"));
+  $("replay-close").addEventListener("click", () => { U.leaveReplay(); U.showTab("stream"); });
   $("attach").addEventListener("click", () => $("file-input").click());
   $("file-input").addEventListener("change", async () => { await U.addFiles($("file-input").files); $("file-input").value = ""; });
   const comp = $("composer");
@@ -743,63 +351,11 @@
   $("tools-btn").addEventListener("click", () => U.togglePanel("tools"));
   $("apis-btn").addEventListener("click", () => U.togglePanel("apis"));
   $("privacy-btn").addEventListener("click", () => U.togglePanel("privacy"));
-  $("api-form").addEventListener("submit", addApi);
+  $("api-form").addEventListener("submit", U.addApi);
   $("local-scan").addEventListener("click", U.scanLocal);
   $("wizard-btn").addEventListener("click", () => U.togglePanel("wizard"));
   $("tablet-btn").addEventListener("click", () => U.togglePanel("tablet"));
   $("glossary-btn").addEventListener("click", () => U.togglePanel("glossary"));
-  // --- "?" balonu: üzerine gelince ya da odaklanınca açıklama çıkar; tıklayınca açık kalır (sayfadan ayrılmaz) ---
-  const tipEl = () => $("gloss-tip");
-  function hideGlossTip() {
-    clearTimeout(tipTimer);
-    const el = tipEl();
-    if (el) el.hidden = true;
-    if (tipFor) tipFor.removeAttribute("aria-describedby");
-    tipFor = null; tipPinned = false;
-  }
-  function showGlossTip(btn, pin) {
-    const term = UstaGlossary.find(btn.dataset.gloss);
-    if (!term) return;
-    clearTimeout(tipTimer);
-    if (tipFor && tipFor !== btn) tipFor.removeAttribute("aria-describedby");
-    tipFor = btn; tipPinned = !!pin;
-    const el = tipEl();
-    const open = h("button", null, "Sözlükte aç");
-    open.type = "button";
-    open.addEventListener("click", () => {
-      const q = btn.dataset.gloss;
-      hideGlossTip();
-      if ($("glossary").hidden) U.togglePanel("glossary");
-      $("gloss-q").value = q; U.renderGlossary();
-    });
-    el.replaceChildren(h("strong", null, term.term), h("p", null, term.say), h("p", "wiz-note", `Benzetme: ${term.like}`), open);
-    el.hidden = false;
-    btn.setAttribute("aria-describedby", "gloss-tip");
-    const r = btn.getBoundingClientRect();
-    const w = Math.min(320, window.innerWidth - 24);
-    el.style.width = `${w}px`;
-    let left = Math.max(12, Math.min(window.scrollX + r.left + r.width / 2 - w / 2, window.scrollX + window.innerWidth - w - 12));
-    el.style.left = `${left}px`;
-    const below = r.bottom + 8;
-    const fitsBelow = below + el.offsetHeight < window.innerHeight - 8;
-    el.style.top = `${window.scrollY + (fitsBelow ? below : Math.max(8, r.top - 8 - el.offsetHeight))}px`;
-  }
-  const qBtn = (ev) => ev.target.closest && ev.target.closest("button.q[data-gloss]");
-  document.addEventListener("mouseover", (ev) => { const b = qBtn(ev); if (b && !tipPinned) showGlossTip(b, false); });
-  document.addEventListener("mouseout", (ev) => {
-    if (!qBtn(ev) || tipPinned) return;
-    clearTimeout(tipTimer);
-    tipTimer = setTimeout(() => { if (!tipPinned && !tipEl().matches(":hover")) hideGlossTip(); }, 250);  // balona geçmeye zaman tanır
-  });
-  tipEl().addEventListener("mouseleave", () => { if (!tipPinned) tipTimer = setTimeout(hideGlossTip, 250); });
-  document.addEventListener("focusin", (ev) => { const b = qBtn(ev); if (b) showGlossTip(b, false); });
-  document.addEventListener("focusout", (ev) => { if (qBtn(ev) && !tipPinned) tipTimer = setTimeout(() => { if (!tipEl().contains(document.activeElement)) hideGlossTip(); }, 150); });
-  document.addEventListener("click", (ev) => {
-    const b = qBtn(ev);
-    if (b) { if (tipFor === b && tipPinned) hideGlossTip(); else showGlossTip(b, true); return; }
-    if (!tipEl().hidden && !tipEl().contains(ev.target)) hideGlossTip();  // dışarı tıklayınca kapanır
-  });
-  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !tipEl().hidden) { const f = tipFor; hideGlossTip(); if (f) f.focus(); } });
   $("gloss-q").addEventListener("input", U.renderGlossary);
   $("settings-btn").addEventListener("click", () => U.togglePanel("settings"));
   $("tablet-renew").addEventListener("click", U.loadTablet);
@@ -816,12 +372,12 @@
   $("wiz-cloud-form").addEventListener("submit", U.wizTryKey);
   $("skill-upload").addEventListener("click", () => $("skill-input").click());
   $("skill-input").addEventListener("change", async () => { await U.uploadSkills($("skill-input").files); $("skill-input").value = ""; });
-  $("tab-file").addEventListener("click", () => showTab("file"));
-  $("tab-preview").addEventListener("click", () => showTab("preview"));
-  $("tab-office").addEventListener("click", () => showTab("office"));
-  $("preview-go").addEventListener("click", loadPreview);
-  $("preview-reload").addEventListener("click", loadPreview);
-  $("preview-path").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); loadPreview(); } });
+  $("tab-file").addEventListener("click", () => U.showTab("file"));
+  $("tab-preview").addEventListener("click", () => U.showTab("preview"));
+  $("tab-office").addEventListener("click", () => U.showTab("office"));
+  $("preview-go").addEventListener("click", U.loadPreview);
+  $("preview-reload").addEventListener("click", U.loadPreview);
+  $("preview-path").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); U.loadPreview(); } });
   $("kisi-save").addEventListener("click", U.saveProfile);
   $("skill-design").addEventListener("click", U.startSkillDesign);
   $("design-off").addEventListener("click", () => { U.setDesignSkill(false); $("prompt").value = ""; });
@@ -906,23 +462,23 @@
     document.body.replaceChildren(h("p", "wiz-note", "Usta kapandı. Tekrar açmak için masaüstündeki Usta simgesine çift tıkla. Bu sekmeyi kapatabilirsin."));
     document.body.style.padding = "32px";
   });
-  $("result-open").addEventListener("click", () => showTab("preview"));
+  $("result-open").addEventListener("click", () => U.showTab("preview"));
   $("result-folder").addEventListener("click", async () => {
     const r = await api(`/workspaces/${encodeURIComponent(state.ws)}/reveal`, { method: "POST" });
-    if (!r.ok) addNode(h("div", "msg error", "Klasör açılamadı. Dosyalar sol taraftaki \"Dosyalarım\" listesinde de görünür."));
+    if (!r.ok) U.addNode(h("div", "msg error", "Klasör açılamadı. Dosyalar sol taraftaki \"Dosyalarım\" listesinde de görünür."));
   });
   let undoArmed = null;
   $("result-undo").addEventListener("click", async () => {
     const b = $("result-undo");
     if (!undoArmed) { b.textContent = "Emin misin? Tekrar bas"; undoArmed = setTimeout(() => { undoArmed = null; b.textContent = "Yaptığı değişikliği geri al"; }, 4000); return; }
     clearTimeout(undoArmed); undoArmed = null; b.textContent = "Yaptığı değişikliği geri al";
-    if (await doRevert()) { hideResult(); updateStarters(); }
+    if (await U.doRevert()) { hideResult(); updateStarters(); }
   });
   $("ctx").addEventListener("change", () => saveSetting({ context_window: Number($("ctx").value) }));
   applyZoom();
   if (window.Office && typeof window.Office.init === "function") window.Office.init();
-  // Ofis onay şeridi → mevcut karar akışı (tek yol: decideApproval)
-  if (window.Office) window.Office.onDecide = (id, decision) => decideApproval(id, decision);
+  // Ofis onay şeridi → mevcut karar akışı (tek yol: U.decideApproval)
+  if (window.Office) window.Office.onDecide = (id, decision) => U.decideApproval(id, decision);
   $("theme").addEventListener("change", () => { applyTheme($("theme").value); saveSetting({ theme: $("theme").value }); });
   $("guard").addEventListener("change", () => saveSetting({ guard: $("guard").checked }));
   $("mode").addEventListener("change", () => { applyMode($("mode").value); saveSetting({ mode: $("mode").value }); });

@@ -23,6 +23,9 @@ def client(tmp_path):
         ("/setup.js", "text/javascript"),
         ("/files.js", "text/javascript"),
         ("/history.js", "text/javascript"),
+        ("/stream.js", "text/javascript"),
+        ("/apis.js", "text/javascript"),
+        ("/glosstip.js", "text/javascript"),
         ("/app.css", "text/css"),
         ("/logic.js", "text/javascript"),
         ("/office-logic.js", "text/javascript"),
@@ -80,10 +83,28 @@ def test_html_has_no_inline_script_or_handlers():
     ["innerHTML", "outerHTML", "insertAdjacentHTML", "eval(", "document.write", "new Function"],
 )
 def test_js_never_uses_html_injection_sinks(banned):
-    assert banned not in "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
+    assert banned not in "\n".join(
+        (WEB / f).read_text()
+        for f in (
+            "settings.js",
+            "setup.js",
+            "files.js",
+            "history.js",
+            "stream.js",
+            "apis.js",
+            "glosstip.js",
+            "app.js",
+        )
+    )
 
 
-OFFICE_JS = ("office-logic.js", "office-scene.js", "office-actors.js", "office-panels.js", "office.js")
+OFFICE_JS = (
+    "office-logic.js",
+    "office-scene.js",
+    "office-actors.js",
+    "office-panels.js",
+    "office.js",
+)
 
 
 @pytest.mark.parametrize("name", OFFICE_JS)
@@ -110,7 +131,10 @@ def test_office_logic_exports_for_browser_and_node():
 
 
 def test_office_js_draws_pixels_and_respects_motion_and_visibility():
-    js = "\n".join((WEB / f).read_text() for f in ("office-scene.js", "office-actors.js", "office-panels.js", "office.js"))
+    js = "\n".join(
+        (WEB / f).read_text()
+        for f in ("office-scene.js", "office-actors.js", "office-panels.js", "office.js")
+    )
     assert "image-rendering" in (WEB / "app.css").read_text()
     assert "prefers-reduced-motion" in js and "visibilitychange" in js
     assert "matchMedia" in js and "requestAnimationFrame" in js
@@ -129,7 +153,19 @@ def test_office_tab_present_and_default_stays_stream():
 
 
 def test_app_forwards_events_to_office_and_resets():
-    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
+    js = "\n".join(
+        (WEB / f).read_text()
+        for f in (
+            "settings.js",
+            "setup.js",
+            "files.js",
+            "history.js",
+            "stream.js",
+            "apis.js",
+            "glosstip.js",
+            "app.js",
+        )
+    )
     assert "O.onEvent(type, data)" in js and "Office.onEvent(type, data)" in js
     # yeni görev, geçmiş oturum (aç/kapat), alan değişimi, yeniden bağlanma
     assert js.count("officeReset()") >= 4
@@ -142,19 +178,46 @@ def test_office_approval_strip_and_replay_bar_are_wired():
     assert 'id="office-approval"' in html and 'role="group"' in html
     assert 'id="office-approval-allow"' in html and 'id="office-approval-deny"' in html
     assert 'id="office-replay-range"' in html and 'type="range"' in html
-    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
+    js = "\n".join(
+        (WEB / f).read_text()
+        for f in (
+            "settings.js",
+            "setup.js",
+            "files.js",
+            "history.js",
+            "stream.js",
+            "apis.js",
+            "glosstip.js",
+            "app.js",
+        )
+    )
     # onay kararı tek akışta: Ofis şeridi mevcut akışı çağırır (kopya kod yok)
     assert "Office.onDecide = (id, decision) => decideApproval(id, decision)" in js
     assert "async function decideApproval(" in js
     assert "/approvals/" in js and js.count("/approvals/") == 1
     # geçmiş oturum: olaylar Ofis'e toplu verilir
     assert "O.loadReplay(events)" in js and "officeReplay(s.events.map" in js
-    office = "\n".join((WEB / f).read_text() for f in ("office-scene.js", "office-actors.js", "office-panels.js", "office.js"))
+    office = "\n".join(
+        (WEB / f).read_text()
+        for f in ("office-scene.js", "office-actors.js", "office-panels.js", "office.js")
+    )
     assert "Logic.replayState(" in office and "prefers-reduced-motion" in office
 
 
 def test_js_does_not_persist_token_in_localstorage():
-    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
+    js = "\n".join(
+        (WEB / f).read_text()
+        for f in (
+            "settings.js",
+            "setup.js",
+            "files.js",
+            "history.js",
+            "stream.js",
+            "apis.js",
+            "glosstip.js",
+            "app.js",
+        )
+    )
     assert "localStorage" not in js
 
 
@@ -184,18 +247,44 @@ def test_html_has_theme_and_mode_selectors_with_expected_values():
 
 
 def test_js_exchanges_login_code_and_cleans_url():
-    js = "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
+    js = "\n".join(
+        (WEB / f).read_text()
+        for f in (
+            "settings.js",
+            "setup.js",
+            "files.js",
+            "history.js",
+            "stream.js",
+            "apis.js",
+            "glosstip.js",
+            "app.js",
+        )
+    )
     assert "/auth/exchange" in js and "history.replaceState" in js
     assert js.index("history.replaceState") < js.index("exchangeCode(loginCode)")
 
 
 def test_html_has_guard_checkbox_and_js_sends_it():
     assert 'id="guard"' in (WEB / "index.html").read_text()
-    assert 'guard: $("guard").checked' in "\n".join((WEB / f).read_text() for f in ("settings.js", "setup.js", "files.js", "history.js", "app.js"))
+    assert 'guard: $("guard").checked' in "\n".join(
+        (WEB / f).read_text()
+        for f in (
+            "settings.js",
+            "setup.js",
+            "files.js",
+            "history.js",
+            "stream.js",
+            "apis.js",
+            "glosstip.js",
+            "app.js",
+        )
+    )
 
 
 def test_every_help_button_points_to_a_glossary_term():
     terms = set(re.findall(r'term: "([^"]+)"', (WEB / "glossary.js").read_text(encoding="utf-8")))
-    used = set(re.findall(r'data-gloss="([^"]+)"', (WEB / "index.html").read_text(encoding="utf-8")))
+    used = set(
+        re.findall(r'data-gloss="([^"]+)"', (WEB / "index.html").read_text(encoding="utf-8"))
+    )
     used |= {"Ollama", "Docker"}  # Ayarlar → programlar kartları (app.js, ilk sözcük)
     assert used and used <= terms, used - terms

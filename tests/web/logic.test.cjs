@@ -311,3 +311,11 @@ test("skillLink finds a GitHub link only when the message is about a skill", () 
   assert.equal(L.skillLink("skill yaz bana"), null);
   assert.equal(L.skillLink("skill: https://evil.com/github.com/o/r"), null);
 });
+
+test("resultPage opens the page written in this task, whatever its name", () => {
+  assert.equal(L.resultPage(["abc_uygulama.html"], ["abc_uygulama.html"]), "abc_uygulama.html");
+  assert.equal(L.resultPage(["stil.css", "index.html", "b.html"], []), "index.html");
+  assert.equal(L.resultPage(["notlar.md"], ["index.html"]), "index.html");
+  assert.equal(L.resultPage(["alt/sayfa.html"], ["notlar.md"]), null);
+  assert.equal(L.resultPage(undefined, undefined), null);
+});

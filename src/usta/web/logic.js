@@ -183,6 +183,14 @@
     return list;
   }
 
+  // "Sonucu aç"ın açacağı sayfa: bu görevde yazılan kök klasördeki .html (önce index.html), yoksa kökteki index.html
+  function resultPage(changed, rootFiles) {
+    const html = (n) => /\.html?$/i.test(n) && !n.includes("/");
+    const fresh = (changed || []).filter(html);
+    if (fresh.length) return fresh.includes("index.html") ? "index.html" : fresh[0];
+    return (rootFiles || []).includes("index.html") ? "index.html" : null;
+  }
+
   // Onay isteğini kodsuz kullanıcının anlayacağı bir cümleye çevirir (ham araç adı ve JSON ayrıntıda kalır).
   function plainApproval(tool, args, reason) {
     const a = args && typeof args === "object" ? args : {};
@@ -265,7 +273,7 @@
     return m ? `https://${m[1].replace(/^www\./i, "").replace(/[.,;:!?)]+$/, "")}` : null;
   }
 
-  const api = { skillLink, plainProgress, plainApproval, friendlyModelError, chatModels, autoScale, createSSEParser, parseDiff, summarize, isActive, authHeaders, formatTokens, usageText };
+  const api = { resultPage, skillLink, plainProgress, plainApproval, friendlyModelError, chatModels, autoScale, createSSEParser, parseDiff, summarize, isActive, authHeaders, formatTokens, usageText };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.UstaLogic = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

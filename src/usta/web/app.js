@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   const U = (window.UstaApp = window.UstaApp || {});
-  Object.assign(U, { api, errorText, fillPrompt, h, hideResult, loadModels, put, setActive, updateStarters });
+  Object.assign(U, { api, errorText, fillPrompt, h, hideResult, loadModels, updateResultPage, put, setActive, updateStarters });
   const L = window.UstaLogic;
   const $ = (id) => document.getElementById(id);
   const state = { token: "", ws: null, task: null, active: false, abort: null, approvals: {}, contextWindow: null, files: [], replay: false, openFile: null, openDirs: new Set(), selDir: "", defaultWs: null, zoom: "auto", fsMode: null, tab: "stream", resultOn: false, panelStack: [], designSkill: false };
@@ -160,22 +160,32 @@
     }
     box.replaceChildren(h("h3", null, "Ne yapmamı istersin?"), h("p", "tip", "Bir örneğe bas ya da aşağıya kendi cümlelerinle yaz. Ne kadar ayrıntı verirsen sonuç o kadar iyi olur."), grid);
   }
-  function hideResult() { state.resultOn = false; $("result-card").hidden = true; }
+  function hideResult() { state.resultOn = false; $("result-card").hidden = true; $("work").classList.remove("has-result"); }
   async function showResult() {
     if (!state.ws || state.replay) return;
     const card = $("result-card");
     state.resultOn = true;
     card.hidden = state.tab !== "stream";  // başka sekmedeyken görünmez; Konuşma'ya dönünce yeniden görünür
+    $("work").classList.toggle("has-result", !card.hidden);
     $("starters").hidden = true;
-    let hasIndex = false;
+    state.rootFiles = [];
     try {
       const r = await api(`/workspaces/${encodeURIComponent(state.ws)}/tree?path=`);
-      if (r.ok) hasIndex = ((await r.json()).entries || []).some((e) => !e.dir && e.name === "index.html");
+      if (r.ok) state.rootFiles = ((await r.json()).entries || []).filter((e) => !e.dir).map((e) => e.name);
     } catch (_) { /* yoksay */ }
-    $("result-open").hidden = !hasIndex;
-    $("result-title").textContent = hasIndex ? "Usta işi bitirdi. Sonucu görmek için \"Sonucu aç\"a bas." : "Usta işi bitirdi.";
+    updateResultPage();
     const fu = $("followups");
     fu.replaceChildren(...FOLLOWUPS.map((t) => { const b = h("button", null, t); b.type = "button"; b.addEventListener("click", () => fillPrompt(t)); return b; }));
+  }
+  // görev farkı sonucun ardından gelir; ikisinden hangisi önce gelirse gelsin düğme doğru sayfayı açar
+  function updateResultPage() {
+    const page = L.resultPage(state.changed, state.rootFiles);
+    state.resultPage = page;
+    $("result-open").hidden = !page;
+    const main = page ? $("result-open") : $("result-folder");
+    $("result-open").classList.toggle("dikkat", !!page);
+    $("result-folder").classList.toggle("dikkat", main === $("result-folder"));
+    $("result-title").textContent = page ? "Usta işi bitirdi. Sonucu görmek için \"Sonucu aç\"a bas." : "Usta işi bitirdi.";
   }
   function setActive(active) {
     state.active = active;
@@ -476,7 +486,7 @@
     document.body.replaceChildren(h("p", "wiz-note", "Usta kapandı. Tekrar açmak için masaüstündeki Usta simgesine çift tıkla. Bu sekmeyi kapatabilirsin."));
     document.body.style.padding = "32px";
   });
-  $("result-open").addEventListener("click", () => U.showTab("preview"));
+  $("result-open").addEventListener("click", () => { $("preview-path").value = state.resultPage || "index.html"; U.showTab("preview"); });
   $("result-folder").addEventListener("click", async () => {
     const r = await api(`/workspaces/${encodeURIComponent(state.ws)}/reveal`, { method: "POST" });
     if (!r.ok) U.addNode(h("div", "msg error", "Klasör açılamadı. Dosyalar sol taraftaki \"Dosyalarım\" listesinde de görünür."));

@@ -109,6 +109,8 @@
   const MAX_DIFF_LINES = 2000;
   function renderDiff(text) {
     const files = L.parseDiff(text);
+    U.state.changed = files.filter((f) => f.status !== "deleted").map((f) => f.name);
+    if (U.state.resultOn) U.updateResultPage();
     const root = $("diff-files");
     root.replaceChildren();
     $("diff-count").textContent = files.length ? `(${files.length})` : "";
@@ -146,6 +148,7 @@
     for (const t of ["stream", "diff", "memory", "history", "file", "preview", "office"]) $(`tab-${t}`).setAttribute("aria-selected", String(t === name));
     if (window.Office && typeof window.Office.setVisible === "function") window.Office.setVisible(name === "office");
     $("result-card").hidden = !(U.state.resultOn && name === "stream");
+    $("work").classList.toggle("has-result", !$("result-card").hidden);
     U.updateStarters();
     if (name === "memory") U.loadMemory();
     if (name === "history") U.loadHistory();

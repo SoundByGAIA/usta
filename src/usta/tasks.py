@@ -35,7 +35,7 @@ from usta.task import (
 )
 from usta.tools import ToolContext, build_registry
 from usta.verify import CompletionGate, Verifier
-from usta.workspace import diff, remove_new_protected, revert, snapshot
+from usta.workspace import changes, diff, remove_new_protected, revert, snapshot
 
 MODES = ("manual", "auto", "plan")
 PLAN_TOOLS = frozenset({"read_file", "list_dir", "fetch_url"})
@@ -533,6 +533,10 @@ class TaskManager:
             except OSError:
                 task.diff = ""
                 task.diff_failed = True  # değişiklik var sayılır (geri alma kuralı)
+            # kutudaki komutların değiştirdikleri dahil: hangi araçla değiştiği fark etmeden her dosya kayda girer
+            with contextlib.suppress(OSError):
+                if task.diff and (changed := changes(task.snapshot, task.root)):
+                    audit.record("task_changes", files=changed[:500], total=len(changed))
             if (
                 task.mode != "plan"
             ):  # plan hiçbir şeyi değiştirmedi; hafızaya girip istemi şişirmesin

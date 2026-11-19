@@ -142,6 +142,25 @@ def test_task_lifecycle_sse_and_diff(tmp_path):
     assert d.headers["content-type"].startswith("text/plain") and "+merhaba" in d.text
 
 
+def test_task_end_records_every_changed_file(tmp_path):
+    import hashlib
+
+    model = Scripted(
+        call("write_file", {"path": "a.txt", "content": "merhaba\n"}), ModelResponse("yazdım")
+    )
+    c, _ = make_client(tmp_path, model)
+    w = new_ws(c)
+    tid = c.post(f"/workspaces/{w}/tasks", json={"prompt": "yaz"}, headers=AUTH).json()["id"]
+    sse(c, f"/tasks/{tid}/events")
+    rows = [
+        r
+        for r in c.get("/audit", params={"workspace": w}, headers=AUTH).json()
+        if r["event"] == "task_changes"
+    ]
+    after = hashlib.sha256(b"merhaba\n").hexdigest()
+    assert [r["files"] for r in rows] == [[{"path": "a.txt", "before": None, "after": after}]]
+
+
 def test_sse_resume_with_last_event_id(tmp_path):
     c, _ = make_client(tmp_path, Scripted(ModelResponse("ok")))
     w = new_ws(c)

@@ -1,4 +1,6 @@
-from usta.workspace import diff, revert, snapshot
+import hashlib
+
+from usta.workspace import changes, diff, revert, snapshot
 
 
 def test_no_changes_empty_diff(tmp_path):
@@ -157,3 +159,19 @@ def test_revert_replaces_directory_that_took_a_files_place(tmp_path):
     (root / "top.txt" / "x").write_text("y")
     revert(snap, root)
     assert (root / "top.txt").is_file() and (root / "top.txt").read_text() == "üst"
+
+
+def test_changes_lists_added_modified_deleted_with_hashes(tmp_path):
+    h = lambda b: hashlib.sha256(b).hexdigest()
+    (tmp_path / "a.txt").write_bytes(b"bir")
+    (tmp_path / "sil.txt").write_bytes(b"gidecek")
+    (tmp_path / "ayni.txt").write_bytes(b"x")
+    snap = snapshot(tmp_path)
+    (tmp_path / "a.txt").write_bytes(b"iki")
+    (tmp_path / "sil.txt").unlink()
+    (tmp_path / "yeni.txt").write_bytes(b"y")
+    assert changes(snap, tmp_path) == [
+        {"path": "a.txt", "before": h(b"bir"), "after": h(b"iki")},
+        {"path": "sil.txt", "before": h(b"gidecek"), "after": None},
+        {"path": "yeni.txt", "before": None, "after": h(b"y")},
+    ]

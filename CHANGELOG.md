@@ -14,6 +14,8 @@
 - `usta serve` da ortak hafıza ev sahibiyse dinleyiciyi açar (önce yalnız portal açıyordu).
 - MCP: Windows'ta sunucunun hata mesajı sistemin kod sayfasıyla yazılmışsa da Türkçe karakterleri doğru okunur.
 - `usta audit show` kayıt adı verilmezse en son değişen kaydı gösterir.
+- Denetim kaydı: portal görevinin sonunda değişen her dosya (kutudaki komutların değiştirdikleri dahil) önce/sonra
+  hash'iyle `task_changes` olarak yazılır; panelden yüklenen dosyalar da `file_change` olarak girer.
 
 ## 0.9.0: şifreli ortak hafıza, zincirli denetim kaydı
 

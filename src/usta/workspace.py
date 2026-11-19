@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import hashlib
 import os
 import shutil
 import stat
@@ -165,6 +166,23 @@ def _current(root: Path, snap: Snapshot) -> dict[str, bytes]:
             continue
         cur[rel] = p.read_bytes()
     return cur
+
+
+def changes(snap: Snapshot, root: Path) -> list[dict]:
+    """Görev başından beri eklenen, değişen ve silinen dosyalar; önceki/sonraki sha256 (dosya yoksa None)."""
+    cur = _current(root, snap)
+    out = []
+    for rel in sorted(set(snap.files) | set(cur)):
+        a, b = snap.files.get(rel), cur.get(rel)
+        if a != b:
+            out.append(
+                {
+                    "path": rel,
+                    "before": None if a is None else hashlib.sha256(a).hexdigest(),
+                    "after": None if b is None else hashlib.sha256(b).hexdigest(),
+                }
+            )
+    return out
 
 
 def diff(snap: Snapshot, root: Path) -> str:

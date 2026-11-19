@@ -113,6 +113,8 @@ Ayrıntı: [docs/design.md](docs/design.md) §5. Özet ve bilinçli sınırlar:
 - Denetim kaydı (`~/.usta/audit/`, çalışma alanının dışında, sandbox içinden yazılamaz): her satır önceki satırın sha256'sını taşır;
   `usta audit verify` aradan silinen, eklenen ya da değiştirilen satırı bulur. Ajanın ve panelin dosya değişiklikleri önce/sonra hash'iyle,
   görev modu ve tetikleyiciyle (`görev`, `okunan içerik`, `kullanıcı`; ajan için yalnız kaynak izi kapısı açıkken) yazılır.
+  Portal görevinin sonunda, kutudaki komutların değiştirdikleri dahil değişen her dosya ayrıca `task_changes` olarak yazılır
+  (anlık görüntünün kapsadığı dosyalar; `usta run` komut satırı görevleri bunu yazmaz).
   Sınırlar: zincir imzasızdır ve kayıt Usta ile aynı kullanıcı yetkisiyle yazılır; dosyayı değiştirebilen biri zinciri baştan yeniden
   üretebilir, sondan satır silmek ya da son satırı değiştirmek de zincirde görünmez. Bunu yakalamak için `usta audit verify` çıktısındaki
   son hash'i başka bir yerde (ayrı makine, kâğıt) saklayın ve sonra `usta audit verify <kayıt> --anchor <hash>` ile denetleyin.

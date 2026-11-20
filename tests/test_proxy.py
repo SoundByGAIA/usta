@@ -135,6 +135,41 @@ def test_connect_allowed_opens_tunnel():
     run(go())
 
 
+def test_open_connections_are_capped_and_freed_when_closed():
+    # izin verilen bir adresi bağlantı seliyle boğmak: kap başına eşzamanlı bağlantı sınırlı
+    async def go():
+        async with Env(max_open=1) as e:
+            r1, w1 = await asyncio.open_connection("127.0.0.1", e.port)
+            w1.write(f"CONNECT allowed.test:{e.up_port} HTTP/1.1\r\nHost: x\r\n\r\n".encode())
+            assert status(await r1.readuntil(b"\r\n\r\n")) == 200
+            second = await e.raw(
+                f"CONNECT allowed.test:{e.up_port} HTTP/1.1\r\nHost: x\r\n\r\n".encode()
+            )
+            assert status(second) == 429 and e.decisions[-1]["allowed"] is False
+            w1.close()
+            await asyncio.sleep(0.2)
+            third = await e.raw(
+                f"CONNECT allowed.test:{e.up_port} HTTP/1.1\r\nHost: x\r\n\r\n".encode()
+            )
+            assert status(third) == 200
+
+    run(go())
+
+
+def test_new_connections_are_paced():
+    async def go():
+        async with Env(min_gap=0.2) as e:
+            loop = asyncio.get_running_loop()
+            t0 = loop.time()
+            for _ in range(3):
+                await e.raw(
+                    f"CONNECT allowed.test:{e.up_port} HTTP/1.1\r\nHost: x\r\n\r\n".encode()
+                )
+            assert loop.time() - t0 >= 0.35  # üç bağlantı en az iki aralık bekler
+
+    run(go())
+
+
 @pytest.mark.parametrize(
     "target", ["evil.test:{p}", "1.2.3.4:{p}", "[::1]:{p}", "allowed.test:22", "allowed.test"]
 )

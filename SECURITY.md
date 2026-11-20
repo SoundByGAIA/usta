@@ -88,6 +88,11 @@ Ayrıntı: [docs/design.md](docs/design.md) §5. Özet ve bilinçli sınırlar:
   bir enjeksiyondan korumaz. Asıl sınır izin motorudur (yasak yazma yolları, çalışma alanı dışı okuma, bilinmeyen araç, ağ allowlist'i). Çalışma
   alanı dosyaları (`read_file`) işaretlenmez. Çalışma alanı içindeki yazmaları (ör. bir test dosyasını boşaltmak) ve yanıt metnine sızdırmayı hiçbir kural engelleyemez;
   `usta lab` bunu ölçer ve açıkça raporlar.
+- Kötüye kullanım: Usta modelin niyetini denetlemez; kurallara uymayan (sansürsüz) bir model de aynı sınırlar içinde çalışır. Bu yüzden
+  sınırlar modelden bağımsızdır: kutunun ağı kapalıdır, IP ve özel/yerel adresler hiç açılmaz, izin verilmemiş alan adları sorulur (oto onayda
+  reddedilir). İzin verdiğiniz bir alan adına kutudaki komutlar istek atabilir; bir adresi bağlantı seliyle boğmayı zorlaştırmak için kutu
+  başına en çok 32 eşzamanlı bağlantı açılır ve yeni bağlantılar saniyede en çok 20 olacak biçimde aralıklanır (komut 60 sn'de kesilir).
+  Yetkiniz olmayan bir sisteme izin vermeyin; bu sizin sorumluluğunuzdadır.
 - Geri alma yalnız dosyaları kapsar: devre kesici çalışma alanı dosyalarını geri sarar; komutların dış etkileri (ağ istekleri, paket kurulumu, sandbox dışına çıkan her şey) geri alınamaz.
 - Tedarik zinciri (0.2.0'dan beri): Python bağımlılıkları hash'li, çok platformlu kilit dosyalarıyla (`requirements*.lock`) kurulur ve CI'da `pip-audit` kilidi tarar.
   Sandbox ve MCP imajları etiketle seçilir; `usta sandbox pin` / `usta mcp prepare` yerel imaj kimliğini sabitler ve her çalıştırmada doğrular

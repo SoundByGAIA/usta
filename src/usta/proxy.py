@@ -23,6 +23,7 @@ _STATUS = {
     400: "Bad Request",
     403: "Forbidden",
     405: "Method Not Allowed",
+    429: "Too Many Requests",
     431: "Request Header Fields Too Large",
     502: "Bad Gateway",
 }
@@ -129,11 +130,17 @@ class AllowlistProxy:
         header_timeout: float = 10.0,
         connect_timeout: float = 10.0,
         idle_timeout: float = 60.0,
+        max_open: int = 32,
+        min_gap: float = 0.05,
     ):
         self.allowed, self.ports = list(allowed), set(ports)
         self.resolve, self.allow_private, self.on_decision = resolve, allow_private, on_decision
         self.max_header, self.header_timeout = max_header, header_timeout
         self.connect_timeout, self.idle_timeout = connect_timeout, idle_timeout
+        # izin verilen bir adresi bağlantı seliyle boğmak model ne isterse istesin olmasın: eşzamanlı bağlantı
+        # sınırlı, yeni bağlantılar aralıklı (saniyede en çok 1/min_gap). Paket kurulumu buna sığar.
+        self.max_open, self.min_gap = max_open, min_gap
+        self._active, self._next_at = 0, 0.0
 
     def _log(self, **d) -> None:
         if self.on_decision:
@@ -194,6 +201,10 @@ class AllowlistProxy:
             raise Denied(502, "alan adı çözümlenemedi")
         if not self.allow_private and not all(is_public_ip(ip) for ip in ips):
             raise Denied(403, "özel/yerel adrese çözülüyor")
+        now = loop.time()
+        wait, self._next_at = max(0.0, self._next_at - now), max(now, self._next_at) + self.min_gap
+        if wait:
+            await asyncio.sleep(wait)
         for ip in ips:
             try:
                 return await asyncio.wait_for(
@@ -213,7 +224,10 @@ class AllowlistProxy:
 
     async def handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         method, host, port, up_w = "?", "", 0, None
+        self._active += 1
         try:
+            if self._active > self.max_open:
+                raise Denied(429, "çok fazla eşzamanlı bağlantı")
             head, _rest = await self._read_head(reader)
             method, target, _ver, headers = self._parse(head)
             if method == "CONNECT":
@@ -268,6 +282,7 @@ class AllowlistProxy:
         except (OSError, asyncio.CancelledError):
             pass
         finally:
+            self._active -= 1
             for w in (writer, up_w):
                 if w is not None:
                     w.close()

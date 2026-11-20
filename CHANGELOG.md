@@ -7,6 +7,8 @@
   basit görünümde de görünür. Aynı klasörde biriken işler modeli yanlış dosyaya yöneltiyordu.
 - Kutunun ağ geçidi (izinli alan adlarına giden tek yol) eşzamanlı bağlantıyı 32 ile sınırlar ve yeni bağlantıları saniyede en
   çok 20 olacak biçimde aralıklar: izin verilen bir adres model ne isterse istesin bağlantı seliyle boğulamaz.
+- Geri alma kuralı görev sırasını saate göre değil sıra numarasına göre belirler: Windows'ta peş peşe başlayan iki görev
+  aynı saati alabiliyordu ve eski görevi geri almak yenisinin işini de silebilirdi.
 - Proje hafızasında, adını andığı dosya artık olmayan not modele verilmez (dosyadaki not silinmez).
 - Gemini 3 modelleri araç çağrısında bir düşünce imzası gönderir ve sonraki istekte onu geri ister; Usta imzayı
   taşımadığı için ilk dosya yazımından sonraki her istek HTTP 400 alıyordu. Sağlayıcının araç çağrısına eklediği alan

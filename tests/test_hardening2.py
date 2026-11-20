@@ -7,7 +7,7 @@ import pytest
 
 from perms import mode_is
 from test_api import AUTH, make_client
-from test_tasks import Scripted, manager
+from test_tasks import Scripted, call, manager
 from usta.audit import mask
 from usta.models import ModelResponse
 from usta.workspace import find_protected, remove_new_protected, revert, snapshot
@@ -334,6 +334,30 @@ def test_failed_diff_counts_as_change_for_revert_rule(tmp_path, monkeypatch):
     assert t2.finished.wait(10) and t2.diff_failed
     with pytest.raises(RevertRefused):
         m.revert(t1.id)  # t2'nin ne değiştirdiği bilinmiyor: t1'i geri almak t2'yi ezebilir
+
+
+def test_newer_task_is_seen_even_when_the_clock_has_not_moved(tmp_path, monkeypatch):
+    # Windows'ta saat ~15 ms adımla ilerler: peş peşe iki görev aynı zamanı alabilir
+    import usta.task as task_mod
+    from usta.task import RevertRefused
+
+    monkeypatch.setattr(task_mod.time, "monotonic", lambda: 1000.0)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    m = manager(
+        tmp_path,
+        Scripted(
+            ModelResponse("a"),
+            call("write_file", {"path": "b.txt", "content": "b"}),
+            ModelResponse("b"),
+        ),
+    )
+    t1 = m.start("w", ws, "x", "auto")
+    assert t1.finished.wait(10)
+    t2 = m.start("w", ws, "y", "auto")
+    assert t2.finished.wait(10) and t2.diff
+    with pytest.raises(RevertRefused):
+        m.revert(t1.id)
 
 
 def test_protected_cleanup_errors_never_leave_workspace_busy(tmp_path, monkeypatch):

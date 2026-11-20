@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 import threading
 import time
@@ -11,6 +12,8 @@ from pathlib import Path
 
 from usta.sessions import SessionStore
 from usta.workspace import Snapshot
+
+_SEQ = itertools.count()
 
 CHECKBOX = re.compile(r"^[ \t]*[-*][ \t]*\[( |x|X)\][ \t]*(.*)$", re.MULTILINE)  # \s değil: ReDoS
 
@@ -97,7 +100,7 @@ class Task:
         self.mode = mode
         self.guard = guard
         self.id = uuid.uuid4().hex[:12]
-        self.created = time.monotonic()
+        self.seq = next(_SEQ)  # saat aynı değeri verse de (Windows ~15 ms) görev sırası kesin
         self.usage: dict | None = None
         self.context_window = context_window
         self.workspace_id, self.root, self.prompt = workspace_id, root, prompt

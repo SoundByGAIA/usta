@@ -284,7 +284,7 @@ class TaskManager:
             if t.snapshot is not None:
                 by_ws.setdefault(t.workspace_id, []).append(t)
         for tasks in by_ws.values():  # çalışma alanı başına son KEEP_SNAPSHOTS görev
-            tasks.sort(key=lambda t: t.created)
+            tasks.sort(key=lambda t: t.seq)
             for t in tasks[: max(0, len(tasks) - KEEP_SNAPSHOTS)]:
                 if t.finished.is_set():
                     t.snapshot = None
@@ -324,7 +324,7 @@ class TaskManager:
             newer = any(
                 t is not task
                 and t.workspace_id == task.workspace_id
-                and t.created > task.created
+                and t.seq > task.seq
                 and t.mode != "plan"
                 and (
                     t.diff or t.diff_failed or not t.finished.is_set()

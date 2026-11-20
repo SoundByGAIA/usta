@@ -36,6 +36,7 @@ from usta import (
     memory,
     ortak,
     privacy,
+    projects,
     skills,
     support,
 )
@@ -45,6 +46,7 @@ from usta.api_models import (
     ApprovalIn,
     CodeIn,
     MessageIn,
+    NewJobIn,
     TaskIn,
     WorkspaceId,
     WorkspaceIn,
@@ -237,12 +239,25 @@ def create_app(
             raise HTTPException(409, "çalışma alanı zaten var") from None
         return {"id": body.name}
 
+    @api.post("/workspaces/yeni", status_code=201)
+    def create_job(body: NewJobIn) -> dict:
+        # yeni iş kullanıcının gördüğü klasörün (portal varsayılanı) içinde açılır; yoksa Usta'nın kendi klasöründe
+        parent = (home / "workspaces" / workspace).resolve() if workspace else home / "workspaces"
+        try:
+            wid, name = projects.new_job(home, parent, body.title)
+        except (OSError, ValueError) as e:
+            raise HTTPException(409, f"yeni iş açılamadı: {e}") from None
+        return {"id": wid, "name": name}
+
     @api.get("/workspaces")
     def list_workspaces() -> list[dict]:
         base = home / "workspaces"
-        return (
-            [{"id": p.name} for p in sorted(base.iterdir()) if p.is_dir()] if base.is_dir() else []
-        )
+        if not base.is_dir():
+            return []
+        # bağlı klasörde kimlik "usta-e96a" gibi görünür; kullanıcı klasörün kendi adını tanır
+        return [
+            {"id": p.name, "name": p.resolve().name} for p in sorted(base.iterdir()) if p.is_dir()
+        ]
 
     def preview_key(workspace: str) -> str:
         return hmac.new(

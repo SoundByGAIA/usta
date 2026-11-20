@@ -84,7 +84,7 @@ def test_workspace_create_list_and_validation(tmp_path):
     assert c.post("/workspaces", json={"name": "proje"}, headers=AUTH).status_code == 409
     for bad in ["../x", "A B", "", "a/b", ".gizli", "x" * 80]:
         assert c.post("/workspaces", json={"name": bad}, headers=AUTH).status_code == 422, bad
-    assert c.get("/workspaces", headers=AUTH).json() == [{"id": "proje"}]
+    assert c.get("/workspaces", headers=AUTH).json() == [{"id": "proje", "name": "proje"}]
     assert (tmp_path / "home" / "workspaces" / "proje").is_dir()
 
 

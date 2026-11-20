@@ -16,9 +16,27 @@ _TR = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
 MAX_BASE = 24  # + "-" + 4 hane = en çok 29 karakter (kimlik sınırı 40)
 
 
-def slug(name: str) -> str:
+def slug(name: str, default: str = "proje") -> str:
     s = re.sub(r"[^a-z0-9_-]+", "-", (name or "").translate(_TR).casefold()).strip("-_")
-    return (s[:MAX_BASE].strip("-_")) or "proje"
+    return (s[:MAX_BASE].strip("-_")) or default
+
+
+def new_job(home: Path, parent: Path, title: str) -> tuple[str, str]:
+    """Yeni iş için `parent` içinde isteğin ilk kelimelerinden adlandırılmış boş klasör açar ve kaydeder.
+
+    Her iş ayrı klasörde ve ayrı hafızada durur: aynı klasörde biriken işler modeli yanlış dosyaya yöneltiyordu."""
+    base = slug(" ".join((title or "").split()[:4]), default="yeni-is")
+    parent = Path(parent)
+    for n in range(1, 100):
+        name = base if n == 1 else f"{base}-{n}"
+        path = parent / name
+        try:
+            path.mkdir(parents=True)
+        except FileExistsError:
+            continue
+        check_root(home, path)
+        return register(home, path), name
+    raise OSError("yeni iş klasörü açılamadı")
 
 
 def check_root(home: Path, path: Path) -> None:

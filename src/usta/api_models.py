@@ -23,6 +23,12 @@ class WorkspaceIn(BaseModel):
     name: str = Field(pattern=ID_PATTERN)
 
 
+class NewJobIn(BaseModel):
+    title: str = Field(
+        min_length=1, max_length=500
+    )  # kullanıcının ilk isteği; klasör adı ondan çıkar
+
+
 class AttachIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     content: str = Field(max_length=attachments.MAX_FILE * 2)

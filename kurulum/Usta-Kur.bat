@@ -6,6 +6,15 @@ echo  Usta kuruluyor. Bu pencereyi kapatma, birkaç dakika sürebilir.
 echo  Ekranda bir şey yazmasa da çalışıyor.
 echo.
 
+rem Windows 11 Akilli Uygulama Denetimi aciksa imzasiz Python parcalari yuklenmez; kurup bozuk Usta birakma
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy" /v VerifiedAndReputablePolicyState 2>nul | find "0x1" >nul
+if not errorlevel 1 (
+  echo  Bu bilgisayarda Windows'un "Akıllı Uygulama Denetimi" açık.
+  echo  Bu koruma Usta'nın kullandığı imzasız parçaları engellediği için Usta şimdilik burada çalışamaz.
+  echo  Korumayı kapatma: kapatınca geri açmak için Windows'u sıfırlamak gerekebilir.
+  echo  Usta'nın imzalı Windows sürümü hazırlanıyor; hazır olunca aynı sayfadan indirebilirsin.
+  goto bitti_hata
+)
 rem Python'u bul: once "python", PATH'e eklenmemisse "py" baslaticisi
 set PY=python
 python --version >nul 2>nul

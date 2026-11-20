@@ -12,6 +12,10 @@ Usta, ne istediğini yazdığında bunu senin için yapan bir yapay zekâ yardı
 3. Dosya Python'u kontrol eder (yoksa nasıl kuracağını söyler), Usta'yı kurar ve masaüstüne **"Usta"** simgesi koyar. Sonunda Usta kendiliğinden açılır. Siyah pencerede bir süre yazı çıkmayabilir; kapatma, çalışıyor.
 4. Bundan sonra Usta'yı açmak için **masaüstündeki "Usta" simgesine çift tıkla**. Siyah pencere açılmaz; tarayıcın açılır. İşin bitince Usta'daki **Ayarlar → "Usta'yı kapat"** düğmesine bas.
 
+**"Akıllı Uygulama Denetimi açık" dediyse:** Windows 11'in bu koruması (temiz kurulumda açık gelir) Usta'nın
+kullandığı imzasız parçaları engeller; Usta bu bilgisayarda şimdilik çalışamaz. Korumayı kapatma: kapatınca geri açmak
+için Windows'u sıfırlamak gerekebilir. Usta'nın imzalı Windows sürümü hazırlanıyor. Elle kurulum da aynı engele takılır.
+
 ### Elle kurulum (üstteki çalışmazsa)
 
 **1. Python'u kur** (bir kerelik; bilgisayarında varsa atla)

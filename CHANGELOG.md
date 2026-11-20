@@ -13,6 +13,9 @@
   eklenir. Ölçümde Gemini 3.5 Flash Lite ve Qwen3 4B zararlı istekleri ilkeler olmadan da reddetti; Qwen3 4B ilkelerle
   zararsız bir sayfayı reddetti. Varsayılan kapalı (docs/olcumler/anayasa.md).
 - Kabul edilebilir kullanım belgesi (docs/kullanim.md): neyin yasak olduğu, Usta'nın neyi engelleyip neyi engelleyemediği.
+- Windows 11'in Akıllı Uygulama Denetimi imzasız bir parçayı engellediğinde Usta Python hata dökümü yerine düz Türkçe
+  açıklama gösterir (masaüstü simgesinden açıldıysa pencerede); `Usta-Kur.bat` koruma açıksa kurmadan önce nedenini
+  söyleyip durur.
 - Proje hafızasında, adını andığı dosya artık olmayan not modele verilmez (dosyadaki not silinmez).
 - Gemini 3 modelleri araç çağrısında bir düşünce imzası gönderir ve sonraki istekte onu geri ister; Usta imzayı
   taşımadığı için ilk dosya yazımından sonraki her istek HTTP 400 alıyordu. Sağlayıcının araç çağrısına eklediği alan

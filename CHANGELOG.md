@@ -2,6 +2,9 @@
 
 ## Yayınlanmadı
 
+- Windows kurulum dosyası (`Usta-Kurulum.exe`): Python'u içinde taşır, yönetici izni istemez, Başlat menüsüne ve
+  masaüstüne simge koyar, Programlar listesinden kaldırılır. Henüz imzasız; Akıllı Uygulama Denetimi açık
+  bilgisayarlarda imzalı sürüm gerekir.
 - Yazı kutusunda "Enter ile gönder" seçeneği: açıkken Enter gönderir, Shift+Enter alt satıra geçer; Ctrl+Enter her
   durumda gönderir. Seçim ayarlarda saklanır.
 - "Yeni iş": kenar çubuğundaki düğmeyle her iş ayrı klasörde ve ayrı hafızada başlar. Klasör ilk istekten

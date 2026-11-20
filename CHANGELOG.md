@@ -2,6 +2,8 @@
 
 ## Yayınlanmadı
 
+- Yazı kutusunda "Enter ile gönder" seçeneği: açıkken Enter gönderir, Shift+Enter alt satıra geçer; Ctrl+Enter her
+  durumda gönderir. Seçim ayarlarda saklanır.
 - "Yeni iş": kenar çubuğundaki düğmeyle her iş ayrı klasörde ve ayrı hafızada başlar. Klasör ilk istekten
   adlandırılır (Usta klasörünün içinde, ör. `basit-bir-yilan-oyunu`); "İşlerim" listesi klasör adlarını gösterir ve
   basit görünümde de görünür. Aynı klasörde biriken işler modeli yanlış dosyaya yöneltiyordu.

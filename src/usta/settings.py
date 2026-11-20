@@ -39,6 +39,7 @@ class Settings:
     guard: bool = (
         False  # koruma: doğrulama kapısı + devre kesici (varsayılan kapalı, ölçüm sonrası açılır)
     )
+    enter_send: bool = False  # portal: Enter gönderir, Shift+Enter alt satır
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "theme", theme.resolve(self.theme))
@@ -79,7 +80,7 @@ class Settings:
             or self.context_window < 256
         ):
             raise ValueError("context_window >= 256 olmalı")
-        for name in ("portal", "guard"):
+        for name in ("portal", "guard", "enter_send"):
             if not isinstance(getattr(self, name), bool):
                 raise TypeError(f"{name} true/false olmalı")
 

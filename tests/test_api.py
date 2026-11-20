@@ -379,6 +379,7 @@ def test_settings_requires_auth_and_has_defaults(tmp_path):
         "theme": "siyah",
         "mode": "manual",
         "guard": False,
+        "enter_send": False,
         "zoom": "auto",
         "accent": "cini",
         "think": "auto",
@@ -398,6 +399,7 @@ def test_settings_put_validates_persists_and_shares_with_terminal(tmp_path):
         "theme": "gri",
         "mode": "plan",
         "guard": False,
+        "enter_send": False,
         "zoom": "auto",
         "accent": "cini",
         "think": "auto",
@@ -437,6 +439,14 @@ def test_task_guard_flag_and_settings_guard(tmp_path):
     assert c.get("/settings", headers=AUTH).json()["guard"] is False
     assert c.put("/settings", json={"guard": True}, headers=AUTH).json()["guard"] is True
     assert c.put("/settings", json={"guard": "evet"}, headers=AUTH).status_code == 422
+
+
+def test_settings_enter_send_roundtrip(tmp_path):
+    c, _ = make_client(tmp_path, Scripted())
+    assert c.get("/settings", headers=AUTH).json()["enter_send"] is False
+    assert c.put("/settings", json={"enter_send": True}, headers=AUTH).json()["enter_send"] is True
+    assert c.get("/settings", headers=AUTH).json()["enter_send"] is True
+    assert c.put("/settings", json={"enter_send": "evet"}, headers=AUTH).status_code == 422
 
 
 def test_settings_zoom_roundtrip_and_validation(tmp_path):

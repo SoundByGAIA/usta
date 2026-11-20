@@ -84,6 +84,7 @@
     applyAccent(s.accent);
     applyMode(s.mode);
     $("guard").checked = !!s.guard;
+    $("enter-send").checked = !!s.enter_send;
     state.defaultWs = s.workspace || null;
     state.zoom = s.zoom || "auto";
     applyZoom();
@@ -193,7 +194,8 @@
     $("send").disabled = !ready;
     $("send").textContent = active ? "Yönlendir" : "Gönder";
     $("send").title = active ? "Görev sürerken mesaj gönder: ajan bir sonraki adımında görür" : "";
-    $("prompt").placeholder = !ready ? "Önce soldan bir çalışma alanı seç ya da + Yeni iş'e bas" : state.newJob && !active ? "Yeni işin ne? Ne kadar ayrıntı verirsen o kadar iyi olur." : active ? "Görev sürerken de yazabilirsin; mesajın ajana iletilir (Ctrl+Enter)" : "Ne yapmamı istersin? (Ctrl+Enter gönderir)";
+    const key = $("enter-send").checked ? "Enter" : "Ctrl+Enter";
+    $("prompt").placeholder = !ready ? "Önce soldan bir çalışma alanı seç ya da + Yeni iş'e bas" : state.newJob && !active ? "Yeni işin ne? Ne kadar ayrıntı verirsen o kadar iyi olur." : active ? `Görev sürerken de yazabilirsin; mesajın ajana iletilir (${key})` : `Ne yapmamı istersin? (${key} gönderir)`;
     $("prompt").disabled = !ready;
     $("model-select").disabled = active;
     $("attach").disabled = active || !state.ws;
@@ -348,8 +350,14 @@
   $("token-form").addEventListener("submit", connect);
   $("ws-form").addEventListener("submit", createWorkspace);
   $("composer").addEventListener("submit", (ev) => { ev.preventDefault(); U.sendPrompt(); });
+  $("enter-send").addEventListener("change", () => {
+    saveSetting({ enter_send: $("enter-send").checked });
+    setActive(state.active);
+  });
+  // Ctrl+Enter her durumda gönderir
   $("prompt").addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); U.sendPrompt(); }
+    if (ev.key !== "Enter" || ev.isComposing) return;
+    if (ev.ctrlKey || ev.metaKey || ($("enter-send").checked && !ev.shiftKey)) { ev.preventDefault(); U.sendPrompt(); }
   });
   $("stop").addEventListener("click", U.stopTask);
   $("model-select").addEventListener("change", switchModel);

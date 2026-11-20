@@ -127,6 +127,7 @@ class SettingsIn(BaseModel):
     theme: Literal["beyaz", "gri", "siyah"] | None = None
     mode: Literal["manual", "auto", "plan"] | None = None
     guard: bool | None = None
+    enter_send: bool | None = None
     zoom: Literal["auto", "0.9", "1", "1.1", "1.25", "1.5", "1.75"] | None = None
     accent: Literal["cini", "turkuaz", "nar", "zeytin", "mor"] | None = None
     think: Literal["auto", "off", "low", "medium", "high"] | None = None

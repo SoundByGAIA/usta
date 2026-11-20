@@ -9,6 +9,10 @@
   çok 20 olacak biçimde aralıklar: izin verilen bir adres model ne isterse istesin bağlantı seliyle boğulamaz.
 - Geri alma kuralı görev sırasını saate göre değil sıra numarasına göre belirler: Windows'ta peş peşe başlayan iki görev
   aynı saati alabiliyordu ve eski görevi geri almak yenisinin işini de silebilirdi.
+- Deneysel "Usta anayasası" (`USTA_ANAYASA=1`): Claude'un anayasasından (CC0) kısaltılmış 7 ilke sistem talimatına
+  eklenir. Ölçümde Gemini 3.5 Flash Lite ve Qwen3 4B zararlı istekleri ilkeler olmadan da reddetti; Qwen3 4B ilkelerle
+  zararsız bir sayfayı reddetti. Varsayılan kapalı (docs/olcumler/anayasa.md).
+- Kabul edilebilir kullanım belgesi (docs/kullanim.md): neyin yasak olduğu, Usta'nın neyi engelleyip neyi engelleyemediği.
 - Proje hafızasında, adını andığı dosya artık olmayan not modele verilmez (dosyadaki not silinmez).
 - Gemini 3 modelleri araç çağrısında bir düşünce imzası gönderir ve sonraki istekte onu geri ister; Usta imzayı
   taşımadığı için ilk dosya yazımından sonraki her istek HTTP 400 alıyordu. Sağlayıcının araç çağrısına eklediği alan

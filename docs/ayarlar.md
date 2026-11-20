@@ -40,6 +40,7 @@ kaldırılır.
 | `--guard` | doğrulama kapısı ve devre kesici | kapalı | zayıf modelde tek başına fayda göstermedi: [arsiv/0.2.0-olcumleri.md](arsiv/0.2.0-olcumleri.md) |
 | `USTA_SITE_STEPS=1` | yeni site isteğini parça parça kurar | kapalı | deneysel; ölçüm: [olcumler/site-istekleri.md](olcumler/site-istekleri.md) |
 | `USTA_SITE_LEVEL=1\|2\|3` | parça büyüklüğü (1 en küçük); verilmezse beceri sondası seçer | sonda | deneysel; sonda henüz kararlı değil |
+| `USTA_ANAYASA=1` | Usta'nın ilkelerini (dürüstlük, gerçek yardım, kesin yasaklar) sistem talimatına ekler | kapalı | deneysel; ölçüm: [olcumler/anayasa.md](olcumler/anayasa.md) |
 | `USTA_WORKSPACE_HINT=1` | görev başında klasördeki dosya adlarını modele söyler | kapalı | deneysel, ölçülmedi |
 | `USTA_SYMBOL_TOOLS=1`, `--symbol-tools` | Tree-sitter sembol araçları (`pip install 'usta[symbols]'`) | kapalı | deneysel |
 

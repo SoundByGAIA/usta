@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from usta import attachments, harnesses, mcpconfig, memory, ortak, projectcfg, projects
+from usta import anayasa, attachments, harnesses, mcpconfig, memory, ortak, projectcfg, projects
 from usta import settings as usta_settings
 from usta.agent import SYSTEM_PROMPT, Agent
 from usta.audit import AuditLog
@@ -492,7 +492,7 @@ class TaskManager:
                 context_window=self.context_window,
                 inbox=task.drain,
                 shrink_writes=self.shrink_writes,
-                system_prompt=f"{SYSTEM_PROMPT}\n\n{PLAN_PROMPT}" if plan else None,
+                system_prompt=f"{anayasa.system_prompt(SYSTEM_PROMPT)}\n\n{PLAN_PROMPT}" if plan else None,
                 phases=PhaseTracker() if not plan else None,  # yalnız gözlem: döngüyü değiştirmez
                 taint=self.taint_gate,
                 finish_check=self.finish_check,

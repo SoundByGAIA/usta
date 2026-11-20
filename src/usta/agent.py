@@ -7,8 +7,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from usta import anayasa, sitebuild
 from usta import context as ctx
-from usta import sitebuild
 from usta.audit import AuditLog, file_hash
 from usta.breaker import CircuitBreaker, Trip
 from usta.finishcheck import WRITE_TOOLS, FinishCheck
@@ -104,7 +104,7 @@ class Agent:
         self.audit, self.approver, self.max_steps = audit, approver, max_steps
         self.on_event, self.cancel = on_event, cancel
         self.memory_context = memory_context
-        self.system_prompt = system_prompt or SYSTEM_PROMPT
+        self.system_prompt = system_prompt or anayasa.system_prompt(SYSTEM_PROMPT)
         self.verifier = verifier
         self.breaker = breaker
         self.context_window = context_window

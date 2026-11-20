@@ -2,6 +2,9 @@
 
 ## Yayınlanmadı
 
+- Sistem talimatındaki "kısa ve net yanıt ver" kalktı: yanıt uzunluğu isteğe göre ayarlanır, öğret ya da açıkla
+  denince adım adım anlatılır. Qwen 3.8 27B öğretme isteklerinde anlatmak yerine dosya kurcalıyordu (7/12 → 3/12;
+  [ölçüm](docs/olcumler/talimat.md)).
 - Model tanıma kısaldı: yerel araç çağrısı ilk denemede tam puan alırsa öbür yöntemler denenmez (6 istek yerine 3).
   Yoğun servis "şu kadar saniye sonra dene" derse (Retry-After, en çok 60 sn) o kadar beklenir.
 - Sözlük üst menüden çıktı: sol alt köşedeki düğmeyle küçük bir pencerede açılır, × ya da Esc ile kapanır; açıkken

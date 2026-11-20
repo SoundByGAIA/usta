@@ -25,7 +25,8 @@ Bu sınırlar modelden bağımsızdır; kurallara uymayan bir model de onları a
   en çok 60 saniye çalışır.
 - Usta yalnız seçtiğin klasöre yazar; riskli adımlar için sana sorar.
 - İstersen (`USTA_ANAYASA=1`, deneysel) model Usta'nın ilkelerini de okur: yukarıdaki yasakları ve nedenini bilir.
-  Denenen modeller zararlı istekleri ilkeler olmadan da reddetti ([ölçüm](olcumler/anayasa.md)).
+  Gemini ve Qwen3 4B zararlı istekleri ilkeler olmadan da reddetti ([ölçüm](olcumler/anayasa.md)); Qwen 3.8 27B ise
+  bir site çökertme isteğine araç yazdı ([ölçüm](olcumler/talimat.md)). Model reddetmezse yalnız yukarıdaki sınırlar kalır.
 
 ## Usta neyi engelleyemez
 

@@ -2,6 +2,8 @@
 
 ## Yayınlanmadı
 
+- Model tanıma kısaldı: yerel araç çağrısı ilk denemede tam puan alırsa öbür yöntemler denenmez (6 istek yerine 3).
+  Yoğun servis "şu kadar saniye sonra dene" derse (Retry-After, en çok 60 sn) o kadar beklenir.
 - Sözlük üst menüden çıktı: sol alt köşedeki düğmeyle küçük bir pencerede açılır, × ya da Esc ile kapanır; açıkken
   ekrandaki iş görünmeye devam eder.
 - Windows kurulum dosyası (`Usta-Kurulum.exe`): Python'u içinde taşır, yönetici izni istemez, Başlat menüsüne ve

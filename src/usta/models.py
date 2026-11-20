@@ -10,6 +10,18 @@ from typing import Protocol
 import httpx
 
 TRANSIENT_STATUS = frozenset({429, 502, 503, 504})
+MAX_RETRY_AFTER = (
+    60.0  # servis daha uzun beklet derse kullanıcı boş ekrana bakmasın; hata gösterilir
+)
+
+
+def _retry_after(r: httpx.Response) -> float | None:
+    """Servisin istediği bekleme (saniye cinsinden Retry-After); tarih biçimi ve bozuk değer yok sayılır."""
+    try:
+        wait = float(r.headers.get("retry-after", ""))
+    except ValueError:
+        return None
+    return min(max(wait, 0.0), MAX_RETRY_AFTER)
 
 
 class ModelError(Exception):
@@ -124,6 +136,9 @@ class OpenAICompatClient:
             else:
                 if r.status_code not in TRANSIENT_STATUS or last:
                     return r
+                if (wait := _retry_after(r)) is not None:
+                    self.sleep(wait)
+                    continue
             self.sleep(self.backoff * 2**attempt)
         raise AssertionError("ulaşılamaz")  # pragma: no cover
 

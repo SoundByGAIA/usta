@@ -89,9 +89,16 @@ def test_multiline_content_with_quotes_is_part_of_the_probe():
 
 
 def test_probe_is_small():
-    f = Fake()
+    f = Fake("talk", "call")
     profile.probe(f, "m")
     assert f.calls <= 8
+
+
+def test_perfect_native_skips_other_protocols():
+    # yerel 3/3 ise eşitlikte zaten yerel seçilir; öbür protokoller sonucu değiştiremez
+    f = Fake("call", "call")
+    p = profile.probe(f, "m")
+    assert p.protocol == "native" and f.calls == p.total
 
 
 # --- önbellek -------------------------------------------------------------------------------

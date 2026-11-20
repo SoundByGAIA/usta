@@ -268,6 +268,37 @@ def test_transient_connect_errors_are_retried(monkeypatch):
     assert c.chat([models.Message("user", "a")]).content == "tamam" and len(calls) == 3
 
 
+def test_retry_waits_as_long_as_the_service_asks(monkeypatch):
+    import httpx
+
+    from usta import models
+
+    seq = []
+
+    def busy_then_ok(url, **kw):
+        seq.append(url)
+        if len(seq) == 1:
+            return httpx.Response(
+                429, headers={"Retry-After": "20"}, request=httpx.Request("POST", url)
+            )
+        if len(seq) == 2:  # saçma uzun istek sınırlanır
+            return httpx.Response(
+                503, headers={"Retry-After": "3600"}, request=httpx.Request("POST", url)
+            )
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "tamam"}}]},
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(httpx, "post", busy_then_ok)
+    c = models.OpenAICompatClient("http://x/v1", "m")
+    waits = []
+    c.sleep = waits.append
+    assert c.chat([models.Message("user", "a")]).content == "tamam"
+    assert waits == [20.0, 60.0]
+
+
 def test_retry_gives_up_and_503_retried_but_400_not(monkeypatch):
     import httpx
     import pytest

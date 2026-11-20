@@ -84,10 +84,14 @@ def _supports_extra(client: object) -> bool:
 def probe(client: ModelClient, model: str) -> Profile:
     total = len(PROBES)
     native_ok, rescued = _run(client, TOOLS)
+    # yerel tam puan alırsa eşitlikte zaten seçilir; ücretsiz bulut katmanında her istek dakikalar sürebilir
+    perfect = native_ok == total
     json_ok = (
-        _run(JsonProtocolClient(client, retries=0), TOOLS)[0] if _supports_extra(client) else 0
+        _run(JsonProtocolClient(client, retries=0), TOOLS)[0]
+        if not perfect and _supports_extra(client)
+        else 0
     )
-    text_ok, _ = _run(TextProtocolClient(client, retries=0), TOOLS)
+    text_ok = 0 if perfect else _run(TextProtocolClient(client, retries=0), TOOLS)[0]
     counts = {"native": native_ok, "json": json_ok, "text": text_ok}
     order = ("native", "json", "text")  # eşitlikte en basit/güvenilir olan önce
     best = max(order, key=lambda k: (counts[k], -order.index(k)))

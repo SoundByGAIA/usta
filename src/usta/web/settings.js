@@ -477,7 +477,6 @@
     else if (name === "wizard") U.wizShow("wiz-start");
     else if (name === "tablet") loadTablet();
     else if (name === "settings") { loadPrograms(); loadMySkills(); loadHarnesses(); loadProfile().then(loadOrtak); }
-    else if (name === "glossary") { $("gloss-q").value = ""; renderGlossary(); $("gloss-q").focus(); }
     else { U.apisMsg(""); U.loadApis(); }
   }
   function togglePanel(name) {
@@ -485,6 +484,17 @@
     if (current === name) { showPanel(U.state.panelStack.pop() || null); return; }  // "Sayfaya dön"
     if (current) U.state.panelStack.push(current); else U.state.panelStack = [];
     showPanel(name);
+  }
+  // sözlük bir bölüm değil, köşede açılan küçük penceredir: üstündeki işi kapatmaz
+  function openGlossary(q = "") {
+    $("glossary").hidden = false;
+    $("glossary-btn").setAttribute("aria-pressed", "true");
+    $("gloss-q").value = q; renderGlossary(); $("gloss-q").focus();
+  }
+  function closeGlossary() {
+    $("glossary").hidden = true;
+    $("glossary-btn").setAttribute("aria-pressed", "false");
+    $("glossary-btn").focus();
   }
   function closePanels() { U.state.panelStack = []; showPanel(null); }
   const fmtBytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
@@ -557,5 +567,5 @@
     if (kisiFacts.length >= 20) { kisiMsg("En çok 20 madde yazabilirsin. Birini silip yenisini ekle.", "error"); return; }
     kisiFacts.push(v); $("kisi-yeni").value = ""; renderKisiFacts(); kisiMsg("Eklendi. Kalıcı olması için Kaydet'e bas.");
   });
-  Object.assign(U, { closePanels, installButton, kisiMsg, loadOrtak, loadProfile, loadTablet, ortakCall, ortakMsg, renderGlossary, saveProfile, setDesignSkill, skillFromLinkNode, skillProposalNode, startSkillDesign, togglePanel, uploadSkills });
+  Object.assign(U, { closeGlossary, closePanels, openGlossary, installButton, kisiMsg, loadOrtak, loadProfile, loadTablet, ortakCall, ortakMsg, renderGlossary, saveProfile, setDesignSkill, skillFromLinkNode, skillProposalNode, startSkillDesign, togglePanel, uploadSkills });
 })();

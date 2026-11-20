@@ -2,6 +2,8 @@
 
 ## Yayınlanmadı
 
+- Sözlük üst menüden çıktı: sol alt köşedeki düğmeyle küçük bir pencerede açılır, × ya da Esc ile kapanır; açıkken
+  ekrandaki iş görünmeye devam eder.
 - Windows kurulum dosyası (`Usta-Kurulum.exe`): Python'u içinde taşır, yönetici izni istemez, Başlat menüsüne ve
   masaüstüne simge koyar, Programlar listesinden kaldırılır. Henüz imzasız; Akıllı Uygulama Denetimi açık
   bilgisayarlarda imzalı sürüm gerekir.

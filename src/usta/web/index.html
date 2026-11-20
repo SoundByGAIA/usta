@@ -42,7 +42,6 @@
     <nav class="top" aria-label="Menü">
       <button id="tools-btn" class="adv" type="button" aria-pressed="false">Araçlar</button>
       <button id="apis-btn" class="adv" type="button" aria-pressed="false">API'ler</button>
-      <button id="glossary-btn" type="button" aria-pressed="false" title="Bilmediğin bir kelimeyi burada ara">Sözlük</button>
       <button id="privacy-btn" type="button" aria-pressed="false">Gizlilik</button>
       <button id="wizard-btn" class="adv" type="button" aria-pressed="false">Kurulum</button>
       <button id="tablet-btn" class="adv" type="button" aria-pressed="false">Tablet</button>
@@ -190,8 +189,8 @@
     <p id="wiz-msg" class="empty" role="status"></p>
   </section>
 
-  <section id="glossary" aria-label="Sözlük" hidden>
-    <h2>Sözlük</h2>
+  <section id="glossary" class="gloss-pop" aria-label="Sözlük" hidden>
+    <div class="gloss-head"><h2>Sözlük</h2><button id="gloss-close" type="button" aria-label="Sözlüğü kapat" title="Kapat">×</button></div>
     <p class="wiz-note">Bilmediğin bir kelime mi var? Aşağıya yaz, sana en kolay yoldan açıklayayım.</p>
     <input id="gloss-q" type="search" placeholder="Mesela: JSON, Docker, token" autocomplete="off" spellcheck="false" aria-label="Sözlükte ara">
     <div id="gloss-list"></div>
@@ -607,6 +606,7 @@
       </form>
     </section>
   </main>
+  <button id="glossary-btn" class="gloss-fab" type="button" aria-pressed="false" aria-controls="glossary" title="Bilmediğin bir kelimeyi burada ara">Sözlük</button>
 
   <div id="gloss-tip" class="gloss-tip" role="tooltip" hidden></div>
 

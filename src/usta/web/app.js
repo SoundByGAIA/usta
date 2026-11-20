@@ -245,7 +245,7 @@
     } catch (_) { sel.value = sel.dataset.cur; setConn("Model değiştirilemedi", "bad"); }
     sel.disabled = state.active;
   }
-  const PANELS = ["tools", "apis", "privacy", "wizard", "tablet", "settings", "glossary"];
+  const PANELS = ["tools", "apis", "privacy", "wizard", "tablet", "settings"];
   Object.assign(U, { PANELS });
   const openPanel = () => PANELS.find((p) => !$(p).hidden) || null;
   Object.assign(U, { openPanel });
@@ -389,7 +389,8 @@
   $("local-scan").addEventListener("click", U.scanLocal);
   $("wizard-btn").addEventListener("click", () => U.togglePanel("wizard"));
   $("tablet-btn").addEventListener("click", () => U.togglePanel("tablet"));
-  $("glossary-btn").addEventListener("click", () => U.togglePanel("glossary"));
+  $("glossary-btn").addEventListener("click", () => ($("glossary").hidden ? U.openGlossary() : U.closeGlossary()));
+  $("gloss-close").addEventListener("click", U.closeGlossary);
   // "Yeni iş": boş sohbet açılır; klasör ilk istek yazılınca ondan adlandırılıp açılır (sendPrompt)
   $("new-job").addEventListener("click", () => {
     if (state.active) return;
@@ -409,7 +410,10 @@
     $("prompt").focus();
   });
   document.querySelector(".brand").addEventListener("click", () => U.closePanels());
-  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && U.openPanel() && $("gloss-tip").hidden) U.closePanels(); });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape" || !$("gloss-tip").hidden) return;
+    if (!$("glossary").hidden) U.closeGlossary(); else if (U.openPanel()) U.closePanels();
+  });
   $("gloss-q").addEventListener("input", U.renderGlossary);
   $("settings-btn").addEventListener("click", () => U.togglePanel("settings"));
   $("tablet-renew").addEventListener("click", U.loadTablet);

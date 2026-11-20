@@ -26,8 +26,7 @@
     open.addEventListener("click", () => {
       const q = btn.dataset.gloss;
       hideGlossTip();
-      if ($("glossary").hidden) U.togglePanel("glossary");
-      $("gloss-q").value = q; U.renderGlossary();
+      U.openGlossary(q);
     });
     el.replaceChildren(U.h("strong", null, term.term), U.h("p", null, term.say), U.h("p", "wiz-note", `Benzetme: ${term.like}`), open);
     el.hidden = false;

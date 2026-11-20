@@ -67,6 +67,7 @@ bırakılmıyor:
 - Ek araçlar (MCP) ayrı bir kutuda çalışır. Panel yalnız bu bilgisayardan açılır.
 
 Ayrıntılar, bulunup kapatılan açıklar ve açık bildirme yolu: [SECURITY.md](SECURITY.md).
+Neyin yasak olduğu ve Usta'nın neyi engelleyip neyi engelleyemediği: [docs/kullanim.md](docs/kullanim.md).
 
 ## Neler var
 

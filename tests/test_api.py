@@ -198,7 +198,8 @@ def test_cancel_endpoint(tmp_path):
     w = new_ws(c)
     tid = c.post(f"/workspaces/{w}/tasks", json={"prompt": "x"}, headers=AUTH).json()["id"]
     assert c.post(f"/tasks/{tid}/cancel", headers=AUTH).status_code == 202
-    assert c.get(f"/tasks/{tid}", headers=AUTH).json()["status"] == "cancelling"
+    # görev iş parçacığı modele ulaşmadan iptal gelirse doğrudan "cancelled" olur
+    assert c.get(f"/tasks/{tid}", headers=AUTH).json()["status"] in ("cancelling", "cancelled")
     gate.set()
     events = sse(c, f"/tasks/{tid}/events")
     assert json.loads(events[-1]["data"])["status"] == "cancelled"

@@ -2,6 +2,10 @@
 
 ## Yayınlanmadı
 
+- "Yeni iş": kenar çubuğundaki düğmeyle her iş ayrı klasörde ve ayrı hafızada başlar. Klasör ilk istekten
+  adlandırılır (Usta klasörünün içinde, ör. `basit-bir-yilan-oyunu`); "İşlerim" listesi klasör adlarını gösterir ve
+  basit görünümde de görünür. Aynı klasörde biriken işler modeli yanlış dosyaya yöneltiyordu.
+- Proje hafızasında, adını andığı dosya artık olmayan not modele verilmez (dosyadaki not silinmez).
 - Gemini 3 modelleri araç çağrısında bir düşünce imzası gönderir ve sonraki istekte onu geri ister; Usta imzayı
   taşımadığı için ilk dosya yazımından sonraki her istek HTTP 400 alıyordu. Sağlayıcının araç çağrısına eklediği alan
   (`extra_content`) artık olduğu gibi geri gönderilir.

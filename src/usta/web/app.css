@@ -24,6 +24,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 var
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 header { display: flex; align-items: center; gap: 8px 20px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.new-job { width: 100%; margin-bottom: 12px; }
 .panel-back { display: block; margin-bottom: 14px; font-weight: 600; }
 .brand h1 { margin: 0; font: 700 23px/1 var(--display); letter-spacing: .01em; }
 .mark { width: 32px; height: 32px; flex: none; }

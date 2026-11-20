@@ -276,7 +276,7 @@
 
   async function sendPrompt() {
     const prompt = $("prompt").value.trim();
-    if (!prompt || !U.state.ws) return;
+    if (!prompt || !(U.state.ws || U.state.newJob)) return;
     if (U.state.active) return steer(prompt);
     const link = L.skillLink(prompt);
     if (link) {  // "şu skill iyiymiş: github.com/…": beceri kartı doğrudan açılır, modele gitmez
@@ -285,6 +285,13 @@
       addNode(U.h("div", "msg user", prompt));
       addNode(U.skillFromLinkNode(link));
       return U.updateStarters();  // başlangıç önerileri kartın üstünde kalmasın
+    }
+    if (U.state.newJob) {  // "Yeni iş": klasör bu istekten adlandırılıp açılır, görev orada temiz hafızayla başlar
+      const files = U.state.files;
+      const r = await U.api("/workspaces/yeni", { method: "POST", body: JSON.stringify({ title: prompt }) });
+      if (!r.ok) { addNode(U.h("div", "msg error", await U.errorText(r))); return; }
+      await U.selectWorkspace((await r.json()).id);
+      return startTask(prompt, $("mode").value, files);
     }
     return startTask(prompt, $("mode").value, U.state.files);
   }

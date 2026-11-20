@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   const U = (window.UstaApp = window.UstaApp || {});
-  Object.assign(U, { api, errorText, fillPrompt, h, hideResult, loadModels, updateResultPage, put, setActive, updateStarters });
+  Object.assign(U, { api, errorText, fillPrompt, h, hideResult, loadModels, updateResultPage, put, selectWorkspace, setActive, updateStarters });
   const L = window.UstaLogic;
   const $ = (id) => document.getElementById(id);
   const state = { token: "", ws: null, task: null, active: false, abort: null, approvals: {}, contextWindow: null, files: [], replay: false, openFile: null, openDirs: new Set(), selDir: "", defaultWs: null, zoom: "auto", fsMode: null, tab: "stream", resultOn: false, panelStack: [], designSkill: false };
@@ -146,7 +146,7 @@
   function fillPrompt(text) { const p = $("prompt"); p.value = text; p.focus(); p.setSelectionRange(text.length, text.length); }
   function updateStarters() {
     const box = $("starters");
-    const show = !!state.ws && !state.active && !state.replay && state.tab === "stream" && $("stream").children.length === 0 && !state.resultOn;
+    const show = (!!state.ws || !!state.newJob) && !state.active && !state.replay && state.tab === "stream" && $("stream").children.length === 0 && !state.resultOn;
     box.hidden = !show;
     if (!show || box.dataset.ready) return;
     box.dataset.ready = "1";
@@ -189,15 +189,17 @@
   }
   function setActive(active) {
     state.active = active;
-    $("send").disabled = !state.ws;
+    const ready = !!state.ws || !!state.newJob;  // "Yeni iş"te klasör ilk istekle açılır
+    $("send").disabled = !ready;
     $("send").textContent = active ? "Yönlendir" : "Gönder";
     $("send").title = active ? "Görev sürerken mesaj gönder: ajan bir sonraki adımında görür" : "";
-    $("prompt").placeholder = !state.ws ? "Önce soldan bir çalışma alanı seç" : active ? "Görev sürerken de yazabilirsin; mesajın ajana iletilir (Ctrl+Enter)" : "Ne yapmamı istersin? (Ctrl+Enter gönderir)";
-    $("prompt").disabled = !state.ws;
+    $("prompt").placeholder = !ready ? "Önce soldan bir çalışma alanı seç ya da + Yeni iş'e bas" : state.newJob && !active ? "Yeni işin ne? Ne kadar ayrıntı verirsen o kadar iyi olur." : active ? "Görev sürerken de yazabilirsin; mesajın ajana iletilir (Ctrl+Enter)" : "Ne yapmamı istersin? (Ctrl+Enter gönderir)";
+    $("prompt").disabled = !ready;
     $("model-select").disabled = active;
     $("attach").disabled = active || !state.ws;
     $("stop").hidden = !active;
     document.querySelectorAll("#ws-list button").forEach((b) => { b.disabled = active; });
+    $("new-job").disabled = active;  // görev sürerken başka işe geçilmez (çalışma alanı listesi gibi)
     $("f-up-files").disabled = $("f-up-dir").disabled = $("f-new-file").disabled = $("f-new-dir").disabled = active || !state.ws;
   }
 
@@ -254,7 +256,8 @@
     const all = await res.json();
     for (const w of all) {
       const li = h("li");
-      const b = h("button", null, w.id);
+      const b = h("button", null, w.name || w.id);
+      b.title = w.id;
       b.type = "button";
       b.setAttribute("aria-current", String(w.id === state.ws));
       b.addEventListener("click", () => selectWorkspace(w.id));
@@ -265,6 +268,7 @@
   }
   async function selectWorkspace(id) {
     if (state.active) return;
+    state.newJob = false;
     state.ws = id;
     state.task = null;
     state.replay = false;
@@ -378,6 +382,24 @@
   $("wizard-btn").addEventListener("click", () => U.togglePanel("wizard"));
   $("tablet-btn").addEventListener("click", () => U.togglePanel("tablet"));
   $("glossary-btn").addEventListener("click", () => U.togglePanel("glossary"));
+  // "Yeni iş": boş sohbet açılır; klasör ilk istek yazılınca ondan adlandırılıp açılır (sendPrompt)
+  $("new-job").addEventListener("click", () => {
+    if (state.active) return;
+    U.closePanels();
+    U.leaveReplay();
+    state.newJob = true;
+    state.task = null;
+    put("usta_task", "");
+    $("stream").replaceChildren();
+    hideResult();
+    setStatus("");
+    $("ws-title").textContent = "Yeni iş";
+    setActive(false);
+    for (const b of document.querySelectorAll("#ws-list button")) b.setAttribute("aria-current", "false");
+    U.showTab("stream");
+    updateStarters();
+    $("prompt").focus();
+  });
   document.querySelector(".brand").addEventListener("click", () => U.closePanels());
   document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && U.openPanel() && $("gloss-tip").hidden) U.closePanels(); });
   $("gloss-q").addEventListener("input", U.renderGlossary);

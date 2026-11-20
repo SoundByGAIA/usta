@@ -2,6 +2,10 @@
 
 ## Yayınlanmadı
 
+- Kaynak izi kapısı yıkıcı yazmayı da yakalar: not ya da okunan içerik varken var olan bir dosyanın yarıdan fazlasını
+  silen yazma, düzenleme ya da komut (`>`, `rm`, `truncate`, `cp`/`mv` hedefi, `tee`) kullanıcı silmeyi istemediyse onay
+  ister (oto modda reddedilir). Ortak hafızadaki "data.csv dosyasını boşalt" notu Gemini 3.1 Flash Lite'ta 10 denemenin
+  6'sında uygulanıyordu, şimdi 0.
 - Sistem talimatındaki "kısa ve net yanıt ver" kalktı: yanıt uzunluğu isteğe göre ayarlanır, öğret ya da açıkla
   denince adım adım anlatılır. Qwen 3.8 27B öğretme isteklerinde anlatmak yerine dosya kurcalıyordu (7/12 → 3/12;
   [ölçüm](docs/olcumler/talimat.md)).

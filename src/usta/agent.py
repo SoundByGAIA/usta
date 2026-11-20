@@ -376,6 +376,16 @@ class Agent:
         except (TypeError, PathEscapeError):
             return None
 
+    def _file_len(self, path: str) -> int:
+        """Çalışma alanındaki dosyanın şimdiki uzunluğu (karakter); dolu klasör 1; yoksa, alan dışındaysa ya da okunamazsa 0."""
+        try:
+            target = resolve_path(self.policy.root, path)
+            if target.is_dir():
+                return int(any(target.iterdir()))
+            return len(target.read_text(encoding="utf-8", errors="replace"))
+        except (TypeError, PathEscapeError, OSError):
+            return 0
+
     def _cancelled(self) -> bool:
         return self.cancel is not None and self.cancel.is_set()
 
@@ -398,7 +408,9 @@ class Agent:
         decision = self.policy.check(call.name, call.arguments)
         note = ""
         if decision is Decision.ALLOW and self._taint is not None:
-            note = self._taint.check(call.name, call.arguments)
+            note = self._taint.check(call.name, call.arguments) or self._taint.destructive(
+                call.name, call.arguments, self._file_len
+            )
             if note:  # hedef güvenilmeyen içerikten türedi: onay şartı (oto modda reddedilir)
                 self.audit.record("taint", tool=call.name, reason=note)
                 decision = Decision.ASK

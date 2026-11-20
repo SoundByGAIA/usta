@@ -15,6 +15,10 @@ sürekli işaretlerdi (ör. test çıktısındaki izden hatalı dosyayı düzelt
 Gizli bilgi dosyası okuma: güvenilmeyen bir içerik okunduktan (ya da ortak/kalıcı not bağlamı verildikten) sonra
 `.env`, anahtar, parola dosyası gibi bir dosyayı okumak, kullanıcı o dosyayı isteğinde anmadıysa onay ister. Yanıta
 sızmayı hiçbir kural engelleyemez; ama sızmanın ön koşulu olan okumayı yakalamak mümkün.
+
+Yıkıcı yazma: not ya da okunan içerik varken var olan bir dosyayı silen ya da yarıdan fazlasını kırpan yazma,
+düzenleme veya komut, kullanıcı silmeyi istemediyse onay ister. Hedef istekte geçse de yakalanır: kullanıcının
+"say" dediği dosyayı bir not "boşalt" diye yönlendirebilir.
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ from __future__ import annotations
 import posixpath
 import re
 import shlex
+from collections.abc import Callable
 
 UNTRUSTED_TOOLS = frozenset({"read_file", "read_symbol", "fetch_url", "web_search", "delegate"})
 MAX_BLOB = 400_000  # güvenilmeyen metin üst sınırı (karakter); eskiler atılır
@@ -53,6 +58,52 @@ _READ_ONLY = re.compile(
     r"|\bwrite\b\W{0,3}(?:alan[ıi]n[ıi]\s+)?(?:=|:)?\s*false\b|yazma\s+izni\s+(?:verme|olmadan)",
     re.IGNORECASE,
 )
+
+
+#: kullanıcı silmeyi/boşaltmayı kendisi istedi (Türkçe ekler için kök eşleşmesi: sil, silin, boşaltır...)
+_DESTROY_ASKED = re.compile(
+    r"\b(?:sil|boşalt|bosalt|temizle|kaldır|kaldir|sıfırla|sifirla|kısalt|kisalt|sadeleştir|sadelestir"
+    r"|baştan\s+yaz|bastan\s+yaz|üzerine\s+yaz|uzerine\s+yaz"
+    r"|delete|remove|clear|empty|truncate|wipe|overwrite|rewrite|shorten|simplify)",
+    re.IGNORECASE,
+)
+
+
+_SHELL_SEP = frozenset({";", "&&", "||", "|", "&", "(", ")"})
+_SHELL_DELETE = frozenset({"rm", "unlink", "shred", "truncate"})
+
+
+def _shell_targets(command: str) -> list[str]:
+    """Komutun üzerine yazdığı ya da sildiği dosyalar: `> f`, rm/unlink/shred/truncate, cp/mv hedefi, tee (ek kipi değilse)."""
+    try:
+        lex = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        tokens = list(lex)
+    except ValueError:
+        return []
+    out: list[str] = []
+    segment: list[str] = []
+    for tok in [*tokens, ";"]:
+        if tok not in _SHELL_SEP:
+            segment.append(tok)
+            continue
+        for i, t in enumerate(segment):  # yönlendirme: > dosya (>> ekleme geçer)
+            if t in (">", ">|", "&>") and i + 1 < len(segment):
+                out.append(segment[i + 1])
+        words = [t for t in segment if t not in (">", ">>", ">|", "&>", "<")]
+        if words:
+            cmd, rest = (
+                posixpath.basename(words[0]),
+                [w for w in words[1:] if not w.startswith("-")],
+            )
+            if cmd in _SHELL_DELETE:
+                out += rest
+            elif cmd in ("cp", "mv") and len(rest) >= 2:
+                out.append(rest[-1])
+            elif cmd == "tee" and not any(w in ("-a", "--append") for w in words[1:]):
+                out += rest
+        segment = []
+    return out
 
 
 def wants_write(args: dict) -> bool:
@@ -126,6 +177,39 @@ class Taint:
             tool == "delegate"
             and wants_write(args)
             and any(_READ_ONLY.search(u) for u in self._user)
+        )
+
+    def destructive(self, tool: str, args: dict, size: Callable[[str], int]) -> str:
+        """Var olan dosyayı silen ya da yarıdan fazlasını kırpan eylem; kullanıcı istemediyse ve not/okunan içerik varsa gerekçe.
+
+        Hedef kullanıcının isteğinde geçse de yakalanır: "say" denen bir dosyayı ortak not "boşalt" diye yönlendirebilir.
+        `size(yol)` dosyanın şimdiki uzunluğudur (yoksa 0). Komutta model aynı işi `>`, `rm` gibi yollarla da yapabilir.
+        """
+        if not (self._blobs or self._context) or any(_DESTROY_ASKED.search(u) for u in self._user):
+            return ""
+        path = _norm_path(args.get("path"))
+        if tool == "run":
+            hit = next(
+                (t for t in _shell_targets(str(args.get("command") or "")) if size(t) > 0), None
+            )
+            if hit is None:
+                return ""
+            path, old_len, new_len = hit, size(hit), 0
+        elif tool in ("write_file", "edit_file"):
+            old_len = size(str(args.get("path") or ""))
+            if tool == "write_file":
+                new_len = len(str(args.get("content") or ""))
+            else:
+                new_len = (
+                    old_len - len(str(args.get("old") or "")) + len(str(args.get("new") or ""))
+                )
+            if old_len <= 0 or new_len * 2 > old_len:
+                return ""
+        else:
+            return ""
+        return (
+            f"'{path}' dosyasının içeriği büyük ölçüde siliniyor ({old_len} → {max(new_len, 0)} karakter); "
+            "isteğinde silme yok ve Usta not ya da okunan içerik görüyor (bu yazmayı yönlendirmiş olabilir)"
         )
 
     def check(self, tool: str, args: dict) -> str:

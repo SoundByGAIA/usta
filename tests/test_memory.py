@@ -21,6 +21,17 @@ def test_add_and_read_notes(tmp_path):
     assert (tmp_path / ".usta" / "memory" / "NOTES.md").is_file()
 
 
+def test_notes_about_deleted_files_are_not_shown_to_the_model(tmp_path):
+    (tmp_path / "abc_uygulama.html").write_text("<html></html>", encoding="utf-8")
+    memory.add_note(tmp_path, "abc_gozlem_formu.md dosyası kronometreli form ile güncellendi.")
+    memory.add_note(tmp_path, "abc_uygulama.html öğrenci kayıtlarını tarayıcıda saklar.")
+    memory.add_note(tmp_path, "Kullanıcı sade renkleri seviyor.")
+    ctx = memory.render_context(tmp_path)
+    assert "abc_gozlem_formu.md" not in ctx
+    assert "abc_uygulama.html" in ctx and "sade renkleri" in ctx
+    assert "abc_gozlem_formu.md" in memory.read_notes(tmp_path)  # dosyadaki not silinmez
+
+
 def test_no_notes_is_empty_string(tmp_path):
     assert memory.read_notes(tmp_path) == "" and memory.recent_history(tmp_path) == []
     assert memory.render_context(tmp_path) == ""

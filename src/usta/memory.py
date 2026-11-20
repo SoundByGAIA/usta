@@ -206,8 +206,25 @@ def recent_history(root: Path, n: int = CONTEXT_TASKS) -> list[dict]:
     return out[-n:]
 
 
+# notta adı geçen çıktı dosyası (sürüm numarası ya da alan adı karışmasın diye yalnız sık uzantılar)
+_NOTE_FILE = re.compile(
+    r"(?<![\w/.-])([\w-]+(?:/[\w.-]+)*\.(?:html?|css|js|md|txt|csv|json|py|xlsx|docx|pdf))\b",
+    re.IGNORECASE,
+)
+
+
+def _live_notes(root: Path, notes: str) -> str:
+    """Adını andığı dosyaların hiçbiri artık yoksa not modele gitmez: silinmiş dosyayı aratıp oyalıyordu."""
+
+    def alive(line: str) -> bool:
+        names = _NOTE_FILE.findall(line)
+        return not names or any((Path(root) / n).exists() for n in names)
+
+    return "\n".join(ln for ln in notes.splitlines() if alive(ln))
+
+
 def render_context(root: Path) -> str:
-    notes, hist = read_notes(root), recent_history(root)
+    notes, hist = _live_notes(root, read_notes(root)), recent_history(root)
     if not notes and not hist:
         return ""
     nonce = secrets.token_hex(8)  # dosya içeriği bitiş işaretini tahmin edip taklit edemez

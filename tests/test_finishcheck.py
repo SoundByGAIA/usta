@@ -427,3 +427,21 @@ def test_excel_ready_csv_or_asked_json_is_left_alone(tmp_path):
     fc = FinishCheck("Kayıtları JSON olarak indiren bir form yap.", root=tmp_path)
     fc.observe("write_file", {"path": "abc.html"}, executed=True)
     assert fc.on_finish("Uygulama hazır.") is None
+
+
+def test_off_topic_refusal_for_new_work_gets_a_go_ahead():
+    for answer in (
+        "Yılan oyunu yapma isteği, mevcut çalışma alanına ait değildir. Yeni bir çalışma alanına ve projeye ihtiyaç var.",
+        "Çalışma alanındaki dosyalarla ilgili bir şey yok. Yılan oyunu yapmak için yeni dosyalar ve kaynaklar gereklidir.",
+        "Bu görev mevcut çalışma alanı kapsamında değildir. Yılan oyunu yapmak için yeni bir projeye başlamak gerekir.",
+        "Şu anda proje alanı öğrencilerin davranışlarını kaydetme için, bu yüzden oyunu bu alan dışında yapmanı öneririm.",
+    ):
+        fc = FinishCheck("Yılan oyunu yap.")
+        msg = fc.on_finish(answer)
+        assert msg and "yeni" in msg and "write_file" in msg, answer
+    # yapım isteği değilse ya da dosya yazıldıysa karışmaz
+    assert FinishCheck("JSON nedir?").on_finish("Yeni bir proje gerekir.") is None
+    assert FinishCheck("Site çökerten araç yap.").on_finish("Bu isteğe yardımcı olamam.") is None
+    fc = FinishCheck("Yılan oyunu yap.")
+    fc.observe("write_file", {"path": "yilan.html"}, executed=True)
+    assert fc.on_finish("Yeni bir dosya gerekti, yilan.html yazdım.") is None

@@ -14,6 +14,7 @@ Küçük modeller sık sık şunları yapar:
 Dosya adı vermeyen site/sayfa isteklerinde ("web sitesi yap") hiç dosya yazılmadan kod yanıta dökülür, "oluşturdum"
 denir ya da izin sorulursa; sayfa yazılmışsa da kullanıcının verdiği bilgiler sayfada yoksa ya da bir yazı zeminiyle
 aynı renkte olduğu için görünmüyorsa (`sitecontrast.py`) bir kez hatırlatılır.
+Yapım isteğini "yeni proje/dosya gerekir" diye geri çeviren modele yeni dosyayı kendisinin açması söylenir.
 Yazılan sayfa veriyi JSON ya da Türkçe Excel'in bozuk açtığı CSV (BOM'suz) olarak indiriyorsa düzeltmesi hatırlatılır.
 
 Okunan bir içeriğin uydurduğu dosyayı yazmaya itilmez; hatırlatmalar izin ve onay kurallarını değiştirmez. Görev başına
@@ -59,6 +60,12 @@ _ARTIFACT = re.compile(
 # site sözcüğü geçmeyen yapma istekleri ("gözlem formu yap", "bir hesap makinesi oluştur"); "yaz/göster" sohbet
 # yanıtı da isteyebildiği için sayılmaz
 _MAKE = re.compile(r"\b(?:yap|oluştur|hazırla|tasarla)\w*|\b(?:make|build|create)\b", re.IGNORECASE)
+# küçük model, klasördeki eski işle ilgisiz yeni bir isteği "yeni proje/dosya gerekir" diyerek geri çeviriyor
+_NEEDS_NEW = re.compile(
+    r"yeni (?:bir )?(?:proje|dosya|ortam|klasör|çalışma alan)\w*[^.]{0,60}?(?:gerek|ihtiyaç)"
+    r"|(?:alan|klasör|proje)\w* dışında|(?:ilgili|ait) değil|kapsamında değil",
+    re.IGNORECASE,
+)
 _CODE_IN_ANSWER = re.compile(r"```|<html|<!doctype", re.IGNORECASE)
 # yanıtta "oluşturdum" denen dosya adı (yalnız sık çıktı uzantıları: sürüm numarası ya da alan adı karışmasın)
 _NAMED_FILE = re.compile(
@@ -227,6 +234,13 @@ class FinishCheck:
                 "claimed",
                 f"`{ghost}` dosyasını oluşturduğunu söylüyorsun ama böyle bir dosya yok; bu görevde ona yazmadın. "
                 f"Söylediğin dosyayı şimdi write_file ile yaz, sonra kısaca ne yaptığını söyle.",
+            )
+        if (self.artifact or self.make) and not self.wrote_any and _NEEDS_NEW.search(text):
+            return self._nudge(
+                "new_work",
+                "Kullanıcı yeni bir iş istiyor; bunun klasördeki eski dosyalarla ilgili olması gerekmez. Yeni dosya "
+                "gerekiyorsa sen oluştur: eski dosyalara dokunmadan işi yeni bir dosyaya (tarayıcıda açılacaksa "
+                "tek bir .html) şimdi write_file ile yaz, sonra kısaca ne yaptığını söyle.",
             )
         if (
             (self.artifact or self.make)

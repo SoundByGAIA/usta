@@ -2,6 +2,8 @@
 
 ## Yayınlanmadı
 
+- Küçük model yeni bir yapım isteğini ("Yılan oyunu yap.") klasördeki eski işle ilgisi yok diye geri çevirirse bir
+  kez uyarılır: yeni dosyayı kendisi açar, eski dosyalara dokunmaz.
 - Model servisi "yoğunum" (429/503) derse Usta bir buçuk dakikaya kadar bekleyip yeniden dener (önceden yarım
   dakika); yine olmazsa ekranda "model servisi şu an yoğun, bir iki dakika sonra yeniden dene" yazar.
 - Ofis: Usta klasöre bakarken sol alttaki dolaba yürür (önceden kitaplığa gidiyordu); dolabın tabelası "DOLAP".

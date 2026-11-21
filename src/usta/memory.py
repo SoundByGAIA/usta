@@ -23,6 +23,9 @@ MAX_NOTES_BYTES = 32_768
 MAX_HISTORY = 200
 CONTEXT_NOTES_CHARS = 8_000
 CONTEXT_TASKS = 5
+LAST_ANSWER = (
+    2000  # "daha güzel yap" gibi takip isteği son yanıtın ne dediğini bilmeli; eskiler kısa kalır
+)
 
 
 def _clean(s: str) -> str:
@@ -180,7 +183,7 @@ def append_history(root: Path, *, task_id: str, prompt: str, status: str, answer
         "task": task_id,
         "status": status,
         "prompt": _clean(prompt)[:300],
-        "answer": _clean(answer or "")[:500],
+        "answer": _clean(answer or "")[:LAST_ANSWER],
     }
     lines = _read(path).splitlines() + [json.dumps(rec, ensure_ascii=False)]
     _write(path, "\n".join(lines[-MAX_HISTORY:]) + "\n")
@@ -241,8 +244,8 @@ def render_context(root: Path) -> str:
             "Son görevler:\n"
             + "\n".join(
                 f"- [{_clean(h['ts'])}] {_clean(h['status'])}: {_clean(h['prompt'])[:200]}"
-                f" → {_clean(h['answer'])[:200]}"
-                for h in hist
+                f" → {_clean(h['answer'])[: LAST_ANSWER if i == len(hist) - 1 else 200]}"
+                for i, h in enumerate(hist)
             )
         )
     parts.append(f"<<<PROJE-HAFIZASI-SONU id={nonce}>>>")

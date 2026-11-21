@@ -82,7 +82,14 @@ def test_history_roundtrip_and_truncation(tmp_path):
     )
     [h] = memory.recent_history(tmp_path)
     assert h["task"] == "t1" and h["status"] == "done"
-    assert len(h["prompt"]) <= 300 and len(h["answer"]) <= 500 and h["ts"]
+    assert len(h["prompt"]) <= 300 and len(h["answer"]) <= 2000 and h["ts"]
+
+
+def test_follow_up_sees_most_of_the_last_answer(tmp_path):
+    memory.append_history(tmp_path, task_id="t1", prompt="eski", status="done", answer="e" * 1500)
+    memory.append_history(tmp_path, task_id="t2", prompt="son", status="done", answer="s" * 1500)
+    ctx = memory.render_context(tmp_path)
+    assert "s" * 1500 in ctx and "e" * 201 not in ctx
 
 
 def test_history_keeps_only_latest_entries_and_tolerates_junk(tmp_path):

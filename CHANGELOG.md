@@ -2,6 +2,8 @@
 
 ## Yayınlanmadı
 
+- Takip isteği ("daha güzel yap" gibi) önceki işin yanıtını görür: proje hafızasında son yanıtın 2000 karakteri
+  kalır (önceden 200); daha eski işler kısa özet olarak kalır.
 - Başka bir bilgisayarda çalışan MCP sunucusuna (ör. ortak hafıza) bağlanma: `usta mcp add AD --url ADRES --token`,
   jeton `usta mcp secret AD` ile girilir. Düz http yalnız bu bilgisayarda ve ev ağında; jeton yönlendirmeyle başka
   adrese gitmez. Açık uzak sunucular gizlilik özetinde görünür.

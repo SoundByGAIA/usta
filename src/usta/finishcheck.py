@@ -14,6 +14,7 @@ Küçük modeller sık sık şunları yapar:
 Dosya adı vermeyen site/sayfa isteklerinde ("web sitesi yap") hiç dosya yazılmadan kod yanıta dökülür, "oluşturdum"
 denir ya da izin sorulursa; sayfa yazılmışsa da kullanıcının verdiği bilgiler sayfada yoksa ya da bir yazı zeminiyle
 aynı renkte olduğu için görünmüyorsa (`sitecontrast.py`) bir kez hatırlatılır.
+Yazılan sayfa veriyi JSON ya da Türkçe Excel'in bozuk açtığı CSV (BOM'suz) olarak indiriyorsa düzeltmesi hatırlatılır.
 
 Okunan bir içeriğin uydurduğu dosyayı yazmaya itilmez; hatırlatmalar izin ve onay kurallarını değiştirmez. Görev başına
 en çok iki hatırlatma. Ölçüm: docs/olcumler/soz-eylem.md. Kapatmak: `--no-finish-check` ya da `USTA_FINISH_CHECK=0`.
@@ -70,6 +71,14 @@ _READ_ONLY = re.compile(
     re.IGNORECASE,
 )
 # tarayıcıda çalışacak kod: .md/.txt içinde açılınca düz metin olarak görünür, düğmeler çalışmaz
+# kodsuz kullanıcı indirdiği JSON'u açamaz; Türkçe Excel de BOM'suz, virgüllü CSV'yi tek sütunda ve bozuk harfle açar
+_JSON_EXPORT = re.compile(r"application/json|download\s*=\s*[^;\n>]*\.json\b", re.IGNORECASE)
+_CSV_EXPORT = re.compile(r"text/csv|\.csv\b", re.IGNORECASE)
+_BOM = re.compile(r"\\u\{?feff\}?|%EF%BB%BF|\ufeff", re.IGNORECASE)
+_CSV_HOW = (
+    "ilk satır başlıklar, ayraç noktalı virgül (;), metin '\\ufeff' ile başlasın (Türkçe harfler bozulmasın), "
+    "type 'text/csv;charset=utf-8', dosya adı .csv. Önce read_file ile sayfayı oku."
+)
 _PAGE_CODE = re.compile(r"<script|<!doctype\s+html|<html", re.IGNORECASE)
 # yapmak için izin sormak ("oluşturayım mı?", "shall I") ya da seçenek sunmak ("kodlayabilirim ... hangisi?")
 _ASK_TO_BUILD = re.compile(
@@ -182,6 +191,14 @@ class FinishCheck:
             found += [h for h in sitecontrast.hidden(html, "\n".join(css)) if h not in found]
         return found
 
+    def _export_problem(self) -> str | None:
+        for t in self._page_texts():
+            if _JSON_EXPORT.search(t) and not _CSV_EXPORT.search(t):
+                return "json"
+            if _CSV_EXPORT.search(t) and not _BOM.search(t):
+                return "bom"
+        return None
+
     def _claimed_missing(self, text: str) -> str | None:
         # sayfa isteğinde hiç dosya yazılmadıysa "index.html'i aç" demek de yazdım demektir
         asked = (self.artifact or self.make) and not self.wrote_any
@@ -262,6 +279,16 @@ class FinishCheck:
                 + "\n".join(lines)
                 + "\nÖnce read_file ile sayfayı oku; edit_file'da eski metni dosyadaki gibi birebir yaz.",
             )
+        export = (
+            self._export_problem() if self.wrote_any and "json" not in self.task.lower() else None
+        )
+        if export:
+            said = (
+                "indirme düğmesi JSON veriyor; kullanıcı onu açamaz. İndirmeyi Excel'in açtığı CSV yap"
+                if export == "json"
+                else "CSV indirmesi Türkçe Excel'de tek sütunda ve bozuk harflerle açılır. Düzelt"
+            )
+            return self._nudge("csv", f"Sayfadaki {said}: {_CSV_HOW}")
         intent_only = len(text) <= MAX_INTENT_CHARS and "?" not in text and not _CLAIM.search(text)
         if text and intent_only and _INTENT.search(text):
             return self._nudge(

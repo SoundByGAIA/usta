@@ -2,6 +2,8 @@
 
 ## Yayınlanmadı
 
+- Usta'nın yaptığı uygulama kayıtları JSON ya da Türkçe Excel'in tek sütunda ve bozuk harfle açtığı CSV olarak
+  indiriyorsa model bir kez uyarılır: noktalı virgüllü, BOM'lu CSV yapar. Kullanıcı JSON isterse dokunulmaz.
 - Takip isteği ("daha güzel yap" gibi) önceki işin yanıtını görür: proje hafızasında son yanıtın 2000 karakteri
   kalır (önceden 200); daha eski işler kısa özet olarak kalır.
 - Başka bir bilgisayarda çalışan MCP sunucusuna (ör. ortak hafıza) bağlanma: `usta mcp add AD --url ADRES --token`,

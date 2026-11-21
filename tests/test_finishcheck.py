@@ -390,3 +390,40 @@ def test_workspace_hint_lists_visible_files_only_when_enabled(tmp_path):
     agent, _ = _agent(tmp_path, off)
     agent.run("Sitemin rengini maviye çevir.")
     assert off.seen[1] == "Sitemin rengini maviye çevir."
+
+
+ABC = "ABC gözlem formu uygulaması yap, kayıtları indirebileyim."
+JSON_EXPORT = (
+    "<button id=indir>İndir</button><script>const b = new Blob([JSON.stringify(kayitlar)], "
+    "{type: 'application/json'}); a.download = 'kayitlar.json';</script>"
+)
+
+
+def test_json_download_in_an_app_gets_one_csv_reminder(tmp_path):
+    (tmp_path / "abc.html").write_text(JSON_EXPORT, encoding="utf-8")
+    fc = FinishCheck(ABC, root=tmp_path)
+    fc.observe("write_file", {"path": "abc.html"}, executed=True)
+    msg = fc.on_finish("Uygulama hazır.")
+    assert msg and "CSV" in msg and "Excel" in msg and "\\ufeff" in msg
+    assert fc.on_finish("Uygulama hazır.") is None
+
+
+def test_csv_without_bom_gets_the_same_reminder(tmp_path):
+    page = "<script>const b = new Blob([csv], {type: 'text/csv'}); a.download = 'k.csv';</script>"
+    (tmp_path / "abc.html").write_text(page, encoding="utf-8")
+    fc = FinishCheck(ABC, root=tmp_path)
+    fc.observe("write_file", {"path": "abc.html"}, executed=True)
+    msg = fc.on_finish("Uygulama hazır.")
+    assert msg and "Excel" in msg and "noktalı virgül" in msg
+
+
+def test_excel_ready_csv_or_asked_json_is_left_alone(tmp_path):
+    ready = "<script>new Blob(['\\ufeff' + csv], {type: 'text/csv;charset=utf-8'}); a.download='k.csv'</script>"
+    (tmp_path / "abc.html").write_text(JSON_EXPORT + ready, encoding="utf-8")
+    fc = FinishCheck(ABC, root=tmp_path)
+    fc.observe("write_file", {"path": "abc.html"}, executed=True)
+    assert fc.on_finish("Uygulama hazır.") is None
+    (tmp_path / "abc.html").write_text(JSON_EXPORT, encoding="utf-8")
+    fc = FinishCheck("Kayıtları JSON olarak indiren bir form yap.", root=tmp_path)
+    fc.observe("write_file", {"path": "abc.html"}, executed=True)
+    assert fc.on_finish("Uygulama hazır.") is None

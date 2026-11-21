@@ -225,12 +225,13 @@
       <p class="wiz-note">Beceri, Usta'ya öğrettiğin bir işin yazılı tarifidir (ör. "haftalık raporu hep şu düzende yaz"). Usta senin için bir tane tasarlayabilir; sen okuyup onaylamadan hiçbir şey kaydedilmez. Beceriler kendiliğinden çalışmaz: yalnız sen "Kullan"a basınca ya da <code>/beceri-adı</code> yazınca devreye girer.</p>
       <ul id="my-skills" class="kisi-liste"></ul>
       <div class="row"><button id="skill-design" class="primary" type="button">Usta'ya yeni bir iş öğret</button></div>
-      <form id="skill-link-form" class="row">
+      <p class="wiz-note adv">Başkasının yazdığı bir beceriyi almak için GitHub'daki sayfasının bağlantısını yapıştır; adını yazmak yetmez. Örnek: <code>https://github.com/anthropics/skills/tree/main/skills/pdf</code></p>
+      <form id="skill-link-form" class="row adv">
         <label for="skill-link" class="sr">Beğendiğin bir becerinin GitHub bağlantısı</label>
-        <input id="skill-link" placeholder="Beğendiğin bir becerinin GitHub bağlantısı" spellcheck="false" required minlength="10">
+        <input id="skill-link" placeholder="https://github.com/…" spellcheck="false" required>
         <button type="submit">Getir</button>
       </form>
-      <div id="skill-link-out"></div>
+      <div id="skill-link-out" class="adv"></div>
     </div>
     <h3 class="set-group">Yardımcı yapay zekâ programları</h3>
     <div class="set-row" id="set-harness">

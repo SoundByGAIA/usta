@@ -30,6 +30,11 @@ class SkillLinkError(Exception):
 def raw_url(url: str) -> str:
     """GitHub bağlantısı → `SKILL.md`'nin ham adresi (klasör bağlantısında klasördeki SKILL.md)."""
     url = url.strip()
+    if "/" not in url:
+        raise SkillLinkError(
+            f'"{url}" bir ad, bağlantı değil. Usta becerileri adla bulamaz: becerinin GitHub sayfasını '
+            "aç, adres çubuğundaki bağlantıyı kopyala ve buraya yapıştır."
+        )
     if _RAW.match(url):
         return url
     m = _GH.match(url)

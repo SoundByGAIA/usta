@@ -105,3 +105,13 @@ def test_api_turns_a_link_into_a_proposal_card_without_saving(tmp_path, monkeypa
     assert c.post(
         "/skills/baglanti", json={"url": "https://github.com/o/r"}, headers=AUTH
     ).json() == {"secenekler": ["https://github.com/o/r/blob/HEAD/a/SKILL.md"]}
+
+
+def test_a_bare_name_gets_a_plain_hint(tmp_path):
+    from test_api import AUTH, Scripted, make_client
+
+    c, _ = make_client(tmp_path, Scripted())
+    for name in ("graphifyyy", "pdf"):
+        r = c.post("/skills/baglanti", json={"url": name}, headers=AUTH)
+        assert r.status_code == 422
+        assert "bağlantı değil" in r.json()["detail"]

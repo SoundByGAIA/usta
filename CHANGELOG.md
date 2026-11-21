@@ -2,6 +2,8 @@
 
 ## Yayınlanmadı
 
+- Model servisi "yoğunum" (429/503) derse Usta bir buçuk dakikaya kadar bekleyip yeniden dener (önceden yarım
+  dakika); yine olmazsa ekranda "model servisi şu an yoğun, bir iki dakika sonra yeniden dene" yazar.
 - Ofis: Usta klasöre bakarken sol alttaki dolaba yürür (önceden kitaplığa gidiyordu); dolabın tabelası "DOLAP".
 - Usta'nın yaptığı uygulama kayıtları JSON ya da Türkçe Excel'in tek sütunda ve bozuk harfle açtığı CSV olarak
   indiriyorsa model bir kez uyarılır: noktalı virgüllü, BOM'lu CSV yapar. Kullanıcı JSON isterse dokunulmaz.

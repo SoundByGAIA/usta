@@ -112,13 +112,13 @@ class OpenAICompatClient:
         self.api_key = api_key
         self.timeout = timeout
         self.usage = Usage()
-        self.retries, self.backoff, self.sleep = 4, 2.0, time.sleep
+        self.retries, self.backoff, self.sleep = 6, 2.0, time.sleep
         self.connect_retries = 2  # kapalı yerel sunucu hatası beklemeden söylensin
 
     def _post(self, body: dict, headers: dict) -> httpx.Response:
         """Geçici hatalarda (bağlantı kurulamadı, 429/502/503/504) artan aralıkla yeniden dener.
 
-        Yoğun bulut servisi (ücretsiz katmanda 429/503) birkaç saniyede düzelmez: bekleme 2, 4, 8, 16 sn.
+        Yoğun bulut servisi (ücretsiz katmanda 429/503) yarım dakikada da düzelmeyebilir: bekleme 2, 4, 8, 16, 30, 30 sn.
         Okuma zaman aşımı yeniden denenmez: istek modele ulaşmış olabilir, tekrarı pahalıdır.
         """
         for attempt in range(self.retries + 1):
@@ -139,7 +139,7 @@ class OpenAICompatClient:
                 if (wait := _retry_after(r)) is not None:
                     self.sleep(wait)
                     continue
-            self.sleep(self.backoff * 2**attempt)
+            self.sleep(min(self.backoff * 2**attempt, 30.0))
         raise AssertionError("ulaşılamaz")  # pragma: no cover
 
     def chat(
@@ -164,11 +164,13 @@ class OpenAICompatClient:
             data = r.json()
             msg = data["choices"][0]["message"]
         except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
-            detail = (
-                f"HTTP {e.response.status_code}"
-                if isinstance(e, httpx.HTTPStatusError)
-                else type(e).__name__
-            )
+            status = e.response.status_code if isinstance(e, httpx.HTTPStatusError) else None
+            if status in TRANSIENT_STATUS:
+                raise ModelError(
+                    f"model servisi şu an yoğun (HTTP {status}); bir iki dakika sonra yeniden dene",
+                    infra=True,
+                ) from e
+            detail = f"HTTP {status}" if status else type(e).__name__
             raise ModelError(f"model isteği başarısız: {detail}", infra=True) from e
         self.usage.requests += 1
         used = data.get("usage") if isinstance(data, dict) else None

@@ -1,6 +1,10 @@
 # Değişiklik günlüğü
 
-## Yayınlanmadı
+## 0.9.2: yeni iş, Windows kurulum dosyası, ağdaki MCP sunucusu, Docker
+
+Varsayılan model davranışında değişenler: sistem talimatı (yanıt uzunluğu isteğe göre), kaynak izi kapısının yıkıcı
+yazma kuralı ve bitirme denetiminin yeni hatırlatmaları (CSV, ilgisiz sanılan yeni iş). Çoğu madde gerçek bir kodsuz
+kullanıcı denemesinde ve ekip geri bildiriminde bulundu.
 
 - Docker: `docker compose up -d --build` ile Usta sunucuda servis olarak çalışır (Dockerfile, docker-compose.yml,
   [docs/docker.md](docs/docker.md)).
@@ -58,7 +62,6 @@
   aynı adla `.html` yazması; dosya diskte yokken "`index.html`'i oluşturdum" ya da "çift tıklayın" denirse onu yazması
   hatırlatılır. "Uygulama" isteği sayfa isteği sayılır; klasöre bakan komut (`ls`, `dir`) dosya yazmak sayılmaz.
   Plan kipinde yazma aracı olmadığı için denetim çalışmaz.
-- Yoğun bulut servisi (429/503) için yeniden deneme 2, 4, 8, 16 sn aralıkla; kapalı yerel sunucu yine hemen söylenir.
 - Sözlük kutusu "sana en kolay yoldan açıklayayım" der.
 - Açılan bölümlerin (Sözlük, Ayarlar, Gizlilik…) başında "← Geri dön" düğmesi var; "Usta" yazısına basmak ya da Esc ana
   sayfaya döndürür. Üst çubuktaki "Sayfaya dön" kalabalıkta görülmüyordu.

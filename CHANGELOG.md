@@ -2,6 +2,8 @@
 
 ## Yayınlanmadı
 
+- Docker: `docker compose up -d --build` ile Usta sunucuda servis olarak çalışır (Dockerfile, docker-compose.yml,
+  [docs/docker.md](docs/docker.md)).
 - Küçük model yeni bir yapım isteğini ("Yılan oyunu yap.") klasördeki eski işle ilgisi yok diye geri çevirirse bir
   kez uyarılır: yeni dosyayı kendisi açar, eski dosyalara dokunmaz.
 - Model servisi "yoğunum" (429/503) derse Usta bir buçuk dakikaya kadar bekleyip yeniden dener (önceden yarım

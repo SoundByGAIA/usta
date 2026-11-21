@@ -33,6 +33,8 @@ yolu kullanır.
 
 Usta'yı hangi klasörde açtıysan çalışma alanı orasıdır. Dosyalar oraya yazılır, dışına yazılamaz.
 
+Sunucuda servis olarak çalıştırmak için Docker: [docs/docker.md](docs/docker.md).
+
 ## Neden bir tane daha?
 
 Büyük modeller zaten iyi iş çıkarıyor. Küçük modeller ise yarı yolda bırakıyor: "dosyaya yazdım" deyip yazmıyorlar,

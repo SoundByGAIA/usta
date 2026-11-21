@@ -33,6 +33,8 @@ protocol.
 
 The folder you start Usta in is the workspace. Files are written there and nowhere else.
 
+To run it as a service on a server with Docker: [docs/docker.md](docs/docker.md) (Turkish).
+
 ## Why another one?
 
 Large models already do good work. Small models fall short in ways that hurt beginners: they say "I wrote the file" when

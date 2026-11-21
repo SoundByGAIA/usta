@@ -1,0 +1,19 @@
+# Usta'yı sunucuda çalıştırır. Ayarlar .env dosyasından gelir (örnek: .env.ornek). Kullanım: docs/docker.md
+services:
+  usta:
+    build: .
+    image: usta:yerel
+    restart: unless-stopped
+    environment:
+      USTA_ENDPOINT: ${USTA_ENDPOINT:-http://host.docker.internal:11434/v1}
+      USTA_MODEL: ${USTA_MODEL:?USTA_MODEL gerekli, .env dosyasına yaz}
+      USTA_API_KEY: ${USTA_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # aynı makinedeki Ollama / llama.cpp
+    ports:
+      - "${USTA_BIND:-127.0.0.1}:${USTA_PORT:-8765}:8765"
+    volumes:
+      - usta-veri:/data  # ayarlar, jeton, işler (workspaces), denetim kaydı
+
+volumes:
+  usta-veri:

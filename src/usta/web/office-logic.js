@@ -50,6 +50,7 @@
   // Araç adı → ofisteki bölge (sabit eşleme; komut içeriği yalnız `run` için bakılır).
   function zoneFor(tool, args) {
     const name = String(tool || "");
+    if (name === "list_dir") return "memory"; // klasörler sol alttaki dolapta durur
     if (READ_TOOLS.indexOf(name) >= 0) return "library";
     if (WRITE_TOOLS.indexOf(name) >= 0) return "workshop";
     if (name === "run") {
@@ -124,7 +125,7 @@
       workshop: "Atölye'de",
       testbench: "Test tezgâhında",
       post: "Postane'de",
-      memory: "Hafıza dolabında",
+      memory: "Dolapta",
     }[zone] || "ofiste";
   }
 

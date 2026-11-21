@@ -183,7 +183,7 @@
     { key: "workshop", label: "ATOLYE", x: 101, y: 149 },
     { key: "testbench", label: "TEST", x: 150, y: 149 },
     { key: "post", label: "POSTANE", x: 189, y: 149 },
-    { key: "memory", label: "HAFIZA", x: 235, y: 149 },
+    { key: "memory", label: "DOLAP", x: 235, y: 149 },
   ];
 
   function drawSign(ctx, zone, active) {

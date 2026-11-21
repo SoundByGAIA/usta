@@ -20,8 +20,9 @@ test("initial: sayaçlar sıfır, bekliyor", () => {
   assert.deepEqual(s.log, []);
 });
 
-test("araç → bölge: okuma araçları Kitaplık", () => {
-  for (const tool of ["read_file", "list_dir", "outline", "read_symbol", "find_symbol", "symbol_context", "related_files"]) {
+test("araç → bölge: okuma araçları Kitaplık, klasöre bakmak dolap", () => {
+  assert.equal(O.zoneFor("list_dir", { path: "." }), "memory");
+  for (const tool of ["read_file", "outline", "read_symbol", "find_symbol", "symbol_context", "related_files"]) {
     assert.equal(O.zoneFor(tool, { path: "a.py" }), "library", tool);
   }
 });

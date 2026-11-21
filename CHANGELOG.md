@@ -2,6 +2,7 @@
 
 ## Yayınlanmadı
 
+- Ofis: Usta klasöre bakarken sol alttaki dolaba yürür (önceden kitaplığa gidiyordu); dolabın tabelası "DOLAP".
 - Usta'nın yaptığı uygulama kayıtları JSON ya da Türkçe Excel'in tek sütunda ve bozuk harfle açtığı CSV olarak
   indiriyorsa model bir kez uyarılır: noktalı virgüllü, BOM'lu CSV yapar. Kullanıcı JSON isterse dokunulmaz.
 - Takip isteği ("daha güzel yap" gibi) önceki işin yanıtını görür: proje hafızasında son yanıtın 2000 karakteri

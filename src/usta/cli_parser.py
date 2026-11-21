@@ -279,6 +279,15 @@ def build() -> argparse.ArgumentParser:
         "--approve", choices=mcpconfig.APPROVE_MODES, default="ask", help="ask: her çağrıda sor"
     )
     add.add_argument("--yes", action="store_true", help="onay sormadan ekle")
+    add.add_argument(
+        "--url",
+        help="başka yerde çalışan sunucunun adresi (komut yerine; ör. http://127.0.0.1:49374/mcp)",
+    )
+    add.add_argument(
+        "--token",
+        action="store_true",
+        help="--url ile: sunucu jeton istiyor (gizli depoya sorulur)",
+    )
     add.add_argument("--replace", action="store_true", help="aynı adlıyı değiştir")
     add.add_argument(
         "--image",
@@ -314,6 +323,11 @@ def build() -> argparse.ArgumentParser:
         help="--isolation host için zorunlu: sunucu tüm yetkilerinle çalışır",
     )
     ms.add_parser("list", help="ekli sunucuları göster")
+    sec = ms.add_parser(
+        "secret", help="anahtar ya da jeton gir: değer ekrana yazılmaz ya da girişten okunur"
+    )
+    sec.add_argument("name")
+    sec.add_argument("key", nargs="?", help="anahtar adı (tek anahtar varsa gerekmez)")
     for name, text in (
         ("test", "sunucuyu başlat ve araçlarını listele"),
         ("prepare", "paketleri allowlist ağıyla önbelleğe indir ve imaj/önbelleği sabitle"),

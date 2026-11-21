@@ -17,7 +17,7 @@ from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Self
 
-from usta import mcp_runtime, mcpconfig
+from usta import mcp_http, mcp_runtime, mcpconfig
 from usta.fetch import _clean, wrap_external
 from usta.mcp import McpClient, McpError
 from usta.tools import Tool, ToolError
@@ -87,7 +87,12 @@ class McpSession:
             handle: mcp_runtime.Handle | None = None
             client: McpClient | None = None
             try:
-                if (
+                if srv.isolation == mcpconfig.REMOTE:  # başka yerde çalışan sunucu: yalnız HTTP
+                    self.on_event(
+                        "mcp_start", {"server": srv.name, "isolation": "remote", "url": srv.url}
+                    )
+                    client = mcp_http.connect(srv, env, self.timeout)
+                elif (
                     srv.isolation == "host"
                 ):  # açık uyumluluk modu: ana makinede, kullanıcı yetkisiyle
                     self.warnings.append(

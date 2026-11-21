@@ -2,6 +2,9 @@
 
 ## Yayınlanmadı
 
+- Başka bir bilgisayarda çalışan MCP sunucusuna (ör. ortak hafıza) bağlanma: `usta mcp add AD --url ADRES --token`,
+  jeton `usta mcp secret AD` ile girilir. Düz http yalnız bu bilgisayarda ve ev ağında; jeton yönlendirmeyle başka
+  adrese gitmez. Açık uzak sunucular gizlilik özetinde görünür.
 - Becerilerim: bağlantı kutusu yalnız geliştirici modunda görünür ve örnek bağlantı gösterir. Bağlantı yerine
   beceri adı yazılırsa teknik hata yerine "bu bir ad, bağlantı değil" açıklaması çıkar.
 - Kaynak izi kapısı yıkıcı yazmayı da yakalar: not ya da okunan içerik varken var olan bir dosyanın yarıdan fazlasını

@@ -121,10 +121,10 @@
   function serverCard(s) {
     const card = U.h("div", "card");
     const title = U.h("strong", null, s.name);
-    const host = s.isolation === "host";
-    card.append(title, U.h("span", "chip", s.enabled ? "açık" : "kapalı"), U.h("span", "chip", host ? "ANA MAKİNE (yalıtımsız)" : "yalıtılmış konteyner"));
-    if (!host) card.appendChild(U.h("span", "chip", s.pinned ? "sabitlendi" : "sabitlenmedi"));
-    card.append(U.h("p", "empty", `onay: ${s.approve === "allow" ? "sormadan çalışır" : "her çağrıda sorulur"}${host ? "" : ` · imaj: ${s.image || "YOK"} · ağ: ${s.allow_hosts.length ? s.allow_hosts.join(", ") : "kapalı"}`}`), U.h("code", "cmd", s.command.join(" ")));
+    const host = s.isolation === "host", remote = s.isolation === "remote";
+    card.append(title, U.h("span", "chip", s.enabled ? "açık" : "kapalı"), U.h("span", "chip", host ? "ANA MAKİNE (yalıtımsız)" : remote ? "başka bilgisayarda" : "yalıtılmış konteyner"));
+    if (!host && !remote) card.appendChild(U.h("span", "chip", s.pinned ? "sabitlendi" : "sabitlenmedi"));
+    card.append(U.h("p", "empty", `onay: ${s.approve === "allow" ? "sormadan çalışır" : "her çağrıda sorulur"}${host || remote ? "" : ` · imaj: ${s.image || "YOK"} · ağ: ${s.allow_hosts.length ? s.allow_hosts.join(", ") : "kapalı"}`}`), U.h("code", "cmd", remote ? s.url : s.command.join(" ")));
     for (const e of s.env) {
       const row = U.h("div", "key-row");
       const input = U.h("input");
@@ -152,14 +152,14 @@
     test.type = "button";
     test.addEventListener("click", async () => {
       test.disabled = true;
-      toolsMsg("Konteyner başlatılıyor...");
+      toolsMsg(remote ? "Bağlanılıyor..." : "Konteyner başlatılıyor...");
       const r = await toolsCall(`/${encodeURIComponent(s.name)}/test`, "POST");
       test.disabled = false;
       if (r) toolsMsg(`${r.tools.length} araç bulundu: ${r.tools.map((t) => t.name).join(", ")}`.slice(0, 600), "ok");
     });
     const prepare = U.h("button", null, s.pinned ? "Yeniden hazırla" : "Hazırla");
     prepare.type = "button";
-    prepare.hidden = host;
+    prepare.hidden = host || remote;
     prepare.addEventListener("click", async () => {
       prepare.disabled = true;
       toolsMsg("Hazırlanıyor: paketler yalnız paket kayıtlarına açık ağda indirilir, kurulum betikleri çalışmaz (birkaç dakika sürebilir)...");

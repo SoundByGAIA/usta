@@ -33,6 +33,7 @@ from usta import (
     compat,
     filetree,
     harnesses,
+    mcpconfig,
     memory,
     ortak,
     privacy,
@@ -129,6 +130,14 @@ def load_or_create_token(home: Path) -> str:
 MAX_BODY = 10_000_000  # varsayılan istek gövdesi sınırı (kimlik doğrulamadan ÖNCE uygulanır)
 MAX_BODY_IMPORT = 32_000_000
 MAX_BODY_AUTH = 4_096
+
+
+def _remote_mcp(home: Path) -> tuple[str, ...]:
+    try:
+        servers = mcpconfig.load(home).values()
+    except mcpconfig.McpConfigError:
+        return ()
+    return tuple(s.url for s in servers if s.enabled and s.isolation == mcpconfig.REMOTE)
 
 
 def _body_limit(path: str) -> int:
@@ -413,6 +422,7 @@ def create_app(
                 for i in usta_settings.load(home).delegates
                 if i in harnesses.CATALOG
             ),
+            remote_mcp=_remote_mcp(home),
         )
 
     @api.get("/support/report")

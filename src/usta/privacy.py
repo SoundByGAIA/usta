@@ -63,6 +63,7 @@ def report(
     lan_urls=None,
     shared: str | None = None,
     delegates: tuple[str, ...] = (),
+    remote_mcp: tuple[str, ...] = (),
 ) -> dict:
     """`sources`: [{name, endpoint}]; `current_api`: kullanılan API adı (yoksa None)."""
     rows = [
@@ -123,6 +124,15 @@ def report(
             "Web sayfası getirme (fetch_url) her seferinde onay ister"
             + (f"; yalnız şu adresler onaysız açıktır: {', '.join(hosts)}." if hosts else "."),
             "MCP sunucuları yalıtılmış konteynerde çalışır (ağ kapalı ya da yalnız izinli adresler).",
+            *(
+                [
+                    "Başka bir bilgisayardaki MCP sunucusu AÇIK: "
+                    + ", ".join(remote_mcp)
+                    + ". Usta onun bir aracını kullanınca aracın bilgileri bu adrese gider."
+                ]
+                if remote_mcp
+                else []
+            ),
             "Arayüz dışarıdan yazı tipi, betik ya da görsel yüklemez; her şey bilgisayarından gelir.",
             "Kullanım istatistiği, çökme raporu ya da izleme göndermeyiz; bu kodda yok.",
         ],

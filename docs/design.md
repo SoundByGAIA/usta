@@ -92,6 +92,7 @@ Güvenlik:
 - Araç adı `mcp__<sunucu>__<araç>` (yerel araçlarla çakışamaz); açıklama ve şema sunucudan geldiği için güvenilmez: açıklama kısaltılır ve temizlenir, aşırı büyük şema genel bir şemayla değiştirilir.
 - Sonuç her zaman nonce'lu `<<<HARİCİ-İÇERİK ...>>>` içinde VERİ olarak verilir; boyut ve süre sınırlıdır.
 - Sunucu istemciden istek yapamaz (sampling/roots/elicitation reddedilir); stderr sınırlı tutulur, yanıtsız sunucu zaman aşımıyla sonlandırılır, görev bitince süreç kapatılır.
+- Uzak sunucu (Streamable HTTP, `mcp_http.py`): `usta mcp add <ad> --url <adres> [--token]`, jeton `usta mcp secret <ad>` ile gizli depoya girilir (ekranda görünmez ya da girişten okunur). Usta süreç başlatmaz, yalnız bu adrese POST eder; düz http yalnız bu bilgisayar ve ev ağı için kabul edilir, internetteki adres için https gerekir. Jeton yalnız bu adrese gider: yönlendirme izlenmez, sistem vekil sunucusu kullanılmaz, adrese kullanıcı adı/şifre yazılamaz. Onay, araç adlandırma, sonuçların VERİ olarak sarılması ve boyut sınırları stdio ile aynıdır; açık uzak sunucular gizlilik özetinde adresleriyle listelenir. Sunucunun kendisi yalıtılmaz (başka yerde çalışır); ona giden bilgi kullanıcının o sunucuya güvenmesine bağlıdır.
 - Kalan risk: Docker erişimi kök yetkisi demektir; konteyner çekirdeği paylaşır; izinli alan adlarına HTTPS içeriği opaktır; host uyumluluk modu yalıtımsızdır. Plan modunda MCP sunucuları hiç başlatılmaz. Olumsuz testler `tests/test_mcp_runtime.py` (canary dosyalar, sahte sırlar, ağ, salt okunur kök, zaman aşımı/artık süreç temizliği, kapalı başarısızlık).
 
 ### 5.4 Terminal deneyimi, kalıcı oturumlar ve alt ajanlar (taslak, v0.3-0.4)
@@ -144,7 +145,7 @@ Bağımlılıklar: fastapi, uvicorn, httpx, pydantic; test: pytest. Yerel CI = `
 - v0.0 İskelet: yapı, lisans, README, yerel CI, sandbox prototipi (tek komut, ağsız, çıktı), testler.
 - v0.1: ajan döngüsü + dosya/komut araçları + izin motoru + denetim + CLI.
 - v0.2 (tamam): API + SSE + web arayüzü, arka plan görevleri/durdurma, diff/yama, JSON-metin yedek protokolü, allowlist proxy.
-- v0.3: `fetch_url` (tamam), PDF okuma (tamam), `web_search`, proje hafızası (taslak tamam: notlar + görev geçmişi, bkz. §5.2), MCP istemcisi (stdio tamam: `usta mcp ...`, bkz. §5.3; web arayüzünde yönetim ve uzak/HTTP taşıma sonra), eklenti araçları.
+- v0.3: `fetch_url` (tamam), PDF okuma (tamam), `web_search`, proje hafızası (taslak tamam: notlar + görev geçmişi, bkz. §5.2), MCP istemcisi (stdio ve uzak/HTTP tamam: `usta mcp ...`, bkz. §5.3), eklenti araçları.
 - v0.4: roller/kapsamlı jetonlar, ORDIS için dar istemci API'si.
 - v1.0: sertleştirme, belgeler, açık kaynak yayını.
 

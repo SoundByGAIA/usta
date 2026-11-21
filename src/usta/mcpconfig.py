@@ -22,6 +22,7 @@ ENV_NAME = re.compile(r"[A-Z_][A-Z0-9_]{0,63}")
 BLOCKED_ENV_PREFIXES = ("LD_", "DYLD_")
 APPROVE_MODES = ("ask", "allow")
 ISOLATIONS = ("container", "host")  # varsayılan container; host yalnız açık "uyumluluk modu"
+REMOTE = "remote"  # komut değil adres: sunucu başka yerde çalışır, Usta yalnız HTTP ile konuşur
 WORKSPACE_MODES = ("none", "ro", "rw")  # sunucuya çalışma alanı bağlanır mı
 MAX_ARG = 4096
 IMAGE = re.compile(
@@ -56,6 +57,7 @@ class Server:
     pids: int = 64
     pin_image: str = ""  # `usta mcp prepare` anında kaydedilen yerel imaj kimliği (sha256:...)
     pin_cache: str = ""  # hazırlanan paket önbelleğinin içerik özeti (sha256)
+    url: str = ""  # yalnız isolation == REMOTE
 
 
 def validate_runtime(
@@ -157,6 +159,19 @@ def load(home: Path) -> dict[str, Server]:
         if not isinstance(d, dict):
             raise McpConfigError(f"mcp.json: '{name}' geçersiz")
         command, env, approve = d.get("command"), d.get("env", []), d.get("approve", "ask")
+        if d.get("isolation") == REMOTE:
+            url = d.get("url")
+            validate_remote(name, url, env, approve)
+            out[name] = Server(
+                name,
+                (),
+                tuple(env),
+                approve,
+                d.get("enabled", True) is True,
+                isolation=REMOTE,
+                url=url,
+            )
+            continue
         validate(name, command, env, approve)
         # Eski kayıtlarda isolation yoktur: güvenli varsayılan konteynerdir; imajı olmayan eski
         # kayıt bu yüzden kapalı başarısız olur (sessizce ana makinede çalışmaz).
@@ -198,6 +213,14 @@ def load(home: Path) -> dict[str, Server]:
 def _save(home: Path, servers: Mapping[str, Server]) -> None:
     raw = {
         s.name: {
+            "isolation": REMOTE,
+            "url": s.url,
+            "env": list(s.env),
+            "approve": s.approve,
+            "enabled": s.enabled,
+        }
+        if s.isolation == REMOTE
+        else {
             "command": list(s.command),
             "env": list(s.env),
             "approve": s.approve,
@@ -215,6 +238,34 @@ def _save(home: Path, servers: Mapping[str, Server]) -> None:
         for s in servers.values()
     }
     _write_json(Path(home) / "mcp.json", {"servers": raw})
+
+
+def token_env(name: str) -> str:
+    """Uzak sunucunun jetonunun gizli depodaki adı (ör. ai-memory → MCP_AI_MEMORY_TOKEN)."""
+    return f"MCP_{name.upper().replace('-', '_')}_TOKEN"
+
+
+def validate_remote(name: object, url: object, env: object, approve: object) -> None:
+    from usta.mcp_http import url_problem
+
+    validate(name, [url], env, approve)
+    if not isinstance(url, str) or url_problem(url):
+        raise McpConfigError(url_problem(url) if isinstance(url, str) else "adres geçersiz")
+    if list(env) not in ([], [token_env(str(name))]):
+        raise McpConfigError("uzak sunucunun tek gizli bilgisi jetonudur")
+
+
+def add_remote(
+    home: Path, name: str, url: str, token: bool, approve: str = "ask", replace: bool = False
+) -> Server:
+    env = [token_env(name)] if token else []
+    validate_remote(name, url, env, approve)
+    servers = load(home)
+    if name in servers and not replace:
+        raise McpConfigError(f"'{name}' zaten var (üzerine yazmak için --replace)")
+    servers[name] = Server(name, (), tuple(env), approve, True, isolation=REMOTE, url=url)
+    _save(home, servers)
+    return servers[name]
 
 
 def add_server(

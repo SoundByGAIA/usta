@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from usta import mcp_runtime, mcpcatalog, mcpconfig, mcpimport, mcpregistry
+from usta import mcp_http, mcp_runtime, mcpcatalog, mcpconfig, mcpimport, mcpregistry
 from usta.api_models import (
     EnabledIn,
     FoundAddIn,
@@ -51,6 +51,7 @@ def register(api: APIRouter, home: Path) -> None:
                     "image": s.image,
                     "allow_hosts": list(s.allow_hosts),
                     "pinned": bool(s.pin_image and s.pin_cache),
+                    "url": s.url,
                 }
             )
         catalog = [
@@ -201,7 +202,13 @@ def register(api: APIRouter, home: Path) -> None:
         server = mcp_server(name)
         env = mcpconfig.resolve_env(home, server, os.environ)
         try:
-            if server.isolation == "host":  # yalnız CLI'dan açıkça eklenmiş uyumluluk modu
+            if server.isolation == mcpconfig.REMOTE:
+                client = mcp_http.connect(server, env, 90)
+                try:
+                    tools = client.list_tools()
+                finally:
+                    client.close()
+            elif server.isolation == "host":  # yalnız CLI'dan açıkça eklenmiş uyumluluk modu
                 with McpClient(list(server.command), env, timeout=90) as client:
                     tools = client.list_tools()
             else:

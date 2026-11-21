@@ -25,6 +25,7 @@ KNOWN_NETWORK_MODULES = {
     "fetch_inner.py": "sandbox içinde, allowlist proxy üzerinden sayfa getirme",
     "proxy.py": "allowlist proxy",
     "portal.py": "yerel portal sunucusu",
+    "mcp_http.py": "kullanıcının adresini verdiği MCP sunucusu (ör. ortak hafıza); yalnız bu adres, yönlendirme izlenmez",
 }
 
 
